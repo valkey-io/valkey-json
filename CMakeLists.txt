@@ -17,7 +17,7 @@ else()
 endif()
 
 # Project definition
-project(ValkeyJSONModule VERSION 1.0 LANGUAGES C CXX)
+project(ValkeyJSONModule VERSION 0.0.9 LANGUAGES C CXX)
 
 # Set the name of the JSON shared library
 set(JSON_MODULE_LIB json)

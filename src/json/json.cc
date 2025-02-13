@@ -38,7 +38,7 @@
 #include <memory>
 #include <cmath>
 
-#define MODULE_VERSION 10201
+#define MODULE_VERSION 90
 #define MODULE_NAME "json"
 #define DOCUMENT_TYPE_NAME "ReJSON-RL"
 #define DOCUMENT_TYPE_ENCODING_VERSION 3   /* Currently support 1 or 3 */
