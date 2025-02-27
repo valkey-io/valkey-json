@@ -280,8 +280,10 @@ STATIC JsonUtilCode parseAndValidateMSetCmdArgs(ValkeyModuleCtx *ctx, ValkeyModu
     *num_keys = (argc - 1) / 3;
     // Allocate memory for args_list 
     *args_list = reinterpret_cast<MSetCmdArgs *>(ValkeyModule_Alloc((*num_keys) * sizeof(MSetCmdArgs)));
+    memset(*args_list, 0, (*num_keys) * sizeof(MSetCmdArgs));
+
     if (!(*args_list)) {
-        return JSONUTIL_WRONG_NUM_ARGS; //JSONUTIL_ALLOCATION_FAILURE
+        return JSONUTIL_ALLOCATION_FAILURE;
     }
 
     JsonUtilCode rc;
@@ -296,8 +298,8 @@ STATIC JsonUtilCode parseAndValidateMSetCmdArgs(ValkeyModuleCtx *ctx, ValkeyModu
 
         // Handle key allocation failure
         if (!current_arg.key) {
-            rc = JSONUTIL_WRONG_NUM_ARGS; // JSONUTIL_KEY_OPEN_ERROR
-            goto cleanup;
+            rc = JSONUTIL_KEY_OPEN_ERROR;
+            return rc;
         }
 
         current_arg.path = ValkeyModule_StringPtrLen(argv[i * 3 + 2], nullptr);
@@ -308,7 +310,7 @@ STATIC JsonUtilCode parseAndValidateMSetCmdArgs(ValkeyModuleCtx *ctx, ValkeyModu
         if (type != VALKEYMODULE_KEYTYPE_EMPTY &&
             ValkeyModule_ModuleTypeGetType(current_arg.key) != DocumentType) {
             rc = JSONUTIL_NOT_A_DOCUMENT_KEY;
-            goto cleanup;
+            return rc;
         }
 
         // Root path validation
@@ -316,17 +318,14 @@ STATIC JsonUtilCode parseAndValidateMSetCmdArgs(ValkeyModuleCtx *ctx, ValkeyModu
         current_arg.is_root_path = jsonutil_is_root_path(current_arg.path);
         if (is_new_valkey_key && !current_arg.is_root_path) {
             rc = JSONUTIL_COMMAND_SYNTAX_ERROR;
-            goto cleanup;
+            return rc;
         }
 
         // Validate JSON structure
         if (current_arg.is_root_path) {
             JDocument *doc = nullptr;
             rc = dom_parse(ctx, current_arg.json, current_arg.json_len, &doc);
-            if (rc != JSONUTIL_SUCCESS) {
-                if (doc) dom_free_doc(doc);
-                goto cleanup;
-            }
+            ValkeyModule__Assert(rc == JSONUTIL_SUCCESS);
             if (json_is_instrument_enabled_insert() || json_is_instrument_enabled_update()) {
                 size_t len;
                 const char* key_cstr = ValkeyModule_StringPtrLen(current_arg.key_str, &len);
@@ -341,26 +340,15 @@ STATIC JsonUtilCode parseAndValidateMSetCmdArgs(ValkeyModuleCtx *ctx, ValkeyModu
             JDocument *doc = static_cast<JDocument*>(ValkeyModule_ModuleTypeGetValue(current_arg.key));
             if (!doc) {
                 rc = JSONUTIL_DOCUMENT_KEY_NOT_FOUND;
-                goto cleanup;
+                return rc;
             }
             rc = dom_verify_value(ctx, doc, current_arg.path, current_arg.json);
             if (rc != JSONUTIL_SUCCESS) {
-                goto cleanup;
+                return rc;
             }
         }
     }
     return JSONUTIL_SUCCESS;
-
-cleanup:
-    // Free allocated memory and close opened keys
-    for (size_t j = 0; j <= i; ++j) {
-        if ((*args_list)[j].key) {
-            ValkeyModule_CloseKey((*args_list)[j].key);
-        }
-    }
-    ValkeyModule_Free(*args_list);
-    *args_list = nullptr;
-    return rc;
 }
 
 STATIC JsonUtilCode parseGetCmdArgs(ValkeyModuleString **argv, const int argc, ValkeyModuleString **key,
@@ -737,6 +725,7 @@ int Command_JsonMSet(ValkeyModuleCtx *ctx, ValkeyModuleString **argv, int argc) 
     size_t num_keys;
     JsonUtilCode rc = parseAndValidateMSetCmdArgs(ctx, argv, argc, &args_list, &num_keys);
     if (rc != JSONUTIL_SUCCESS) {
+        ValkeyModule_Free(args_list);
         return ValkeyModule_ReplyWithError(ctx, jsonutil_code_to_message(rc));
     }
 
@@ -750,10 +739,7 @@ int Command_JsonMSet(ValkeyModuleCtx *ctx, ValkeyModuleString **argv, int argc) 
             // parse incoming JSON string
             JDocument *doc;
             rc = dom_parse(ctx, args_list[i].json, args_list[i].json_len, &doc);
-            if (rc != JSONUTIL_SUCCESS) {
-                dom_free_doc(doc);
-                goto cleanup;
-            }
+            ValkeyModule_Assert(rc == JSONUTIL_SUCCESS);
 
             int64_t delta = jsonstats_end_track_mem(begin_val);
             size_t doc_size = dom_get_doc_size(doc) + delta;
@@ -768,10 +754,7 @@ int Command_JsonMSet(ValkeyModuleCtx *ctx, ValkeyModuleString **argv, int argc) 
             size_t orig_doc_size = dom_get_doc_size(doc);
 
             rc = dom_set_value(ctx, doc, args_list[i].path, args_list[i].json, args_list[i].json_len, false, false);
-            if (rc != JSONUTIL_SUCCESS) {
-                goto cleanup;
-            }
-
+            ValkeyModule_Assert(rc == JSONUTIL_SUCCESS);
             int64_t delta = jsonstats_end_track_mem(begin_val);
             size_t new_doc_size = dom_get_doc_size(doc) + delta;
             dom_set_doc_size(doc, new_doc_size);
@@ -781,23 +764,12 @@ int Command_JsonMSet(ValkeyModuleCtx *ctx, ValkeyModuleString **argv, int argc) 
         }
 
         ValkeyModule_NotifyKeyspaceEvent(ctx, VALKEYMODULE_NOTIFY_GENERIC, "json.mset", args_list[i].key_str);
-        ValkeyModule_CloseKey(args_list[i].key);
     }
 
     // replicate the entire command
     ValkeyModule_ReplicateVerbatim(ctx);
     ValkeyModule_Free(args_list);
     return ValkeyModule_ReplyWithSimpleString(ctx, "OK");
-
-cleanup:
-    // Rollback & cleanup
-    for (size_t j = 0; j < num_keys; ++j) {
-        if (args_list[j].key) {
-            ValkeyModule_CloseKey(args_list[j].key);
-        }
-    }
-    ValkeyModule_Free(args_list);
-    return ValkeyModule_ReplyWithError(ctx, jsonutil_code_to_message(rc));
 }
 
 int Command_JsonGet(ValkeyModuleCtx *ctx, ValkeyModuleString **argv, int argc) {
