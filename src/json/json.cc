@@ -325,7 +325,7 @@ STATIC JsonUtilCode parseAndValidateMSetCmdArgs(ValkeyModuleCtx *ctx, ValkeyModu
         if (current_arg.is_root_path) {
             JDocument *doc = nullptr;
             rc = dom_parse(ctx, current_arg.json, current_arg.json_len, &doc);
-            ValkeyModule__Assert(rc == JSONUTIL_SUCCESS);
+            ValkeyModule_Assert(rc == JSONUTIL_SUCCESS);
             if (json_is_instrument_enabled_insert() || json_is_instrument_enabled_update()) {
                 size_t len;
                 const char* key_cstr = ValkeyModule_StringPtrLen(current_arg.key_str, &len);
