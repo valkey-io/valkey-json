@@ -169,6 +169,22 @@ void dom_serialize_value(const JValue &val, const PrintFormat *format, rapidjson
     serialize_value(val, 0, format, oss);
 }
 
+JsonUtilCode dom_verify_value(ValkeyModuleCtx *ctx, JDocument *doc, const char *json_path, const char *new_val_json,
+                           size_t new_val_size) {
+    Selector selector;
+    JsonUtilCode rc = selector.prepareSetValues(doc->GetJValue(), json_path);
+    if (rc != JSONUTIL_SUCCESS) return rc;
+    
+    JParser new_val;
+    if (new_val.Parse(new_val_json, new_val_size).HasParseError()) {
+        return new_val.GetParseErrorCode();
+    }
+
+    CHECK_DOCUMENT_PATH_LIMIT(ctx, selector, new_val);
+    CHECK_DOCUMENT_SIZE_LIMIT(ctx, doc->size, new_val.GetJValueSize());
+    return JSONUTIL_SUCCESS;
+}
+
 JsonUtilCode dom_set_value(ValkeyModuleCtx *ctx, JDocument *doc, const char *json_path, const char *new_val_json,
                            size_t new_val_size, const bool is_create_only, const bool is_update_only) {
     if (is_create_only && is_update_only) return JSONUTIL_NX_XX_SHOULD_BE_MUTUALLY_EXCLUSIVE;
