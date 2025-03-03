@@ -325,7 +325,10 @@ STATIC JsonUtilCode parseAndValidateMSetCmdArgs(ValkeyModuleCtx *ctx, ValkeyModu
         if (current_arg.is_root_path) {
             JDocument *doc = nullptr;
             rc = dom_parse(ctx, current_arg.json, current_arg.json_len, &doc);
-            ValkeyModule_Assert(rc == JSONUTIL_SUCCESS);
+            if (rc != JSONUTIL_SUCCESS) {
+                if (doc) dom_free_doc(doc);
+                return rc;
+            }
             if (json_is_instrument_enabled_insert() || json_is_instrument_enabled_update()) {
                 size_t len;
                 const char* key_cstr = ValkeyModule_StringPtrLen(current_arg.key_str, &len);
@@ -2362,10 +2365,6 @@ void Module_Info(ValkeyModuleInfoCtx *ctx, int for_crash_report) {
     } \
 }
 
-
-    //
-    // User visible metrics
-    //
     beginSection("core_metrics")
         addULongLong("total_memory_bytes", jsonstats_get_used_mem() + keyTable->getStats().bytes);
         addULongLong("num_documents", jsonstats_get_num_doc_keys());
