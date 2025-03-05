@@ -98,7 +98,6 @@ namespace jsn
 template <typename T> class stl_allocator {
     public:
         using value_type = T;
-
         stl_allocator() = default;
         stl_allocator(const stl_allocator<T>&) noexcept = default;
         stl_allocator(stl_allocator<T>&&) noexcept = default;
