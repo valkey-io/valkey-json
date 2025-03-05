@@ -1416,13 +1416,8 @@ STATIC JValue readLegacyDoubleAsJValue(ValkeyModuleIO *rdb) {
     double d = ValkeyModule_LoadDouble(rdb);
     char str[BUF_SIZE_DOUBLE_JSON];
     size_t str_len = jsonutil_double_to_string(d, str, sizeof(str));
-    if (str) {
         JValue v(str, str_len, allocator, false, /* isdouble */ true);
         return v;
-    } else {
-        ValkeyModule_LogIOError(rdb, "error", "Unable to read legacy double");
-        return JValue();
-    }
 }
 
 /*

@@ -95,17 +95,40 @@ namespace jsn
 //
 // Our custom allocator
 //
-template <typename T> class stl_allocator : public std::allocator<T> {
- public:
-    typedef T value_type;
-    stl_allocator() = default;
-    stl_allocator(std::allocator<T>&) {}
-    stl_allocator(std::allocator<T>&&) {}
-    template <class U> constexpr stl_allocator(const stl_allocator<U>&) noexcept {}
+template <typename T> class stl_allocator {
+    public:
+        using value_type = T;
 
-    T *allocate(std::size_t n) { return static_cast<T *>(memory_alloc(n*sizeof(T))); }
-    void deallocate(T *p, std::size_t n) { (void)n; memory_free(p); }
+        stl_allocator() = default;
+        stl_allocator(const stl_allocator<T>&) noexcept = default;
+        stl_allocator(stl_allocator<T>&&) noexcept = default;
+        template <class U>
+        constexpr stl_allocator(const stl_allocator<U>&) noexcept {}
+
+        T* allocate(std::size_t n) {
+            return static_cast<T*>(memory_alloc(n * sizeof(T)));
+        }
+
+        void deallocate(T* p, std::size_t n) {
+            (void)n; 
+            memory_free(p);
+        }
+    
+    private:
+        static void* memory_alloc(std::size_t size) {
+            return std::malloc(size);
+        }
+
+        static void memory_free(void* p) {
+            std::free(p);
+        }
 };
+
+template <typename T, typename U>
+bool operator==(const stl_allocator<T>&, const stl_allocator<U>&) { return true; }
+
+template <typename T, typename U>
+bool operator!=(const stl_allocator<T>&, const stl_allocator<U>&) { return false; }
 
 template<class Elm> using vector = std::vector<Elm, stl_allocator<Elm>>;
 
