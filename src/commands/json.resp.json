@@ -1,0 +1,26 @@
+{
+    "JSON.RESP": {
+        "summary": "Return the JSON value at the given path in Valkey Serialization Protocol (RESP).\nIf the value is container, the response is RESP array or nested array.\n\n* JSON null is mapped to the RESP Null Bulk String.\n* JSON boolean values are mapped to the respective RESP Simple Strings.\n* Integer numbers are mapped to RESP Integers.\n* Floating point numbers are mapped to RESP Bulk Strings.\n* JSON Strings are mapped to RESP Bulk Strings.\n* JSON Arrays are represented as RESP Arrays, where the first element is the simple string [,\n  followed by the array's elements.\n* JSON Objects are represented as RESP Arrays, where the first element is the simple string {,\n  followed by key-value pairs, each of which is a RESP bulk string.",
+        "complexity": "O(N) where N is the number of json objects matched by the path.",
+        "group": "json",
+        "module_since": "1.0.0",
+        "arity": 1,
+        "acl_categories": [
+            "READ",
+            "FAST",
+            "JSON"
+        ],
+        "arguments": [
+            {
+                "name": "key",
+                "type": "key",
+                "key_spec_index": 0
+            },
+            {
+                "name": "path",
+                "type": "string",
+                "optional": true
+            }
+        ]
+    }
+}

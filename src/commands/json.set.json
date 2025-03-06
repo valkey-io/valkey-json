@@ -1,0 +1,34 @@
+{
+    "JSON.SET": {
+        "summary": "Set JSON values at the path.\n\n* If the path calls for an object member:\n    * If the parent element does not exist, the command will return NONEXISTENT error.\n    * If the parent element exists but is not an object, the command will return ERROR.\n    * If the parent element exists and is an object:\n        * If the member does not exist, a new member will be appended to the parent object if and only if the parent\n          object is the last child in the path. Otherwise, the command will return NONEXISTENT error.\n        * If the member exists, its value will be replaced by the JSON value.\n* If the path calls for an array index:\n    * If the parent element does not exist, the command will return a NONEXISTENT error.\n    * If the parent element exists but is not an array, the command will return ERROR.\n    * If the parent element exists but the index is out of bounds, the command will return OUTOFBOUNDARIES error.\n    * If the parent element exists and the index is valid, the element will be replaced by the new JSON value.\n* If the path calls for an object or array, the value (object or array) will be replaced by the new JSON value.",
+        "complexity": "O(1)",
+        "group": "json",
+        "module_since": "1.0.0",
+        "arity": 3,
+        "acl_categories": [
+            "WRITE",
+            "SLOW",
+            "JSON"
+        ],
+        "arguments": [
+            {
+                "name": "key",
+                "type": "key",
+                "key_spec_index": 0
+            },
+            {
+                "name": "path",
+                "type": "string"
+            },
+            {
+                "name": "json",
+                "type": "string"
+            },
+            {
+                "name": "options",
+                "type": "string",
+                "optional": true
+            }
+        ]
+    }
+}

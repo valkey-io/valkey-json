@@ -1,0 +1,31 @@
+{
+    "JSON.ARRPOP": {
+        "summary": "Remove and return element at the index from the array. Popping an empty array returns null.",
+        "complexity": "O(1)",
+        "group": "json",
+        "module_since": "1.0.0",
+        "arity": 1,
+        "acl_categories": [
+            "READ",
+            "SLOW",
+            "JSON"
+        ],
+        "arguments": [
+            {
+                "name": "key",
+                "type": "key",
+                "key_spec_index": 0
+            },
+            {
+                "name": "path",
+                "type": "string",
+                "optional": true
+            },
+            {
+                "name": "index",
+                "type": "integer",
+                "optional": true
+            }
+        ]
+    }
+}

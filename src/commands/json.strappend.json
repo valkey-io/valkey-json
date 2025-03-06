@@ -1,0 +1,30 @@
+{
+    "JSON.STRAPPEND": {
+        "summary": "Append a string to the JSON strings at the path.",
+        "complexity": "O(N) where N is the number of json objects matched by the path.",
+        "group": "json",
+        "module_since": "1.0.0",
+        "arity": 2,
+        "acl_categories": [
+            "WRITE",
+            "FAST",
+            "JSON"
+        ],
+        "arguments": [
+            {
+                "name": "key",
+                "type": "key",
+                "key_spec_index": 0
+            },
+            {
+                "name": "path",
+                "type": "string",
+                "optional": true
+            },
+            {
+                "name": "json_string",
+                "type": "string"
+            }
+        ]
+    }
+}
