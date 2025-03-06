@@ -1,0 +1,29 @@
+{
+    "JSON.NUMINCRBY": {
+        "summary": "Increment the number values at the path by a given number.",
+        "complexity": "O(N) where N is the number of json values matched by the path.",
+        "group": "json",
+        "module_since": "1.0.0",
+        "arity": 3,
+        "acl_categories": [
+            "WRITE",
+            "FAST",
+            "JSON"
+        ],
+        "arguments": [
+            {
+                "name": "key",
+                "type": "key",
+                "key_spec_index": 0
+            },
+            {
+                "name": "path",
+                "type": "string"
+            },
+            {
+                "name": "number",
+                "type": "integer"
+            }
+        ]
+    }
+}

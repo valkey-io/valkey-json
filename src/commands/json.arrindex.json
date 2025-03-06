@@ -1,0 +1,39 @@
+{
+    "JSON.ARRINDEX": {
+        "summary": "Search for the first occurrence of a scalar JSON value in the arrays at the path.\n\n* Out of range errors are treated by rounding the index to the array's start and end.\n* If start > end, return -1 (not found).",
+        "complexity": "O(N)",
+        "group": "json",
+        "module_since": "1.0.0",
+        "arity": 3,
+        "acl_categories": [
+            "READ",
+            "FAST",
+            "JSON"
+        ],
+        "arguments": [
+            {
+                "name": "key",
+                "type": "key",
+                "key_spec_index": 0
+            },
+            {
+                "name": "path",
+                "type": "string"
+            },
+            {
+                "name": "json-scalar",
+                "type": "string"
+            },
+            {
+                "name": "start",
+                "type": "integer",
+                "optional": true
+            },
+            {
+                "name": "end",
+                "type": "integer",
+                "optional": true
+            }
+        ]
+    }
+}

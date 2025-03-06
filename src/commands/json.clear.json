@@ -1,0 +1,26 @@
+{
+    "JSON.CLEAR": {
+        "summary": "Clear the arrays or an objects at the path.",
+        "complexity": "O(1)",
+        "group": "json",
+        "module_since": "1.0.0",
+        "arity": 1,
+        "acl_categories": [
+            "WRITE",
+            "FAST",
+            "JSON"
+        ],
+        "arguments": [
+            {
+                "name": "key",
+                "type": "key",
+                "key_spec_index": 0
+            },
+            {
+                "name": "path",
+                "type": "string",
+                "optional": true
+            }
+        ]
+    }
+}

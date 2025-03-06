@@ -1,0 +1,26 @@
+{
+    "JSON.ARRLEN": {
+        "summary": "Get length of the array values at the path.",
+        "complexity": "O(N) where N is the number of arrays in the JSON document ",
+        "group": "json",
+        "module_since": "1.0.0",
+        "arity": 1,
+        "acl_categories": [
+            "READ",
+            "FAST",
+            "JSON"
+        ],
+        "arguments": [
+            {
+                "name": "key",
+                "type": "key",
+                "key_spec_index": 0
+            },
+            {
+                "name": "path",
+                "type": "string",
+                "optional": true
+            }
+        ]
+    }
+}

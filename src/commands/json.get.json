@@ -1,0 +1,37 @@
+{
+    "JSON.GET": {
+        "summary": "Get the serialized JSON at one or multiple paths.",
+        "complexity": "O(N) where N is the number of paths",
+        "group": "json",
+        "module_since": "1.0.0",
+        "arity": 1,
+        "acl_categories": [
+            "READ",
+            "FAST",
+            "JSON"
+        ],
+        "arguments": [
+            {
+                "name": "key",
+                "type": "key",
+                "key_spec_index": 0
+            },
+            {
+                "name": "INDENT/NEWLINE/SPACE",
+                "type": "string",
+                "optional": true
+            },
+            {
+                "name": "NOESCAPE",
+                "type": "string",
+                "optional": true
+            },
+            {
+                "name": "path",
+                "type": "string",
+                "multiple": true,
+                "optional": true
+            }
+        ]
+    }
+}

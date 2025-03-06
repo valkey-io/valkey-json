@@ -1,0 +1,33 @@
+{
+    "JSON.ARRTRIM": {
+        "summary": "Trim arrays at the path so that it becomes subarray [start, end], both inclusive.\n\n* If the array is empty, do nothing, return 0.\n* If start < 0, treat it as 0.\n* If end >= size (size of the array), treat it as size-1.\n* If start >= size or start > end, empty the array and return 0.",
+        "complexity": "O(1)",
+        "group": "json",
+        "module_since": "1.0.0",
+        "arity": 4,
+        "acl_categories": [
+            "WRITE",
+            "FAST",
+            "JSON"
+        ],
+        "arguments": [
+            {
+                "name": "key",
+                "type": "key",
+                "key_spec_index": 0
+            },
+            {
+                "name": "path",
+                "type": "string"
+            },
+            {
+                "name": "start",
+                "type": "integer"
+            },
+            {
+                "name": "end",
+                "type": "integer"
+            }
+        ]
+    }
+}
