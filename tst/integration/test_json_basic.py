@@ -4269,3 +4269,48 @@ class TestJsonBasic(JsonTestCase):
                 break
             cursor = result[0]
         logging.info(f"Verified {count} json keys")
+
+    def test_jsonpath_member_name_containing_slash(self):
+        """
+        Test case for https://github.com/valkey-io/valkey-json/issues/31
+        """
+        client = self.server.get_new_client()
+        client.execute_command("json.set", "k1", ".", "{\"a\": 4.5, \"b/c\": 85}")
+
+        # Test 1: json.get with member name containing slash
+        exp = '[85]'
+        assert exp.encode() == client.execute_command("json.get", "k1", "$.b/c")
+
+        # Test 2: json.set with member name containing slash
+        client.execute_command("json.set", "k1", "$.b/c", "0")
+        exp = "{\"a\":4.5,\"b/c\":0}"
+        assert exp.encode() == client.execute_command("json.get", "k1")
+
+        # Test 3: Slash is already escaped
+        client.execute_command("json.set", "k1", "$.b~1c", "2")
+        exp = "{\"a\":4.5,\"b/c\":2}"
+        assert exp.encode() == client.execute_command("json.get", "k1")
+
+        # Test 4: json.numincrby with member name containing slash
+        client.execute_command("json.numincrby", "k1", "$.b/c", "1")
+        exp = "{\"a\":4.5,\"b/c\":3}"
+        assert exp.encode() == client.execute_command("json.get", "k1")
+
+        # Test 5: json.nummultby with member name containing slash
+        client.execute_command("json.nummultby", "k1", "$.b/c", "2")
+        exp = "{\"a\":4.5,\"b/c\":6}"
+        assert exp.encode() == client.execute_command("json.get", "k1")
+
+        # Test 6: json.get with member name containing slash
+        exp = '[6]'
+        assert exp.encode() == client.execute_command("json.get", "k1", "$.b/c")
+
+        # Test 7: json.set with recursive search
+        client.execute_command("json.set", "k1", "$..b/c", "7")
+        exp = "{\"a\":4.5,\"b/c\":7}"
+        assert exp.encode() == client.execute_command("json.get", "k1")
+
+        # Test 8: json.numincrby with recursive search
+        client.execute_command("json.numincrby", "k1", "$..b/c", "2")
+        exp = "{\"a\":4.5,\"b/c\":9}"
+        assert exp.encode() == client.execute_command("json.get", "k1")
