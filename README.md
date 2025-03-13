@@ -22,6 +22,11 @@ Custom compiler flags can be passed to the build script via environment variable
 ```text
 CFLAGS="-O0 -Wno-unused-function" ./build.sh
 ```
+#### To build the module with ASAN and run tests
+```text
+export ASAN_BUILD=true
+./build.sh
+```
 
 #### To build just the module
 ```text

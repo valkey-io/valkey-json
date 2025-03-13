@@ -21,6 +21,13 @@ file(GLOB_RECURSE UNIT_TEST_SRC "*.cc")
 # This defines each unit test and associates it with its sources
 add_executable(unitTests ${UNIT_TEST_SRC})
 
+if(ENABLE_ASAN)
+        message(STATUS "Enabling Address Sanitizer for unit tests")
+        set(GTEST_PROPERTIES "${CMAKE_CXX_FLAGS}")
+else()
+        set(GTEST_PROPERTIES "")
+endif()
+
 # Build with C11 & C++17
 set_target_properties(
         unitTests
@@ -30,6 +37,7 @@ set_target_properties(
         CXX_STANDARD 17
         CXX_STANDARD_REQUIRED ON
         POSITION_INDEPENDENT_CODE ON
+        COMPILE_FLAGS "${GTEST_PROPERTIES} -Wall -Wextra"
 )
 
 target_include_directories(unitTests
