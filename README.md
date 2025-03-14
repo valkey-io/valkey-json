@@ -25,7 +25,7 @@ CFLAGS="-O0 -Wno-unused-function" ./build.sh
 
 #### To build just the module
 ```text
-mdkir build
+mkdir build
 cd build
 cmake ..
 make
@@ -33,7 +33,7 @@ make
 
 The default valkey version is "unstable". To override it, do:
 ```text
-mdkir build
+mkdir build
 cd build
 cmake .. -DVALKEY_VERSION=8.0
 make
@@ -41,7 +41,7 @@ make
 
 Custom compiler flags can be passed to cmake via variable CFLAGS. For example:
 ```text
-mdkir build
+mkdir build
 cd build
 cmake .. -DCFLAGS="-O0 -Wno-unused-function"
 make
