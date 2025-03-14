@@ -20,7 +20,7 @@ class SimpleTestCase(ValkeyTestCase):
 
     def teardown(self):
         if self.is_connected():
-            self.client.execute_command("FLUSHALL")
+            self.client.execute_command("FLUSHALL SYNC")
             logging.info("executed FLUSHALL at teardown")
         super(SimpleTestCase, self).teardown()
 
