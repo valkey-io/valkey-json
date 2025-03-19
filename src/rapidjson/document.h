@@ -2512,7 +2512,7 @@ private:
         DoReserveMembersVec(count, allocator);
         const typename GenericValue<Encoding,SourceAllocator>::Member* rm = rhs.GetMembersPointerVec();
         for (SizeType i = 0; i < count; i++) {
-            KeyTable_Handle name = std::move(keyTable->clone(rm[i].name));
+            KeyTable_Handle name = keyTable->clone(rm[i].name);
             GenericValue value(rm[i].value, allocator, copyConstStrings);
             DoAddMember(name, value, allocator);
         }

@@ -23,10 +23,17 @@ if [ ! -d "$BUILD_DIR" ]; then
     mkdir $BUILD_DIR
 fi
 cd $BUILD_DIR
-if [ -z "${CFLAGS}" ]; then
-  cmake .. -DVALKEY_VERSION=${SERVER_VERSION}
+
+if [ ! -z "${ASAN_BUILD}" ]; then
+    CMAKE_FLAGS="-DCMAKE_BUILD_TYPE=Debug -DENABLE_ASAN=ON"
 else
-  cmake .. -DVALKEY_VERSION=${SERVER_VERSION} -DCFLAGS=${CFLAGS}
+    CMAKE_FLAGS=""
+fi
+
+if [ -z "${CFLAGS}" ]; then
+  cmake .. -DVALKEY_VERSION=${SERVER_VERSION} ${CMAKE_FLAGS}
+else
+  cmake .. -DVALKEY_VERSION=${SERVER_VERSION} -DCFLAGS=${CFLAGS} ${CMAKE_FLAGS}
 fi
 make
 

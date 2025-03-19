@@ -19,6 +19,15 @@ endif()
 # Project definition
 project(ValkeyJSONModule VERSION 0.0.9 LANGUAGES C CXX)
 
+# ASAN build option
+option(ENABLE_ASAN "Enable Address Sanitizer" OFF)
+
+# ASan flags configuration
+if(ENABLE_ASAN)
+    message("Building with Address Sanitizer enabled")
+    set(ASAN_FLAGS "-fsanitize=address")
+endif()
+
 # Set the name of the JSON shared library
 set(JSON_MODULE_LIB json)
 
@@ -37,16 +46,31 @@ if(NOT CFLAGS)
     # Include debug symbols and set optimize level
     set(CFLAGS "-g -O3 -fno-omit-frame-pointer -Wall -Werror -Wextra")
 endif()
+
+# Add ASan flags if enabled
+if(ENABLE_ASAN)
+    set(CFLAGS "${CFLAGS} ${ASAN_FLAGS}")
+    set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} ${ASAN_FLAGS}")
+    set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} ${ASAN_FLAGS}")
+endif()
+
 message("CFLAGS: ${CFLAGS}")
 
-# Download and build Valkey
+if(ENABLE_ASAN)
+    message("Building Valkey engine with Address Sanitizer enabled")
+    set(BUILD_CMD make distclean && make -j SANITIZER=address)
+else()
+    set(BUILD_CMD make distclean && make -j)
+endif()
+
+# Download and build Valkey with ASAN if enabled
 ExternalProject_Add(
     valkey
-    GIT_REPOSITORY https://github.com/valkey-io/valkey.git  # Replace with actual URL
+    GIT_REPOSITORY https://github.com/valkey-io/valkey.git
     GIT_TAG ${VALKEY_VERSION}
     PREFIX ${VALKEY_DOWNLOAD_DIR}
     CONFIGURE_COMMAND ""
-    BUILD_COMMAND make distclean && make -j
+    BUILD_COMMAND ${BUILD_CMD}
     INSTALL_COMMAND ""
     BUILD_IN_SOURCE 1
 )

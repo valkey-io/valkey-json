@@ -1001,7 +1001,9 @@ JsonUtilCode Selector::recursiveSearch(JValue &v, const char *p) {
     if (v.IsObject()) {
         for (auto &m : v.GetObject()) {
             jsn::string path_copy = nodePath;
-            nodePath.append("/").append(m.name.GetStringView());
+            std::ostringstream oss;
+            escape_member_name_for_json_pointer(m.name.GetStringView(), oss);
+            nodePath.append("/").append(oss.str());
             incrPathDepth();
             TRACE("DEBUG", "-> recursiveSearch descend to object member " << m.name.GetStringView()
                 << ", nodePath: " << nodePath << ", currPathDepth: " << currPathDepth << ", maxPathDepth: "
@@ -1323,7 +1325,9 @@ JsonUtilCode Selector::evalObjectMember(const StringViewHelper &member_name, JVa
     State state;
     snapshotState(state);
 
-    nodePath.append("/").append(member_name.getView());
+    std::ostringstream oss;
+    escape_member_name_for_json_pointer(member_name.getView(), oss);
+    nodePath.append("/").append(oss.str());
     TRACE("DEBUG", "evalObjectMember object member " << member_name.getView()
     << ", curr token: " << lex.currToken().type << ", remaining path: " << lex.p << ", nodePath: " << nodePath)
     JsonUtilCode rc =  evalMember(val, lex.p);
@@ -1400,7 +1404,9 @@ JsonUtilCode Selector::traverseToObjectMember(const StringViewHelper &member_nam
         return JSONUTIL_SUCCESS;
     }
 
-    nodePath.append("/").append(member_name.getView());
+    std::ostringstream oss;
+    escape_member_name_for_json_pointer(member_name.getView(), oss);
+    nodePath.append("/").append(oss.str());
     TRACE("DEBUG", "traverseToObjectMember traversed to object member "
     << member_name.getView() << ". remaining path: " << lex.p
     << ", nodePath: " << nodePath)
@@ -2415,4 +2421,14 @@ void Selector::dedupe() {
     resultSet.clear();
     resultSet.insert(resultSet.end(), rs.begin(), rs.end());
     TRACE("DEBUG", "dedupe resultSet size after dedupe: " << resultSet.size());
+}
+
+void Selector::escape_member_name_for_json_pointer(const std::string_view &member_name, std::ostringstream &oss) {
+    for (char c : member_name) {
+        if (c == '/') {
+            oss << "~1";
+        } else {
+            oss << c;
+        }
+    }
 }
