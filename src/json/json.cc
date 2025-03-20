@@ -38,7 +38,14 @@
 #include <memory>
 #include <cmath>
 
-#define MODULE_VERSION 90
+/* In unstable branch the module version is always "000000". */
+#define MODULE_VERSION 000000
+#define MODULE_NAME "json"
+/* The release stage is used in order to provide release status information.
+ * In unstable branch the status is always "dev".
+ * During release process the status will be set to rc1,rc2...rcN.
+ * When the version is released the status will be "ga". */
+#define MODULE_RELEASE_STAGE "dev"
 #define MODULE_NAME "json"
 #define DOCUMENT_TYPE_NAME "ReJSON-RL"
 #define DOCUMENT_TYPE_ENCODING_VERSION 3   /* Currently support 1 or 3 */
