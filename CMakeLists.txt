@@ -17,7 +17,7 @@ else()
 endif()
 
 # Project definition
-project(ValkeyJSONModule VERSION 0 LANGUAGES C CXX) # Version is 0 for unstable branch
+project(ValkeyJSONModule VERSION 99.99.99 LANGUAGES C CXX) # Version is 99.99.99 for unstable branch
 
 # ASAN build option
 option(ENABLE_ASAN "Enable Address Sanitizer" OFF)
