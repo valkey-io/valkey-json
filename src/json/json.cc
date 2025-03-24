@@ -38,8 +38,8 @@
 #include <memory>
 #include <cmath>
 
-/* In unstable branch the module version is always "000000". */
-#define MODULE_VERSION 000000
+/* In unstable branch the module version is always "999999". */
+#define MODULE_VERSION 999999
 #define MODULE_NAME "json"
 /* The release stage is used in order to provide release status information.
  * In unstable branch the status is always "dev".
