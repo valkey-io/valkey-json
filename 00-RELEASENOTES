@@ -1,13 +1,55 @@
-Hello! This file is just a placeholder, since this is the "unstable" branch
-of Valkey-json, the place where all the development happens.
+Valkey JSON 1.0.0 release notes
+========================
 
-There is no release notes for this branch, it gets forked into another branch
-every time there is a partial feature freeze in order to eventually create
-a new stable release.
+================================================================================
+Valkey JSON 1.0.0 RC1 - Released Mon 24 Mar 2025
+================================================================================
+This is the first release candidate of valkey-json 1.0 that provides native JSON (JavaScript Object Notation) support for Valkey. The implementation complies with RFC7159 and ECMA-404 JSON data interchange standards. Users can natively store, query, and modify JSON data structures using the JSONPath query language. The query expressions support advanced capabilities including wildcard selections, filter expressions, array slices, union operations, and recursive searches.
 
-Usually "unstable" is stable enough for you to use it in development environments
-however you should never use it in production environments.
+Valkey-json leverages RapidJSON, a high-performance JSON parser and generator for C++, chosen for its small footprint and exceptional performance and memory efficiency. As a header-only library with no external dependencies, RapidJSON provides robust Unicode support while maintaining a compact memory profile of just 16 bytes per JSON value on most 32/64-bit machines.
 
-More information is available at https://valkey.io
+API and Interface changes
+=========================
+* Add the json module data type ("json") which can handle RDB load, RDB save, free, copy, debug, defragmentation, AOF rewrite, and memory usage
+* Add the following json module commands: 
+    * JSON.ARRAPPEND
+    * JSON.ARRINDEX
+    * JSON.ARRINSERT
+    * JSON.ARRLEN
+    * JSON.ARRPOP
+    * JSON.ARRTRIM
+    * JSON.CLEAR
+    * JSON.DEBUG
+    * JSON.DEL
+    * JSON.FORGET
+    * JSON.GET
+    * JSON.MGET
+    * JSON.MSET
+    * JSON.NUMINCRBY
+    * JSON.NUMMULTBY
+    * JSON.OBJLEN
+    * JSON.OBJKEYS
+    * JSON.RESP
+    * JSON.SET
+    * JSON.STRAPPEND
+    * JSON.STRLEN
+    * JSON.TOGGLE
+    * JSON.TYPE
+* Add deterministic replication support where a json object creation on a primary is replicated with the same properties to create the same json object on a replica
+* Create a new json specific ACL category ("@json") and add this to all json module commands
+* Add key space events on every JSON write command after the data had been mutated.
+* Add memory-usage limit per json object controlled through the json.max-document-size config
+* Support for JSON.MSET: Sets JSON values for multiple keys. The operation is atomic. Either all values are set or none is set.
+* Add an INFO handler to add json module metrics around usage.
 
-Happy hacking!
+New Metrics
+===========================
+* Add support for the following metrics: json.json_total_memory_bytes, json_num_documents
+
+New configurations
+===========================
+* Add support for the following configurations: json.max-document-size, josn.max-path-limit
+
+We appreciate the efforts of all who contributed code to this release!
+
+Roshan Khatri (roshkhatri), Joe Hu (joehu21), Nikhil Manglore (Nikhil-Manglore)
