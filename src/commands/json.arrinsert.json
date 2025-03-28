@@ -1,10 +1,10 @@
 {
     "JSON.ARRINSERT": {
         "summary": "Insert one or more values into the array values at path before the index.\n\n* Inserting at index 0 prepends to the array.\n* A negative index values is interpreted as starting from the end.\n* The index must be in the array's boundary.",
-        "complexity": "O(M*N) where M is the number of values in an array and N is the number of array where the value needs to be inserted.",
+        "complexity": "O(N) where N is the length of the array.",
         "group": "json",
         "module_since": "1.0.0",
-        "arity": -4,
+        "arity": -5,
         "acl_categories": [
             "WRITE",
             "FAST",

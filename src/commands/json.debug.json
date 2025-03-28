@@ -4,7 +4,7 @@
         "complexity": "O(1)",
         "group": "json",
         "module_since": "1.0.0",
-        "arity": 1,
+        "arity": 2,
         "acl_categories": [
             "READ",
             "SLOW",
