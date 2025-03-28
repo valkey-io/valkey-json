@@ -2,6 +2,8 @@ from utils_json import DEFAULT_MAX_PATH_LIMIT, DEFAULT_STORE_PATH
 from json_test_case import JsonTestCase
 from valkeytests.conftest import resource_port_tracker
 import logging, os, pathlib
+import pytest
+from error_handlers import ErrorStringTester
 
 logging.basicConfig(level=logging.DEBUG)
 
@@ -22,8 +24,13 @@ class TestRdb(JsonTestCase):
         assert b'OK' == client.execute_command(
             'JSON.SET', 'store', '.', self.data_store)
 
-    def setup(self):
-        super(TestRdb, self).setup()
+    @pytest.fixture(autouse=True)
+    def setup_test(self):
+        server_path = f"{os.path.dirname(os.path.realpath(__file__))}/.build/binaries/{os.environ['SERVER_VERSION']}/valkey-server"
+        args = {'loadmodule': os.getenv('MODULE_PATH'), "enable-debug-command": "local", 'enable-protected-configs': 'yes'}
+        self.server, self.client = self.create_server(testdir = self.testdir,  server_path=server_path, args=args)
+
+        self.error_class = ErrorStringTester
         self.setup_data()
 
     def test_rdb_saverestore(self):
