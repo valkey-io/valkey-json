@@ -1,6 +1,6 @@
 {
     "JSON.NUMMULTBY": {
-        "summary": "Multiply the number values at the path by a given number.",
+        "summary": "Multiply the numeric values at the path by a given number.",
         "complexity": "O(N) where N is the number of json values matched by the path.",
         "group": "json",
         "module_since": "1.0.0",

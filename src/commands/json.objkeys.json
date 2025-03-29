@@ -1,6 +1,6 @@
 {
     "JSON.OBJKEYS": {
-        "summary": "Get key names in the object values at the path.",
+        "summary": "Retrieve the key names from the objects at the specified path.",
         "complexity": "O(N) where N is the number of json objects matched by the path.",
         "group": "json",
         "module_since": "1.0.0",

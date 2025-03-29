@@ -1,6 +1,6 @@
 {
     "JSON.ARRPOP": {
-        "summary": "Remove and return element at the index from the array. Popping an empty array returns null.",
+        "summary": "Remove and returns the element at the given index. Popping an empty array returns null.",
         "complexity": "O(1)",
         "group": "json",
         "module_since": "1.0.0",
