@@ -98,8 +98,8 @@ add_custom_command(TARGET valkey
     COMMENT "Copied valkeymodule.h and valkey-server to destination directories"
 )
 
-# Define valkey-test-framework branch
-set(VALKEY_TEST_FRAMEWORK_BRANCH "unstable" CACHE STRING "Valkey-test-framework branch to use")
+# Define valkey-test-framework commit id
+set(VALKEY_TEST_FRAMEWORK_COMMIT "9fb28b74efd122324db00498a2fde6e5d281c90f" CACHE STRING "Valkey-test-framework commit to use")
 
 # Set the download directory for Valkey-test-framework
 set(VALKEY_TEST_FRAMEWORK_DOWNLOAD_DIR "${CMAKE_CURRENT_BINARY_DIR}/_deps/valkey-test-framework-src")
@@ -108,7 +108,7 @@ set(VALKEY_TEST_FRAMEWORK_DOWNLOAD_DIR "${CMAKE_CURRENT_BINARY_DIR}/_deps/valkey
 ExternalProject_Add(
     valkey-test-framework
     GIT_REPOSITORY https://github.com/valkey-io/valkey-test-framework.git
-    GIT_TAG ${VALKEY_TEST_FRAMEWORK_BRANCH}
+    GIT_TAG ${VALKEY_TEST_FRAMEWORK_COMMIT}
     GIT_SHALLOW TRUE
     PREFIX "${VALKEY_TEST_FRAMEWORK_DOWNLOAD_DIR}"
     CONFIGURE_COMMAND ""
