@@ -12,6 +12,7 @@ import struct
 import json
 from math import isclose, isnan, isinf, frexp
 from json_test_case import JsonTestCase
+from error_handlers import ErrorStringTester
 
 logging.basicConfig(level=logging.DEBUG)
 
@@ -163,8 +164,13 @@ class TestJsonBasic(JsonTestCase):
         client.execute_command(
             'SET', str_key, '{"firstName":"John","lastName":"Smith"}')
 
-    def setup(self):
-        super(TestJsonBasic, self).setup()
+    @pytest.fixture(autouse=True)
+    def setup_test(self, setup):
+        server_path = f"{os.path.dirname(os.path.realpath(__file__))}/.build/binaries/{os.environ['SERVER_VERSION']}/valkey-server"
+        args = {'loadmodule': os.getenv('MODULE_PATH'), "enable-debug-command": "local", 'enable-protected-configs': 'yes'}
+        self.server, self.client = self.create_server(testdir = self.testdir,  server_path=server_path, args=args)
+
+        self.error_class = ErrorStringTester
         self.setup_data()
 
     def test_sanity(self):
@@ -3212,10 +3218,10 @@ class TestJsonBasic(JsonTestCase):
 
     def test_json_digest(self):
         client = self.server.get_new_client()
-        orig_digest = client.debug_digest()
+        orig_digest = client.execute_command('DEBUG', 'DIGEST')
         assert orig_digest != 0
         client.execute_command("flushall")
-        new_digest = client.debug_digest()
+        new_digest = client.execute_command('DEBUG', 'DIGEST')
         assert int(new_digest) == 0
 
     def test_big_dup(self):

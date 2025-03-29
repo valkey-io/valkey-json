@@ -98,19 +98,19 @@ add_custom_command(TARGET valkey
     COMMENT "Copied valkeymodule.h and valkey-server to destination directories"
 )
 
-# Define valkey-bloom branch
-set(VALKEY_BLOOM_BRANCH "unstable" CACHE STRING "Valkey-bloom branch to use")
+# Define valkey-test-framework commit id
+set(VALKEY_TEST_FRAMEWORK_COMMIT "9fb28b74efd122324db00498a2fde6e5d281c90f" CACHE STRING "Valkey-test-framework commit to use")
 
-# Set the download directory for Valkey-bloom
-set(VALKEY_BLOOM_DOWNLOAD_DIR "${CMAKE_CURRENT_BINARY_DIR}/_deps/valkey-bloom-src")
+# Set the download directory for Valkey-test-framework
+set(VALKEY_TEST_FRAMEWORK_DOWNLOAD_DIR "${CMAKE_CURRENT_BINARY_DIR}/_deps/valkey-test-framework-src")
 
-# Download valkey-bloom
+# Download valkey-test-framework
 ExternalProject_Add(
-    valkey-bloom
-    GIT_REPOSITORY https://github.com/valkey-io/valkey-bloom.git
-    GIT_TAG ${VALKEY_BLOOM_BRANCH}
+    valkey-test-framework
+    GIT_REPOSITORY https://github.com/valkey-io/valkey-test-framework.git
+    GIT_TAG ${VALKEY_TEST_FRAMEWORK_COMMIT}
     GIT_SHALLOW TRUE
-    PREFIX "${VALKEY_BLOOM_DOWNLOAD_DIR}"
+    PREFIX "${VALKEY_TEST_FRAMEWORK_DOWNLOAD_DIR}"
     CONFIGURE_COMMAND ""
     BUILD_COMMAND ""
     INSTALL_COMMAND ""
@@ -118,12 +118,12 @@ ExternalProject_Add(
 
 # Step to copy pytest files
 ExternalProject_Add_Step(
-    valkey-bloom
+    valkey-test-framework
     copy_pytest_files
     COMMENT "Copying pytest files to tst/integration directory"
     DEPENDEES build
     COMMAND ${CMAKE_COMMAND} -E make_directory ${CMAKE_CURRENT_SOURCE_DIR}/tst/integration
-    COMMAND ${CMAKE_COMMAND} -E copy_directory ${VALKEY_BLOOM_DOWNLOAD_DIR}/src/valkey-bloom/tests/valkeytests ${CMAKE_CURRENT_SOURCE_DIR}/tst/integration/valkeytests
+    COMMAND ${CMAKE_COMMAND} -E copy_directory ${VALKEY_TEST_FRAMEWORK_DOWNLOAD_DIR}/src/valkey-test-framework/src ${CMAKE_CURRENT_SOURCE_DIR}/tst/integration/valkeytests
 )
 
 # Enable instrumentation options if requested
