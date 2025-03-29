@@ -1,6 +1,6 @@
 {
     "JSON.STRLEN": {
-        "summary": "Get lengths of the JSON string values at the path.",
+        "summary": "Get the length of the JSON string values at the specified path.",
         "complexity": "O(N) where N is the number of json objects matched by the path.",
         "group": "json",
         "module_since": "1.0.0",

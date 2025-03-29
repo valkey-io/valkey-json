@@ -1,5 +1,6 @@
 {
     "JSON.FORGET": {
-        "summary": "An alias of JSON.DEL."
+        "summary": "An alias of JSON.DEL.",
+        "group": "json"
     }
 }

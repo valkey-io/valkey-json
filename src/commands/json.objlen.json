@@ -1,6 +1,6 @@
 {
     "JSON.OBJLEN": {
-        "summary": "Get number of keys in the object values at the path.",
+        "summary": "Get the number of keys in the object at the specified path.",
         "complexity": "O(N) where N is the number of json objects matched by the path.",
         "group": "json",
         "module_since": "1.0.0",
