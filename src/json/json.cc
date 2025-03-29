@@ -44,7 +44,7 @@
  * In unstable branch the status is always "dev".
  * During release process the status will be set to rc1,rc2...rcN.
  * When the version is released the status will be "ga". */
-#define MODULE_RELEASE_STAGE "rc1"
+#define MODULE_RELEASE_STAGE "rc2"
 #define MODULE_NAME "json"
 #define DOCUMENT_TYPE_NAME "ReJSON-RL"
 #define DOCUMENT_TYPE_ENCODING_VERSION 3   /* Currently support 1 or 3 */
