@@ -11,9 +11,9 @@ EXECUTE_PROCESS(
 )
 
 if("${ARCHITECTURE}" STREQUAL "x86_64" OR "${ARCHITECTURE}" STREQUAL "aarch64")
-    message("Building valkeyJSON for ${ARCHITECTURE}")
+    message("Building valkey-json for ${ARCHITECTURE}")
 else()
-    message(FATAL_ERROR "Unsupported architecture: ${ARCHITECTURE}. valkeyJSON is only supported on x86_64 and aarch64.")
+    message(FATAL_ERROR "Unsupported architecture: ${ARCHITECTURE}. valkey-json is only supported on x86_64 and aarch64.")
 endif()
 
 # Project definition
@@ -184,7 +184,7 @@ add_subdirectory(src)
 add_subdirectory(tst)
 
 add_custom_target(test
-    COMMENT "Run valkeyJSON integration tests"
+    COMMENT "Run valkey-json integration tests"
     USES_TERMINAL
     COMMAND rm -rf ${CMAKE_BINARY_DIR}/tst/integration
     COMMAND mkdir -p ${CMAKE_BINARY_DIR}/tst/integration

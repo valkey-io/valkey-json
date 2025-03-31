@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Script to build valkeyJSON module, build it and generate .so files, run unit and integration tests.
+# Script to build valkey-json module, build it and generate .so files, run unit and integration tests.
 
 # # Exit the script if any command fails
 set -e
@@ -18,7 +18,7 @@ fi
 BUILD_DIR="$SCRIPT_DIR/build"
 
 # Build the Valkey JSON module using CMake
-echo "Building valkeyJSON..."
+echo "Building valkey-json..."
 if [ ! -d "$BUILD_DIR" ]; then
     mkdir $BUILD_DIR
 fi

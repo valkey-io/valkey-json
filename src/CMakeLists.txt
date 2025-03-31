@@ -1,4 +1,4 @@
-message("src/CMakeLists.txt: Build valkeyJSON")
+message("src/CMakeLists.txt: Build valkey-json")
 
 set(OBJECT_TARGET json-objects CACHE INTERNAL "Object target for json module")
 add_library(${OBJECT_TARGET} OBJECT "")
