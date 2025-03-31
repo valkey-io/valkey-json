@@ -62,6 +62,8 @@ const char *jsonutil_code_to_message(JsonUtilCode code) {
         case JSONUTIL_INVALID_RDB_FORMAT:
             return "ERROR Invalid value in RDB format";
         case JSONUTIL_DOLLAR_CANNOT_APPLY_TO_NON_ROOT: return "SYNTAXERR Dollar sign cannot apply to non-root element";
+        case JSONUTIL_ALLOCATION_FAILURE: return "ERROR Memory Allocation failed ";
+        case JSONUTIL_KEY_OPEN_ERROR: return "ERROR Unable to open valkeymodule key";
         default: ValkeyModule_Assert(false);
     }
     return "";

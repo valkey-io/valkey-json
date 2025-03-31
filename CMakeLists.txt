@@ -17,7 +17,16 @@ else()
 endif()
 
 # Project definition
-project(ValkeyJSONModule VERSION 0.0.9 LANGUAGES C CXX)
+project(ValkeyJSONModule VERSION 99.99.99 LANGUAGES C CXX) # Version is 99.99.99 for unstable branch
+
+# ASAN build option
+option(ENABLE_ASAN "Enable Address Sanitizer" OFF)
+
+# ASan flags configuration
+if(ENABLE_ASAN)
+    message("Building with Address Sanitizer enabled")
+    set(ASAN_FLAGS "-fsanitize=address")
+endif()
 
 # Set the name of the JSON shared library
 set(JSON_MODULE_LIB json)
@@ -37,16 +46,31 @@ if(NOT CFLAGS)
     # Include debug symbols and set optimize level
     set(CFLAGS "-g -O3 -fno-omit-frame-pointer -Wall -Werror -Wextra")
 endif()
+
+# Add ASan flags if enabled
+if(ENABLE_ASAN)
+    set(CFLAGS "${CFLAGS} ${ASAN_FLAGS}")
+    set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} ${ASAN_FLAGS}")
+    set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} ${ASAN_FLAGS}")
+endif()
+
 message("CFLAGS: ${CFLAGS}")
 
-# Download and build Valkey
+if(ENABLE_ASAN)
+    message("Building Valkey engine with Address Sanitizer enabled")
+    set(BUILD_CMD make distclean && make -j SANITIZER=address)
+else()
+    set(BUILD_CMD make distclean && make -j)
+endif()
+
+# Download and build Valkey with ASAN if enabled
 ExternalProject_Add(
     valkey
-    GIT_REPOSITORY https://github.com/valkey-io/valkey.git  # Replace with actual URL
+    GIT_REPOSITORY https://github.com/valkey-io/valkey.git
     GIT_TAG ${VALKEY_VERSION}
     PREFIX ${VALKEY_DOWNLOAD_DIR}
     CONFIGURE_COMMAND ""
-    BUILD_COMMAND make distclean && make -j
+    BUILD_COMMAND ${BUILD_CMD}
     INSTALL_COMMAND ""
     BUILD_IN_SOURCE 1
 )
@@ -74,19 +98,19 @@ add_custom_command(TARGET valkey
     COMMENT "Copied valkeymodule.h and valkey-server to destination directories"
 )
 
-# Define valkey-bloom branch
-set(VALKEY_BLOOM_BRANCH "unstable" CACHE STRING "Valkey-bloom branch to use")
+# Define valkey-test-framework commit id
+set(VALKEY_TEST_FRAMEWORK_COMMIT "9fb28b74efd122324db00498a2fde6e5d281c90f" CACHE STRING "Valkey-test-framework commit to use")
 
-# Set the download directory for Valkey-bloom
-set(VALKEY_BLOOM_DOWNLOAD_DIR "${CMAKE_CURRENT_BINARY_DIR}/_deps/valkey-bloom-src")
+# Set the download directory for Valkey-test-framework
+set(VALKEY_TEST_FRAMEWORK_DOWNLOAD_DIR "${CMAKE_CURRENT_BINARY_DIR}/_deps/valkey-test-framework-src")
 
-# Download valkey-bloom
+# Download valkey-test-framework
 ExternalProject_Add(
-    valkey-bloom
-    GIT_REPOSITORY https://github.com/valkey-io/valkey-bloom.git
-    GIT_TAG ${VALKEY_BLOOM_BRANCH}
+    valkey-test-framework
+    GIT_REPOSITORY https://github.com/valkey-io/valkey-test-framework.git
+    GIT_TAG ${VALKEY_TEST_FRAMEWORK_COMMIT}
     GIT_SHALLOW TRUE
-    PREFIX "${VALKEY_BLOOM_DOWNLOAD_DIR}"
+    PREFIX "${VALKEY_TEST_FRAMEWORK_DOWNLOAD_DIR}"
     CONFIGURE_COMMAND ""
     BUILD_COMMAND ""
     INSTALL_COMMAND ""
@@ -94,12 +118,12 @@ ExternalProject_Add(
 
 # Step to copy pytest files
 ExternalProject_Add_Step(
-    valkey-bloom
+    valkey-test-framework
     copy_pytest_files
     COMMENT "Copying pytest files to tst/integration directory"
     DEPENDEES build
     COMMAND ${CMAKE_COMMAND} -E make_directory ${CMAKE_CURRENT_SOURCE_DIR}/tst/integration
-    COMMAND ${CMAKE_COMMAND} -E copy_directory ${VALKEY_BLOOM_DOWNLOAD_DIR}/src/valkey-bloom/tests/valkeytests ${CMAKE_CURRENT_SOURCE_DIR}/tst/integration/valkeytests
+    COMMAND ${CMAKE_COMMAND} -E copy_directory ${VALKEY_TEST_FRAMEWORK_DOWNLOAD_DIR}/src/valkey-test-framework/src ${CMAKE_CURRENT_SOURCE_DIR}/tst/integration/valkeytests
 )
 
 # Enable instrumentation options if requested

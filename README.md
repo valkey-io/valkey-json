@@ -22,10 +22,15 @@ Custom compiler flags can be passed to the build script via environment variable
 ```text
 CFLAGS="-O0 -Wno-unused-function" ./build.sh
 ```
+#### To build the module with ASAN and run tests
+```text
+export ASAN_BUILD=true
+./build.sh
+```
 
 #### To build just the module
 ```text
-mdkir build
+mkdir build
 cd build
 cmake ..
 make
@@ -33,7 +38,7 @@ make
 
 The default valkey version is "unstable". To override it, do:
 ```text
-mdkir build
+mkdir build
 cd build
 cmake .. -DVALKEY_VERSION=8.0
 make
@@ -41,7 +46,7 @@ make
 
 Custom compiler flags can be passed to cmake via variable CFLAGS. For example:
 ```text
-mdkir build
+mkdir build
 cd build
 cmake .. -DCFLAGS="-O0 -Wno-unused-function"
 make

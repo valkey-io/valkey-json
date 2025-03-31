@@ -321,6 +321,12 @@ TEST_F(DomTest, testSerialize_CustomFormat) {
     EXPECT_STREQ(oss.GetString(), exp_json);
 }
 
+TEST_F(DomTest, testVerifyString) {
+    const char *new_val = "\"Boston\"";
+    JsonUtilCode rc = dom_verify_value(nullptr, doc1, ".address.city", new_val);
+    EXPECT_EQ(rc, JSONUTIL_SUCCESS);
+}
+
 TEST_F(DomTest, testSetString) {
     const char *new_val = "\"Boston\"";
     JsonUtilCode rc = dom_set_value(nullptr, doc1, ".address.city", new_val, false, false);
@@ -332,6 +338,12 @@ TEST_F(DomTest, testSetString) {
     EXPECT_STREQ(GetString(&oss), new_val);
 }
 
+TEST_F(DomTest, testVerifyNumber) {
+    const char *new_val = "37";
+    JsonUtilCode rc = dom_verify_value(nullptr, doc1, ".age", new_val);
+    EXPECT_EQ(rc, JSONUTIL_SUCCESS);
+}
+
 TEST_F(DomTest, testSetNumber) {
     const char *new_val = "37";
     JsonUtilCode rc = dom_set_value(nullptr, doc1, ".age", new_val, false, false);
@@ -341,6 +353,12 @@ TEST_F(DomTest, testSetNumber) {
     rc = dom_get_value_as_str(doc1, ".age", nullptr, oss, false);
     EXPECT_EQ(rc, JSONUTIL_SUCCESS);
     EXPECT_STREQ(GetString(&oss), new_val);
+}
+
+TEST_F(DomTest, testVerifyNull) {
+    const char *new_val = "null";
+    JsonUtilCode rc = dom_verify_value(nullptr, doc1, ".address.street", new_val);
+    EXPECT_EQ(rc, JSONUTIL_SUCCESS);
 }
 
 TEST_F(DomTest, testSetNull) {

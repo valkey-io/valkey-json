@@ -12,6 +12,7 @@ import struct
 import json
 from math import isclose, isnan, isinf, frexp
 from json_test_case import JsonTestCase
+from error_handlers import ErrorStringTester
 
 logging.basicConfig(level=logging.DEBUG)
 
@@ -163,8 +164,13 @@ class TestJsonBasic(JsonTestCase):
         client.execute_command(
             'SET', str_key, '{"firstName":"John","lastName":"Smith"}')
 
-    def setup(self):
-        super(TestJsonBasic, self).setup()
+    @pytest.fixture(autouse=True)
+    def setup_test(self, setup):
+        server_path = f"{os.path.dirname(os.path.realpath(__file__))}/.build/binaries/{os.environ['SERVER_VERSION']}/valkey-server"
+        args = {'loadmodule': os.getenv('MODULE_PATH'), "enable-debug-command": "local", 'enable-protected-configs': 'yes'}
+        self.server, self.client = self.create_server(testdir = self.testdir,  server_path=server_path, args=args)
+
+        self.error_class = ErrorStringTester
         self.setup_data()
 
     def test_sanity(self):
@@ -178,8 +184,14 @@ class TestJsonBasic(JsonTestCase):
 
         assert b'OK' == client.execute_command(
             'JSON.SET', k2, '.', '[1,2,3,4,5]')
-        assert [b'{"a":"1","b":"2","c":"3"}', b'[1,2,3,4,5]'] == client.execute_command(
-            'JSON.MGET', k1, k2, '.')
+        assert b'OK' == client.execute_command(
+            'JSON.MSET', k3, '.', '[1,2,3,4,5]')
+        assert b'OK' == client.execute_command(
+            'JSON.MSET', k2, '.', '[5,4,3,2,1]', k1, '.', '{"a":"1", "b":"2", "c":"3"}')
+        assert [b'{"a":"1","b":"2","c":"3"}', b'[5,4,3,2,1]', b'[1,2,3,4,5]'] == client.execute_command(
+            'JSON.MGET', k1, k2, k3, '.')
+        assert b'OK' == client.execute_command(
+            'JSON.SET', k2, '.', '[1,2,3,4,5]')
         assert b'{"a":"1","b":"2","c":"3"}' == client.execute_command(
             'JSON.GET', k1)
         for (key, path, exp) in [
@@ -2781,6 +2793,146 @@ class TestJsonBasic(JsonTestCase):
                 'JSON.SET', k, '.', json_with_size(64*MB))
         assert self.error_class.is_limit_exceeded_error(str(e.value))
 
+    def test_json_mset_command_supports_all_datatypes(self):
+        client = self.server.get_new_client()
+        for (path, value) in [('.address.city', '"Boston"'),            # string
+                              # number
+                              ('.age', '30'),
+                              ('.foo', '[1,2,3]'),                      # array
+                              # array element access
+                              ('.phoneNumbers[0].number', '"1234567"'),
+                              # object
+                              ('.foo', '{"a":"b"}'),
+                              ('.lastName', 'null'),                    # null
+                              ('.isAlive', 'false')]:                   # boolean
+            assert b'OK' == client.execute_command(
+                'JSON.MSET', wikipedia, path, value)
+            assert value.encode() == client.execute_command(
+                'JSON.GET', wikipedia, path)
+
+    def test_json_mset_command_root_document(self):
+        client = self.server.get_new_client()
+        # path to the root document is represented as '.'
+        assert b'OK' == client.execute_command(
+            "JSON.MSET",
+            k1, ".", '"Boston"',
+            k2, ".", '123',
+            k3, ".", '["Seattle","Boston"]',
+            k4, ".", '[1,2,3]',
+            k5, ".", '{"a":"b"}',
+            k6, ".", '{}',
+            k7, ".", 'null',
+            k8, ".", 'false')
+        for (key, value) in [(k1, '"Boston"'),                # string
+                             (k2, '123'),                     # number
+                             (k3, '["Seattle","Boston"]'),    # array
+                             (k4, '[1,2,3]'),                 # array
+                             (k5, '{"a":"b"}'),               # object
+                             (k6, '{}'),                      # empty object
+                             (k7, 'null'),                    # null
+                             (k8, 'false')]:                  # boolean
+            assert value.encode() == client.execute_command('JSON.GET', key)
+
+    def test_json_mset_command_with_error_conditions(self):
+        client = self.server.get_new_client()
+        # A new Valkey key's path must be root
+        with pytest.raises(ResponseError) as e:
+            assert None == client.execute_command(
+                'JSON.MSET', foo, '.bar', '"bar"')
+        assert self.error_class.is_syntax_error(str(e.value))
+
+    def test_json_mset_command_mixed_path_document(self):
+        client = self.server.get_new_client()
+        # path to the root document is represented as '.'
+        assert b'OK' == client.execute_command(
+            "JSON.MSET",
+            k1, ".", '"Boston"',
+            wikipedia, '.address.city', '"Boston"',
+            k2, ".", '123',
+            wikipedia, '.age', '30',
+            k3, ".", '["Seattle","Boston"]',
+            k4, ".", '[1,2,3]',
+            wikipedia, '.phoneNumbers[0].number', '"1234567"',
+            k5, ".", '{"a":"b"}',
+            wikipedia, '.foo', '{"a":"b"}',
+            k6, ".", '{}',
+            wikipedia, '.lastName', 'null',
+            k7, ".", 'null',
+            wikipedia, '.isAlive', 'false',
+            k8, ".", 'false')
+        for (key, path, value) in [(k1, ".", '"Boston"'),                # string
+                                   (k2, ".", '123'),                     # number
+                                   (k3, ".", '["Seattle","Boston"]'),    # array
+                                   (k4, ".", '[1,2,3]'),                 # array
+                                   (k5, ".", '{"a":"b"}'),               # object
+                                   (k6, ".", '{}'),                      # empty object
+                                   (k7, ".", 'null'),                    # null
+                                   (k8, ".", 'false'),                  # boolean
+                                   (wikipedia, '.address.city', '"Boston"'),
+                                   (wikipedia, '.age', '30'),
+                                   (wikipedia, '.phoneNumbers[0].number', '"1234567"'),
+                                   (wikipedia, '.foo', '{"a":"b"}'),
+                                   (wikipedia, '.lastName', 'null'),
+                                   (wikipedia, '.isAlive', 'false')]:
+            assert value.encode() == client.execute_command(
+                'JSON.GET', key, path)
+
+    def test_json_mset_command_atomicity(self):
+        client = self.server.get_new_client()
+        # path to the root document is represented as '.'
+        assert b'OK' == client.execute_command(
+            "JSON.MSET",
+            k1, ".", '"Boston"',
+            wikipedia, '.address.city', '"Boston"',
+            k2, ".", '123',
+            wikipedia, '.age', '30',
+            k3, ".", '["Seattle","Boston"]',
+            k4, ".", '[1,2,3]',
+            wikipedia, '.phoneNumbers[0].number', '"1234567"',
+            k5, ".", '{"a":"b"}',
+            wikipedia, '.foo', '{"a":"b"}',
+            k6, ".", '{}',
+            wikipedia, '.lastName', 'null',
+            k7, ".", 'null',
+            wikipedia, '.isAlive', 'false',
+            k8, ".", 'false')
+
+        with pytest.raises(ResponseError) as e:
+            assert None == client.execute_command(
+                "JSON.MSET",
+                k1, ".", '"Seattle"',
+                wikipedia, '.address.city', '"Seattle"',
+                k2, ".", '456',
+                wikipedia, '.age', '40',
+                k3, ".", '["Seattle","Chicago"]',
+                k4, ".", '[4,5,6]',
+                wikipedia, '.phoneNumbers[0].number', '"56789"',
+                k5, ".", '{"c":"d"}',
+                wikipedia, '.foo', '{"c":"d"}',
+                k6, ".", '{}',
+                wikipedia, '.lastName', 'null',
+                k7, ".", 'null',
+                foo, '.bar', '"bar"',
+                k8, ".", 'true')
+        assert self.error_class.is_syntax_error(str(e.value))
+
+        for (key, path, value) in [(k1, ".", '"Boston"'),                # string
+                                   (k2, ".", '123'),                     # number
+                                   (k3, ".", '["Seattle","Boston"]'),    # array
+                                   (k4, ".", '[1,2,3]'),                 # array
+                                   (k5, ".", '{"a":"b"}'),               # object
+                                   (k6, ".", '{}'),                      # empty object
+                                   (k7, ".", 'null'),                    # null
+                                   (k8, ".", 'false'),                  # boolean
+                                   (wikipedia, '.address.city', '"Boston"'),
+                                   (wikipedia, '.age', '30'),
+                                   (wikipedia, '.phoneNumbers[0].number', '"1234567"'),
+                                   (wikipedia, '.foo', '{"a":"b"}'),
+                                   (wikipedia, '.lastName', 'null'),
+                                   (wikipedia, '.isAlive', 'false')]:
+            assert value.encode() == client.execute_command(
+                'JSON.GET', key, path)
+
     def test_multi_exec(self):
         client = self.server.get_new_client()
         client.execute_command('MULTI')
@@ -3066,10 +3218,10 @@ class TestJsonBasic(JsonTestCase):
 
     def test_json_digest(self):
         client = self.server.get_new_client()
-        orig_digest = client.debug_digest()
+        orig_digest = client.execute_command('DEBUG', 'DIGEST')
         assert orig_digest != 0
         client.execute_command("flushall")
-        new_digest = client.debug_digest()
+        new_digest = client.execute_command('DEBUG', 'DIGEST')
         assert int(new_digest) == 0
 
     def test_big_dup(self):
@@ -4123,3 +4275,48 @@ class TestJsonBasic(JsonTestCase):
                 break
             cursor = result[0]
         logging.info(f"Verified {count} json keys")
+
+    def test_jsonpath_member_name_containing_slash(self):
+        """
+        Test case for https://github.com/valkey-io/valkey-json/issues/31
+        """
+        client = self.server.get_new_client()
+        client.execute_command("json.set", "k1", ".", "{\"a\": 4.5, \"b/c\": 85}")
+
+        # Test 1: json.get with member name containing slash
+        exp = '[85]'
+        assert exp.encode() == client.execute_command("json.get", "k1", "$.b/c")
+
+        # Test 2: json.set with member name containing slash
+        client.execute_command("json.set", "k1", "$.b/c", "0")
+        exp = "{\"a\":4.5,\"b/c\":0}"
+        assert exp.encode() == client.execute_command("json.get", "k1")
+
+        # Test 3: Slash is already escaped
+        client.execute_command("json.set", "k1", "$.b~1c", "2")
+        exp = "{\"a\":4.5,\"b/c\":2}"
+        assert exp.encode() == client.execute_command("json.get", "k1")
+
+        # Test 4: json.numincrby with member name containing slash
+        client.execute_command("json.numincrby", "k1", "$.b/c", "1")
+        exp = "{\"a\":4.5,\"b/c\":3}"
+        assert exp.encode() == client.execute_command("json.get", "k1")
+
+        # Test 5: json.nummultby with member name containing slash
+        client.execute_command("json.nummultby", "k1", "$.b/c", "2")
+        exp = "{\"a\":4.5,\"b/c\":6}"
+        assert exp.encode() == client.execute_command("json.get", "k1")
+
+        # Test 6: json.get with member name containing slash
+        exp = '[6]'
+        assert exp.encode() == client.execute_command("json.get", "k1", "$.b/c")
+
+        # Test 7: json.set with recursive search
+        client.execute_command("json.set", "k1", "$..b/c", "7")
+        exp = "{\"a\":4.5,\"b/c\":7}"
+        assert exp.encode() == client.execute_command("json.get", "k1")
+
+        # Test 8: json.numincrby with recursive search
+        client.execute_command("json.numincrby", "k1", "$..b/c", "2")
+        exp = "{\"a\":4.5,\"b/c\":9}"
+        assert exp.encode() == client.execute_command("json.get", "k1")

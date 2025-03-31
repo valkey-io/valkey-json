@@ -342,6 +342,7 @@ class Selector {
     JsonUtilCode recursiveSearch(JValue &v, const char *p);
     void setError(const JsonUtilCode error_code) { error = error_code; }
     JsonUtilCode getError() const { return error; }
+    void escape_member_name_for_json_pointer(const std::string_view &member_name, std::ostringstream &oss);
 
     JValue *root;          // the root value, aka the document
     JValue *node;          // current node (value) in the JSON tree
