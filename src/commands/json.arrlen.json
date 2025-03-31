@@ -1,7 +1,7 @@
 {
     "JSON.ARRLEN": {
         "summary": "Get length of the array at the path.",
-        "complexity": "0(N) where N is the number of json arrays matched at the path.",
+        "complexity": "O(N) where N is the number of json arrays matched at the path.",
         "group": "json",
         "module_since": "1.0.0",
         "arity": 2,
