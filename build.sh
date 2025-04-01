@@ -17,8 +17,6 @@ fi
 # Variables
 BUILD_DIR="$SCRIPT_DIR/build"
 
-cmake --version
-
 # Build the Valkey JSON module using CMake
 echo "Building valkey-json..."
 if [ ! -d "$BUILD_DIR" ]; then
