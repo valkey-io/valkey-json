@@ -168,7 +168,7 @@ message("CMAKE_CXX_FLAGS: ${CMAKE_CXX_FLAGS}")
 FetchContent_Declare(
     rapidjson
     GIT_REPOSITORY https://github.com/Tencent/rapidjson.git
-    GIT_TAG 0d4517f15a8d7167ba9ae67f3f22a559ca841e3b
+    GIT_TAG ebd87cb468fb4cb060b37e579718c4a4125416c1
 )
 
 # Disable RapidJSON tests and examples
