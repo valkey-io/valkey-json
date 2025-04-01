@@ -1,6 +1,6 @@
 # RapidJSON Source Code
 * The original RapidJSON Source Code is cloned at build time using CMAKELISTS
-* Last commit on the master branch: 0d4517f15a8d7167ba9ae67f3f22a559ca841e3b, 2021-10-31 11:07:57
+* Last commit on the master branch: ebd87cb468fb4cb060b37e579718c4a4125416c1, 2024-12-02
 
 # Modifications
 We made a few changes to the RapidJSON source code. Before the changes are pushed to the open source,
