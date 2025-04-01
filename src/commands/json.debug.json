@@ -1,6 +1,6 @@
 {
     "JSON.DEBUG": {
-        "summary": "Report information. Supported subcommands are: MEMORY <key> [path] - report memory usage in bytes of a JSON value. DEPTH <key> - report the maximum path depth of the JSON document. FIELDS <key> [path] - report the number of fields at the specified document path. HELP - print help messages of the command.",
+        "summary": "Reports information. Supported subcommands are: MEMORY, DEPTH, FIELDS, HELP",
         "complexity": "O(1)",
         "group": "json",
         "module_since": "1.0.0",
