@@ -2422,7 +2422,7 @@ int handleHashTableFactor(T rapidjson::HashTableFactors::*f, const void *v, T sc
 //
 // Resize the number of shards in the keyTable. this isn't multi-thread safe. But the current AppConfig architecture
 // doesn't provide a good way to solve this problem. Also, we only do it when the table is empty. As long as there
-// are no background operations in progress (slot migration, threadsave) we're good. Sadly there's no easy way for
+// are no background operations in progress (slot migration, threadsafe) we're good. Sadly there's no easy way for
 // a module to detect that. Once we have RM_ApplyConfig, we'll restrict this to only happen at initialization time.
 // and close this small timing hole.
 //
