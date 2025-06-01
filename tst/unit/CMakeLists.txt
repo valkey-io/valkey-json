@@ -65,7 +65,7 @@ target_link_libraries(unitTests
 # To get this to work properly in a cross-compile environment, you need to set up
 # CROSSCOMPILING_EMULATOR (see https://cmake.org/cmake/help/v3.12/prop_tgt/CROSSCOMPILING_EMULATOR.html)
 # DISCOVERY_TIMEOUT - number of seconds given for Gtest to discover the tests to run, it should
-# be big enough so the tests can start on MacOS and can be any number, 59 is just prime number
+# be big enough so the tests can start on macOS and can be any number, 59 is just prime number
 # close to 1 minute ;)
 gtest_discover_tests(unitTests
         TEST_PREFIX unit_
