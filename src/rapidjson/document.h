@@ -2790,7 +2790,7 @@ private:
         for (size_t count = 0; count <= data_.o.capacity; ++count) {
             MemberHT& thisEntry = m[ix];
             if (!thisEntry.name) {
-                trace("Removemember, scan complete");
+                trace("RemoveMember, scan complete");
                 if (loadFactor() < hashTableFactors.minLoad) {
                     //
                     // See DoConstructHT
