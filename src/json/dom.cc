@@ -1437,7 +1437,7 @@ STATIC JValue readLegacyDoubleAsJValue(ValkeyModuleIO *rdb) {
 }
 
 /*
- * One instance of this is passed to all recursive invokations of rdbLoadJValue
+ * One instance of this is passed to all recursive invocations of rdbLoadJValue
  */
 typedef struct load_params {
     ValkeyModuleIO *rdb;
