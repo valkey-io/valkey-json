@@ -935,7 +935,7 @@ int Command_JsonDel(ValkeyModuleCtx *ctx, ValkeyModuleString **argv, int argc) {
 
     if (rc != JSONUTIL_SUCCESS) {
         if (rc == JSONUTIL_INVALID_JSON_PATH || rc == JSONUTIL_JSON_PATH_NOT_EXIST) {
-            // ignore invalid or non-existent path
+            // ignore invalid or nonexistent path
             return ValkeyModule_ReplyWithLongLong(ctx, 0);
         } else {
             return ValkeyModule_ReplyWithError(ctx, jsonutil_code_to_message(rc));

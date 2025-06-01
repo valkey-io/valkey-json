@@ -817,7 +817,7 @@ class TestJsonBasic(JsonTestCase):
             assert exp == client.execute_command(
                 'JSON.GET', key, path)
 
-        # Legacy path returns non-existent error if no value is selected.
+        # Legacy path returns nonexistent error if no value is selected.
         for (key, path, exp) in [
             (k1, '.a[*]', None),
             (k2, '.a.*', None)
@@ -2694,13 +2694,13 @@ class TestJsonBasic(JsonTestCase):
                           [b'number', b'646 555-4567']]
 
     def test_json_debug_memory(self):
-        # non-existent key
+        # nonexistent key
         client = self.server.get_new_client()
 
         assert None == client.execute_command(
             'JSON.DEBUG MEMORY', nonexistentkey)
 
-        # non-existent path
+        # nonexistent path
         with pytest.raises(ResponseError) as e:
             client.execute_command(
                 'JSON.DEBUG MEMORY', wikipedia, nonexistentpath)
