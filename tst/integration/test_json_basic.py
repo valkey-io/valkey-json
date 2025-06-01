@@ -1526,7 +1526,7 @@ class TestJsonBasic(JsonTestCase):
         '''
         Test that double values remain consistent when going through JSON Engine.
             This tests a tolerance of 2^-50 for a decent number of iterations,
-            but is not enough to guarantee that level of presicion to our customers.
+            but is not enough to guarantee that level of precision to our customers.
         Also verify that regular and pretty print double values have the same output.
         '''
         client = self.server.get_new_client()
