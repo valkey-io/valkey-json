@@ -3027,7 +3027,7 @@ extern "C" int ValkeyModule_OnLoad(ValkeyModuleCtx *ctx) {
     }
 
     //
-    // Setup the global string table
+    // Set up the global string table
     //
     initKeyTable(KeyTable::MAX_SHARDS, KeyTable::Factors());
     if (configKeyTable() == VALKEYMODULE_ERR) return VALKEYMODULE_ERR;

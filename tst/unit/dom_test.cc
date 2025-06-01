@@ -59,7 +59,7 @@ extern size_t hash_function(const char *, size_t);
 void SetupAllocFuncs(size_t numShards) {
     setupValkeyModulePointers();
     //
-    // Now setup the KeyTable, the RapidJson library now depends on it
+    // Now set up the KeyTable, the RapidJson library now depends on it
     //
     KeyTable::Config c;
     c.malloc = dom_alloc;

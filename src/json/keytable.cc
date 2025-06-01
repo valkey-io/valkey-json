@@ -418,7 +418,7 @@ struct KeyTable_Shard {
 };
 
 /*
- * Setup the KeyTable itself.
+ * Set up the KeyTable itself.
  */
 KeyTable::KeyTable(const Config& cfg) :
     malloc(cfg.malloc),
