@@ -307,7 +307,7 @@ struct KeyTable {
     const Factors& getFactors() const { return factors; }
     //
     // Query if this set of factors is valid.
-    // returns: NULL, If the factors are valid. Otherwise an error string
+    // returns: NULL, If the factors are valid. Otherwise, an error string
     // This is used to validate a set of factors before setting them.
     //
     static const char *isValidFactors(const Factors& f);
