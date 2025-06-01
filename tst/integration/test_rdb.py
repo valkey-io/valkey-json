@@ -17,8 +17,8 @@ class TestRdb(JsonTestCase):
         # Otherwise, data from previous test cases will interfere current test case.
         client.execute_command("FLUSHDB")
 
-        # Load strore sample JSONs. We use strore.json as input to create a document key. Then, use
-        # strore_compact.json, which does not have indent/space/newline, to verify correctness of serialization.
+        # Load store sample JSONs. We use store.json as input to create a document key. Then, use
+        # store_compact.json, which does not have indent/space/newline, to verify correctness of serialization.
         with open(DEFAULT_STORE_PATH, 'r') as file:
             self.data_store = file.read()
         assert b'OK' == client.execute_command(
