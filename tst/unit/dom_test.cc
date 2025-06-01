@@ -1865,7 +1865,7 @@ TEST_F(DomTest, testToggle_v2path) {
     dom_free_doc(d1);
 }
 
-TEST_F(DomTest, testNumMutiBy_int64) {
+TEST_F(DomTest, testNumMultiBy_int64) {
     jsn::vector<double> res;
     bool isV2Path;
     JParser parser;
@@ -1888,7 +1888,7 @@ TEST_F(DomTest, testNumMutiBy_int64) {
     EXPECT_FALSE(isV2Path);
 }
 
-TEST_F(DomTest, testNumMutiBy_double) {
+TEST_F(DomTest, testNumMultiBy_double) {
     const char *new_val = "1";
     JsonUtilCode rc = dom_set_value(nullptr, doc1, ".foo", new_val, false, false);
     EXPECT_EQ(rc, JSONUTIL_SUCCESS);
@@ -1912,7 +1912,7 @@ TEST_F(DomTest, testNumMutiBy_double) {
     EXPECT_FALSE(isV2Path);
 }
 
-TEST_F(DomTest, testNumMutiBy_int64_overflow) {
+TEST_F(DomTest, testNumMultiBy_int64_overflow) {
     const char *new_val = "9223372036854775800";
     JsonUtilCode rc = dom_set_value(nullptr, doc1, ".foo", new_val, false, false);
     EXPECT_EQ(rc, JSONUTIL_SUCCESS);
@@ -1941,7 +1941,7 @@ TEST_F(DomTest, testNumMutiBy_int64_overflow) {
     EXPECT_FALSE(isV2Path);
 }
 
-TEST_F(DomTest, testNumMutiBy_int64_overflow_negative) {
+TEST_F(DomTest, testNumMultiBy_int64_overflow_negative) {
     const char *new_val = "-9223372036854775808";
     JsonUtilCode rc = dom_set_value(nullptr, doc1, ".foo", new_val, false, false);
     EXPECT_EQ(rc, JSONUTIL_SUCCESS);
@@ -1975,7 +1975,7 @@ TEST_F(DomTest, testNumMutiBy_int64_overflow_negative) {
     EXPECT_FALSE(isV2Path);
 }
 
-TEST_F(DomTest, testNumMutiBy_double_overflow) {
+TEST_F(DomTest, testNumMultiBy_double_overflow) {
     const char *new_val = "1.7e308";
     JsonUtilCode rc = dom_set_value(nullptr, doc1, ".foo", new_val, false, false);
     EXPECT_EQ(rc, JSONUTIL_SUCCESS);
@@ -2001,7 +2001,7 @@ TEST_F(DomTest, testNumMutiBy_double_overflow) {
     EXPECT_FALSE(isV2Path);
 }
 
-TEST_F(DomTest, testNumMutiBy_double_overflow_negative) {
+TEST_F(DomTest, testNumMultiBy_double_overflow_negative) {
     const char *new_val = "1.7e308";
     JsonUtilCode rc = dom_set_value(nullptr, doc1, ".foo", new_val, false, false);
     EXPECT_EQ(rc, JSONUTIL_SUCCESS);
