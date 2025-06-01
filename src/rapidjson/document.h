@@ -1039,7 +1039,7 @@ public:
     */
     GenericValue& operator=(GenericValue& rhs) RAPIDJSON_NOEXCEPT {
         if (RAPIDJSON_LIKELY(this != &rhs)) {
-            // Can't destroy "this" before assigning "rhs", otherwise "rhs"
+            // Can't destroy "this" before assigning "rhs"; otherwise, "rhs"
             // could be used after free if it's an sub-Value of "this",
             // hence the temporary danse.
             GenericValue temp;
