@@ -2743,9 +2743,9 @@ class TestJsonBasic(JsonTestCase):
 
         # Verify the document size calculated by the "per document memory tracking" machinery matches the size
         # calculated by the method of walking the JSON tree.
-        metadate_val = client.execute_command('JSON.DEBUG','MEMORY',wikipedia)
+        metadata_val = client.execute_command('JSON.DEBUG','MEMORY',wikipedia)
         exp_val = client.execute_command('JSON.DEBUG','MEMORY',wikipedia,'.')
-        assert exp_val == metadate_val
+        assert exp_val == metadata_val
 
     def test_keytable_corrupt_injects_handle(self):
         """JSON.DEBUG KEYTABLE-CORRUPT should inject a handle that KEYTABLE-CHECK detects as a mismatch."""
