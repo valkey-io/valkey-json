@@ -2728,9 +2728,9 @@ class TestJsonBasic(JsonTestCase):
 
         # Verify the document size calculated by the "per document memory tracking" machinery matches the size
         # calculated by the method of walking the JSON tree.
-        metadate_val = client.execute_command('JSON.DEBUG','MEMORY',wikipedia)
+        metadata_val = client.execute_command('JSON.DEBUG','MEMORY',wikipedia)
         exp_val = client.execute_command('JSON.DEBUG','MEMORY',wikipedia,'.')
-        assert exp_val == metadate_val
+        assert exp_val == metadata_val
 
     def test_json_duplicate_keys(self):
         client = self.server.get_new_client()
