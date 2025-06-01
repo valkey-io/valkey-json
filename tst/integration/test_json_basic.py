@@ -499,8 +499,8 @@ class TestJsonBasic(JsonTestCase):
         for (path, value) in [('.firstName', '"John"'),         # string
                               ('.address.city', '"New York"'),  # string
                               ('.spouse', 'null'),              # null
-                              ('.children', '[]'),              # empy array
-                              ('.groups', '{}'),                # empy object
+                              ('.children', '[]'),              # empty array
+                              ('.groups', '{}'),                # empty object
                               ('.isAlive', 'true'),             # boolean
                               ('.age', '27')]:           # float number
             assert value.encode() == client.execute_command(

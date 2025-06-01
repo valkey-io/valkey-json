@@ -1509,7 +1509,7 @@ STATIC void reply_arrpop(jsn::vector<rapidjson::StringBuffer> &vec, const bool i
     if (!is_v2_path) {
         // Legacy path: return a single value, which is the first value.
         for (auto it = vec.begin(); it != vec.end(); it++) {
-            if (it->GetLength() != 0) {  // emtpy indicates empty array or wrong type
+            if (it->GetLength() != 0) {  // empty indicates empty array or wrong type
                 ValkeyModule_ReplyWithStringBuffer(ctx, it->GetString(), it->GetLength());
                 return;
             }
@@ -1519,7 +1519,7 @@ STATIC void reply_arrpop(jsn::vector<rapidjson::StringBuffer> &vec, const bool i
         // JSONPath: return an array of lengths.
         ValkeyModule_ReplyWithArray(ctx, vec.size());
         for (auto it = vec.begin(); it != vec.end(); it++) {
-            if (it->GetLength() == 0) {  // emtpy indicates empty array or wrong type
+            if (it->GetLength() == 0) {  // empty indicates empty array or wrong type
                 ValkeyModule_ReplyWithNull(ctx);
             } else {
                 ValkeyModule_ReplyWithStringBuffer(ctx, it->GetString(), it->GetLength());
