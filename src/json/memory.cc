@@ -63,7 +63,7 @@ STATIC void *memory_realloc_without_traps(void *ptr, size_t new_size) {
 //
 
 //
-// This word of data preceeds the memory allocation as seen by the client.
+// This word of data precedes the memory allocation as seen by the client.
 // The presence of the length is redundant with calling the low-level allocators memory-size function,
 // but that function can be fairly expensive, so by duplicating here we optimize the run-time cost.
 //
