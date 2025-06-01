@@ -52,7 +52,7 @@
 
 #define ERRMSG_JSON_DOCUMENT_NOT_FOUND "NONEXISTENT JSON document is not found"
 #define ERRMSG_NEW_VALKEY_KEY_PATH_NOT_ROOT "SYNTAXERR A new Valkey key's path must be root"
-#define ERRMSG_CANNOT_DISABLE_MODULE_DUE_TO_OUTSTADING_DATA \
+#define ERRMSG_CANNOT_DISABLE_MODULE_DUE_TO_OUTSTANDING_DATA \
     "Cannot disable the module because there are outstanding document keys"
 
 #define STATIC /* decorator for static functions, remove so that backtrace symbols include these */
