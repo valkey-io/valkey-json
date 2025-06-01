@@ -487,7 +487,7 @@ TEST_F(SelectorTest, test_filterExpr_expression_part7) {
                         "    \"poquo value\"  : \"\\\"\","
                         "    \"my key\"   : \"key inside here\""
                         "  },"
-                        "  \"anonther object\" : {"
+                        "  \"another object\" : {"
                         "    \"weight\"   : 400,"
                         "    \"a value\"  : 400,"
                         "    \"poquo value\"  : \"'\","
