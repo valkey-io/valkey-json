@@ -612,7 +612,7 @@ TEST_F(SelectorTest, test_filterExpr_single_recursion_array) {
     dom_free_doc(d1);
 }
 
-TEST_F(SelectorTest, test_filertExpr_array_index_single_recursion) {
+TEST_F(SelectorTest, test_filterExpr_array_index_single_recursion) {
     JDocument *d1;
     JsonUtilCode rc = dom_parse(nullptr, node_accounts, strlen(node_accounts), &d1);
     EXPECT_EQ(rc, JSONUTIL_SUCCESS);
