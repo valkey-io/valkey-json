@@ -404,7 +404,7 @@ struct GenericStringRef {
     //! Explicitly create string reference from \c const character pointer
 #ifndef __clang__ // -Wdocumentation
     /*!
-        This constructor can be used to \b explicitly  create a reference to
+        This constructor can be used to \b explicitly create a reference to
         a constant string pointer.
 
         \see StringRef(const CharType*)

@@ -998,7 +998,7 @@ class TestJsonBasic(JsonTestCase):
         ]:
             assert exp.encode() == client.execute_command('JSON.GET', k2, path)
 
-        # we do not support mixing of  unions and slices, nor do we support extraneous commas
+        # we do not support mixing of unions and slices, nor do we support extraneous commas
         for path in [
             '$[0,1,2:4]',
             '$[0:2,3,4]',
