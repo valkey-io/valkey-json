@@ -139,7 +139,7 @@ json.debug-mode yes
 
 When `debug-mode` is not enabled (the default), these subcommands return an error.
 
-## Supported  Module Commands
+## Supported Module Commands
 ```text
 JSON.ARRAPPEND
 JSON.ARRINDEX

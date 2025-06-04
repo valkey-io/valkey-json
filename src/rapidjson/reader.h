@@ -71,7 +71,7 @@ RAPIDJSON_DIAG_OFF(effc++)
     \ingroup RAPIDJSON_ERRORS
     \brief Macro to indicate a parse error.
     \param parseErrorCode \ref rapidjson::ParseErrorCode of the error
-    \param offset  position of the error in JSON input (\c size_t)
+    \param offset position of the error in JSON input (\c size_t)
 
     This macros can be used as a customization point for the internal
     error handling mechanism of RapidJSON.
@@ -109,7 +109,7 @@ RAPIDJSON_DIAG_OFF(effc++)
     \ingroup RAPIDJSON_ERRORS
     \brief (Internal) macro to indicate and handle a parse error.
     \param parseErrorCode \ref rapidjson::ParseErrorCode of the error
-    \param offset  position of the error in JSON input (\c size_t)
+    \param offset position of the error in JSON input (\c size_t)
 
     Invokes RAPIDJSON_PARSE_ERROR_NORETURN and stops the parsing.
 
