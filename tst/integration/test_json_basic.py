@@ -379,7 +379,7 @@ class TestJsonBasic(JsonTestCase):
         with pytest.raises(ResponseError) as e:
             client.execute_command(
                 'JSON.SET', wikipedia, 'phoneNumbers[9]', '"123"')
-        assert self.error_class.is_outofboundaries_error(str(e.value))
+        assert self.error_class.is_outofbounds_error(str(e.value))
 
     def test_json_set_insert_value(self):
         client = self.server.get_new_client()
@@ -861,7 +861,7 @@ class TestJsonBasic(JsonTestCase):
             with pytest.raises(ResponseError) as e:
                 client.execute_command(
                     'JSON.GET', wikipedia, path)
-            assert self.error_class.is_outofboundaries_error(str(e.value))
+            assert self.error_class.is_outofbounds_error(str(e.value))
 
         # test using negative index on a non-array value
         for path in [
@@ -2259,13 +2259,13 @@ class TestJsonBasic(JsonTestCase):
         with pytest.raises(ResponseError) as e:
             client.execute_command(
                 'JSON.ARRINSERT', wikipedia, ".children", 3000000000, '"a"')
-        assert self.error_class.is_outofboundaries_error(str(e.value))
+        assert self.error_class.is_outofbounds_error(str(e.value))
 
         # error condition: index arg is out of array boundaries
         with pytest.raises(ResponseError) as e:
             client.execute_command(
                 'JSON.ARRINSERT', wikipedia, ".children", 31, '"a"')
-        assert self.error_class.is_outofboundaries_error(str(e.value))
+        assert self.error_class.is_outofbounds_error(str(e.value))
 
     def test_json_arrinsert_command_jsonpath(self):
         client = self.server.get_new_client()
@@ -2296,7 +2296,7 @@ class TestJsonBasic(JsonTestCase):
         with pytest.raises(ResponseError) as e:
             client.execute_command(
                 'JSON.ARRINSERT', k2, "$.[*]", 1, '3')
-        assert self.error_class.is_outofboundaries_error(str(e.value))
+        assert self.error_class.is_outofbounds_error(str(e.value))
 
     def test_json_clear_command(self):
         client = self.server.get_new_client()

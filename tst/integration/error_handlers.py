@@ -15,14 +15,14 @@ class ErrorStringTester:
     def is_number_overflow_error(string):
         return string.startswith("OVERFLOW")
 
-    def is_outofboundaries_error(string):
-        return string.startswith("OUTOFBOUNDARIES")
+    def is_outofbounds_error(string):
+        return string.startswith("OUTOFBOUNDS")
 
     def is_limit_exceeded_error(string):
         return string.startswith("LIMIT")
 
     def is_write_error(string):
-        return string.startswith("ERROR") or string.startswith("OUTOFBOUNDARIES") or \
+        return string.startswith("ERROR") or string.startswith("OUTOFBOUNDS") or \
             string.startswith("WRONGTYPE") or string.startswith("NONEXISTENT")
 
     # NOTE: Uses .find instead of .startswith in case prefix added in the future

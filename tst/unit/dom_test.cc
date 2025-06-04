@@ -1842,12 +1842,12 @@ TEST_F(DomTest, testSelector_get_array_legacyPath) {
 
     path = ".phoneNumbers[2]";
     rc = selector.getValues(*doc1, path);
-    EXPECT_EQ(rc, JSONUTIL_INDEX_OUT_OF_ARRAY_BOUNDARIES);
+    EXPECT_EQ(rc, JSONUTIL_INDEX_OUT_OF_ARRAY_BOUNDS);
     EXPECT_TRUE(selector.getResultSet().empty());
 
     path = ".phoneNumbers[2].number";
     rc = selector.getValues(*doc1, path);
-    EXPECT_EQ(rc, JSONUTIL_INDEX_OUT_OF_ARRAY_BOUNDARIES);
+    EXPECT_EQ(rc, JSONUTIL_INDEX_OUT_OF_ARRAY_BOUNDS);
     EXPECT_TRUE(selector.getResultSet().empty());
 
     path = ".phoneNumbers[x]";
@@ -1883,7 +1883,7 @@ TEST_F(DomTest, testSelector_get_array_negativeIndex_legacy_and_v2ath) {
 
     path = "$['phoneNumbers'][-3]['number']";
     rc = selector.getValues(*doc1, path);
-    EXPECT_EQ(rc, JSONUTIL_INDEX_OUT_OF_ARRAY_BOUNDARIES);
+    EXPECT_EQ(rc, JSONUTIL_INDEX_OUT_OF_ARRAY_BOUNDS);
     EXPECT_TRUE(selector.getResultSet().empty());
 }
 
@@ -2042,7 +2042,7 @@ TEST_F(DomTest, testSelector_set_v2path_part2) {
 
     path = "$.phoneNumbers[2].number";
     rc = dom_set_value(nullptr, doc1, path, new_val);
-    EXPECT_EQ(rc, JSONUTIL_INDEX_OUT_OF_ARRAY_BOUNDARIES);
+    EXPECT_EQ(rc, JSONUTIL_INDEX_OUT_OF_ARRAY_BOUNDS);
 }
 
 TEST_F(DomTest, testSelector_set_v2path_part3) {
@@ -2062,7 +2062,7 @@ TEST_F(DomTest, testSelector_set_v2path_part3) {
 
     path = "$.phoneNumbers[-3].number";
     rc = dom_set_value(nullptr, doc1, path, new_val);
-    EXPECT_EQ(rc, JSONUTIL_INDEX_OUT_OF_ARRAY_BOUNDARIES);
+    EXPECT_EQ(rc, JSONUTIL_INDEX_OUT_OF_ARRAY_BOUNDS);
 }
 
 TEST_F(DomTest, testSelector_set_v2path_part4) {
