@@ -1861,7 +1861,7 @@ TEST_F(DomTest, testSelector_get_array_legacyPath) {
     EXPECT_TRUE(selector.getResultSet().empty());
 }
 
-TEST_F(DomTest, testSelector_get_array_negativeIndex_legacy_and_v2ath) {
+TEST_F(DomTest, testSelector_get_array_negativeIndex_legacy_and_v2path) {
     const char *path = ".phoneNumbers[-1]";
     Selector selector;
     JsonUtilCode rc = selector.getValues(*doc1, path);
