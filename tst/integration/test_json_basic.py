@@ -510,7 +510,7 @@ class TestJsonBasic(JsonTestCase):
             assert value == client.execute_command(
                 'JSON.GET', wikipedia, path).decode()
 
-    def test_json_path_syntax_objectkeys(self):
+    def test_json_path_syntax_object_keys(self):
         client = self.server.get_new_client()
         for (path, value) in [('["firstName"]', '"John"'),
                               ('address[\'city\']', '"New York"'),
@@ -1958,7 +1958,7 @@ class TestJsonBasic(JsonTestCase):
                     'JSON.OBJLEN', key, path)
             assert self.error_class.is_wrongtype_error(str(e.value))
 
-    def test_json_objectkeys_command(self):
+    def test_json_object_keys_command(self):
         client = self.server.get_new_client()
         obj_keys = [b'street', b'city', b'state', b'zipcode']
         assert obj_keys == client.execute_command(
