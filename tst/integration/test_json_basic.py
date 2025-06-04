@@ -1887,7 +1887,7 @@ class TestJsonBasic(JsonTestCase):
             assert exp_new_str == client.execute_command(
                 'JSON.GET', key, path).decode()
 
-    def test_json_objectlen_command(self):
+    def test_json_object_len_command(self):
         client = self.server.get_new_client()
         assert 4 == client.execute_command(
             'JSON.OBJLEN', wikipedia, '.address')
