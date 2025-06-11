@@ -8,6 +8,13 @@ set -e
 SCRIPT_DIR=$(pwd)
 echo "Script Directory: $SCRIPT_DIR"
 
+if [ "$1" = "clean" ]; then
+  echo "Cleaning build artifacts"
+  rm -rf build/
+  echo "Clean completed."
+  exit 0
+fi
+
 # If environment variable SERVER_VERSION is not set, default to "unstable"
 if [ -z "$SERVER_VERSION" ]; then
     echo "SERVER_VERSION environment variable is not set. Defaulting to \"unstable\"."
