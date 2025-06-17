@@ -20,7 +20,7 @@ jobs:
             echo "Triggered by a release event."
             VERSION=${{ github.event.release.tag_name }}
           else
-            echo "Triggered manually."
+            echo "Triggered by workflow_dispatch."
             VERSION=${{ inputs.version }}
           fi
 
