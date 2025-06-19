@@ -19,8 +19,9 @@ target_include_directories(${OBJECT_TARGET}
 	# Need to make the source files public within CMake
 	# so that they are used when building the tests.
 	PUBLIC
-	${CMAKE_CURRENT_SOURCE_DIR}
-	${rapidjson_SOURCE_DIR}/include
+        ${CMAKE_CURRENT_SOURCE_DIR}
+        ${CMAKE_CURRENT_SOURCE_DIR}/include
+        ${rapidjson_SOURCE_DIR}/include
 )
 
 # Add source files for the JSON module
@@ -38,3 +39,4 @@ target_sources(${OBJECT_TARGET}
 )
 
 add_library(${JSON_MODULE_LIB} SHARED $<TARGET_OBJECTS:${OBJECT_TARGET}>)
+add_dependencies(${OBJECT_TARGET} valkey)
