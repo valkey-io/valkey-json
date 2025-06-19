@@ -1,5 +1,18 @@
-Valkey JSON 1.0.0 release notes
+Valkey JSON 1.0 release notes
 ========================
+================================================================================
+Valkey JSON 1.0.1 - Released Thu 19 June 2025
+================================================================================
+Improvements in the build script
+
+* Add support for the following options to the build script:
+    ```
+    --help | -h               Print this help message and exit.
+    --release                 Builds the release configuration.
+    --unit                    Builds the unit tests configuration.
+    --integration             Builds the integration tests configuration.
+    --clean                   Cleans the build artifacts.
+    ```
 
 ================================================================================
 Valkey JSON 1.0.0 - Released Mon 1 April 2025
