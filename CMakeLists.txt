@@ -31,7 +31,7 @@ endif()
 # Set the name of the JSON shared library
 set(JSON_MODULE_LIB json)
 
-option(RELEASE_BUILD "Build only valkey-json module" OFF)
+option(BUILD_RELEASE "Build only valkey-json module" OFF)
 option(ENABLE_UNIT_TESTS "Build the module and runs unit tests" ON)
 option(ENABLE_INTEGRATION_TESTS "Build the module and runs integration tests" ON)
 
@@ -59,7 +59,7 @@ if(ENABLE_ASAN)
 endif()
 
 # Determine Valkey build command depending on build type
-if((RELEASE_BUILD OR ENABLE_UNIT_TESTS) AND NOT ENABLE_INTEGRATION_TESTS)
+if((BUILD_RELEASE OR ENABLE_UNIT_TESTS) AND NOT ENABLE_INTEGRATION_TESTS)
     set(VALKEY_BUILD_CMD ${CMAKE_COMMAND} -E echo "Skipping build step for release build")
 else()
     if(ENABLE_ASAN)

@@ -25,9 +25,9 @@ EOF
 
 SCRIPT_DIR=$(pwd)
 BUILD_DIR="$SCRIPT_DIR/build"
-RUN_UNIT=1
-RUN_INTEGRATION=1
-RELEASE_BUILD=0
+RUN_UNIT=0
+RUN_INTEGRATION=0
+BUILD_RELEASE=1
 CLEAN_BUILD=0
 
 ## Parse command line argument
@@ -36,14 +36,14 @@ do
     arg="$1"
     case $arg in
         --release)
-            RELEASE_BUILD=1
+            BUILD_RELEASE=1
             RUN_UNIT=0
             RUN_INTEGRATION=0
             ;;
         --unit)
             RUN_UNIT=1
             RUN_INTEGRATION=0
-            RELEASE_BUILD=0
+            BUILD_RELEASE=0
             ;;
         --integration)
             RUN_UNIT=0
@@ -101,13 +101,13 @@ else
     ENABLE_INTEGRATION_TESTS=OFF
 fi
 
-if [ $RELEASE_BUILD -eq 1 ]; then
-    ENABLE_RELEASE_BUILD=ON
+if [ $BUILD_RELEASE -eq 1 ]; then
+    ENABLE_BUILD_RELEASE=ON
 else
-    ENABLE_RELEASE_BUILD=OFF
+    ENABLE_BUILD_RELEASE=OFF
 fi
 
-CMAKE_FLAGS="$CMAKE_FLAGS -DENABLE_UNIT_TESTS=${ENABLE_UNIT_TESTS} -DENABLE_INTEGRATION_TESTS=${ENABLE_INTEGRATION_TESTS} -DRELEASE_BUILD=${ENABLE_RELEASE_BUILD}"
+CMAKE_FLAGS="$CMAKE_FLAGS -DENABLE_UNIT_TESTS=${ENABLE_UNIT_TESTS} -DENABLE_INTEGRATION_TESTS=${ENABLE_INTEGRATION_TESTS} -DBUILD_RELEASE=${ENABLE_BUILD_RELEASE}"
 
 if [ -z "${CFLAGS}" ]; then
     cmake .. -DVALKEY_VERSION=${SERVER_VERSION} ${CMAKE_FLAGS}
@@ -115,13 +115,13 @@ else
     cmake .. -DVALKEY_VERSION=${SERVER_VERSION} -DCFLAGS="${CFLAGS}" ${CMAKE_FLAGS}
 fi
 
-if [ $RELEASE_BUILD -eq 1 ] && [ $RUN_UNIT -eq 0 ] && [ $RUN_INTEGRATION -eq 0 ]; then
+if [ $BUILD_RELEASE -eq 1 ] && [ $RUN_UNIT -eq 0 ] && [ $RUN_INTEGRATION -eq 0 ]; then
     make -j
     echo "Release build completed"
     exit 0
 elif [ $RUN_UNIT -eq 1 ]; then
+    echo "Building valkey-json and running unit tests..."
     make -j unit
-    echo "Building valkey-json and running unit tests completed"
 fi
 
 if [ $RUN_INTEGRATION -eq 1 ]; then

@@ -5,15 +5,15 @@ Valkey-json is a Valkey module written in C++ that provides native JSON (JavaScr
 Valkey-json leverages [RapidJSON](https://rapidjson.org/), a high-performance JSON parser and generator for C++, chosen for its small footprint and exceptional performance and memory efficiency. As a header-only library with no external dependencies, RapidJSON provides robust Unicode support while maintaining a compact memory profile of just 16 bytes per JSON value on most 32/64-bit machines.
 
 ### Building and testing the module
-Valkey JSON  uses CMake for its build system. To simplify, a build script is provided. 
+Valkey JSON uses CMake for its build system. To simplify, a build script is provided. 
 
-To build and run all tests, use:
+To build only valkey-json module, use:
 ```text
 ./build.sh
 ```
-To build only valkey-json module, use:
+To build and run unit tests, use:
 ```text
-./build.sh --release
+./build.sh --unit
 ```
 To view the available arguments, use:
 ```text
@@ -22,22 +22,14 @@ To view the available arguments, use:
 
 The default valkey version is "unstable" for integration tests. To override it, do:
 ```text
-# Build valkey-server (8.0)
-SERVER_VERSION=8.0 ./build.sh
+# Run integration tests with valkey-server (8.1)
+SERVER_VERSION=8.1 ./build.sh --integration
 ```
 
 Custom compiler flags can be passed to the build script via environment variable CFLAGS. For example:
 ```text
 CFLAGS="-O0 -Wno-unused-function" ./build.sh
 ```
-
-To build the module with ASAN and run tests
-```text
-export ASAN_BUILD=true
-./build.sh
-```
-`ASAN_BUILD` works with any of the build script options and enables memory leak
-checks in the integration tests.
 
 To run single integration test:
 ```text
@@ -49,14 +41,23 @@ TEST_PATTERN=test_sanity ./build.sh --integration
 TEST_PATTERN=test_rdb.py ./build.sh --integration
 ```
 
+`ASAN_BUILD` works with any of the build script options and enables memory leak
+checks in the integration tests.
+
+To build the module with ASAN and run tests
+```text
+export ASAN_BUILD=true
+./build.sh --integration
+```
+
 ## Cleaning
 ```text
 # Clean build artifacts
-./build.sh clean
+./build.sh --clean
 ```
 
 ## Load the Module
-To test the module with a Valkey, you can load the module using any of the following ways:
+To load the module on Valkey, use any of the following:
 
 #### Using valkey.conf:
 ```
