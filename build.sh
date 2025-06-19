@@ -1,68 +1,145 @@
 #!/bin/bash
 
-# Script to build valkey-json module, build it and generate .so files, run unit and integration tests.
-
-# # Exit the script if any command fails
 set -e
 
-SCRIPT_DIR=$(pwd)
-echo "Script Directory: $SCRIPT_DIR"
+function print_usage() {
+cat<<EOF
+Usage: build.sh [--release] [--unit] [--integration] [--clean]
 
-# If environment variable SERVER_VERSION is not set, default to "unstable"
+    --help | -h               Print this help message and exit.
+    --release                 Builds the release configuration.
+    --unit                    Builds the unit tests configuration.
+    --integration             Builds the integration tests configuration.
+    --clean                   Cleans the build artifacts.
+
+Example usage:
+
+    # Build the release configuration,
+    ./build.sh --release
+
+    # Cleans the build artifacts,
+    ./build.sh --clean
+
+EOF
+}
+
+SCRIPT_DIR=$(pwd)
+BUILD_DIR="$SCRIPT_DIR/build"
+RUN_UNIT=0
+RUN_INTEGRATION=0
+BUILD_RELEASE=1
+CLEAN_BUILD=0
+
+## Parse command line argument
+while [[ $# -gt 0 ]]; 
+do
+    arg="$1"
+    case $arg in
+        --release)
+            BUILD_RELEASE=1
+            RUN_UNIT=0
+            RUN_INTEGRATION=0
+            ;;
+        --unit)
+            RUN_UNIT=1
+            RUN_INTEGRATION=0
+            BUILD_RELEASE=0
+            ;;
+        --integration)
+            RUN_UNIT=0
+            RUN_INTEGRATION=1
+            ;;
+        --clean)
+            CLEAN_BUILD=1
+            RUN_UNIT=0
+            RUN_INTEGRATION=0
+            ;;
+        --help|-h)
+            print_usage
+            exit 0
+            ;;
+        *)
+            print_usage
+            exit 1
+            ;;
+        esac
+    shift
+done
+
+if [ $CLEAN_BUILD -eq 1 ]; then
+    echo "Cleaning build artifacts..."
+    rm -rf "$BUILD_DIR" tst/integration/valkeytests tst/integration/.build src/include 
+    rm -rf tst/integration/assets tst/integration/test-data tst/integration/report.html
+    echo "Clean completed"
+    exit 0
+fi
+
 if [ -z "$SERVER_VERSION" ]; then
     echo "SERVER_VERSION environment variable is not set. Defaulting to \"unstable\"."
     export SERVER_VERSION="unstable"
 fi
 
-# Variables
-BUILD_DIR="$SCRIPT_DIR/build"
+mkdir -p "$BUILD_DIR"
+cd "$BUILD_DIR"
 
-# Build the Valkey JSON module using CMake
-echo "Building valkey-json..."
-if [ ! -d "$BUILD_DIR" ]; then
-    mkdir $BUILD_DIR
-fi
-cd $BUILD_DIR
-
-if [ ! -z "${ASAN_BUILD}" ]; then
+CMAKE_FLAGS=""
+if [ -n "${ASAN_BUILD}" ]; then
     CMAKE_FLAGS="-DCMAKE_BUILD_TYPE=Debug -DENABLE_ASAN=ON"
 else
-    CMAKE_FLAGS=""
+    CMAKE_FLAGS="-DCMAKE_BUILD_TYPE=Release"
 fi
+
+if [ $RUN_UNIT -eq 1 ]; then
+    ENABLE_UNIT_TESTS=ON
+else
+    ENABLE_UNIT_TESTS=OFF
+fi
+
+if [ $RUN_INTEGRATION -eq 1 ]; then
+    ENABLE_INTEGRATION_TESTS=ON
+else
+    ENABLE_INTEGRATION_TESTS=OFF
+fi
+
+if [ $BUILD_RELEASE -eq 1 ]; then
+    ENABLE_BUILD_RELEASE=ON
+else
+    ENABLE_BUILD_RELEASE=OFF
+fi
+
+CMAKE_FLAGS="$CMAKE_FLAGS -DENABLE_UNIT_TESTS=${ENABLE_UNIT_TESTS} -DENABLE_INTEGRATION_TESTS=${ENABLE_INTEGRATION_TESTS} -DBUILD_RELEASE=${ENABLE_BUILD_RELEASE}"
 
 if [ -z "${CFLAGS}" ]; then
-  cmake .. -DVALKEY_VERSION=${SERVER_VERSION} ${CMAKE_FLAGS}
+    cmake .. -DVALKEY_VERSION=${SERVER_VERSION} ${CMAKE_FLAGS}
 else
-  cmake .. -DVALKEY_VERSION=${SERVER_VERSION} -DCFLAGS=${CFLAGS} ${CMAKE_FLAGS}
-fi
-make
-
-# Running the Valkey JSON unit tests.
-echo "Running Unit Tests..."
-make -j unit
-
-cd $SCRIPT_DIR
-
-REQUIREMENTS_FILE="requirements.txt"
-
-# Check if pip is available
-if command -v pip > /dev/null 2>&1; then
-    echo "Using pip to install packages..."
-    pip install -r "$SCRIPT_DIR/$REQUIREMENTS_FILE"
-# Check if pip3 is available
-elif command -v pip3 > /dev/null 2>&1; then
-    echo "Using pip3 to install packages..."
-    pip3 install -r "$SCRIPT_DIR/$REQUIREMENTS_FILE"
-else
-    echo "Error: Neither pip nor pip3 is available. Please install Python package installer."
-    exit 1
+    cmake .. -DVALKEY_VERSION=${SERVER_VERSION} -DCFLAGS="${CFLAGS}" ${CMAKE_FLAGS}
 fi
 
-export MODULE_PATH="$SCRIPT_DIR/build/src/libjson.so"
+if [ $BUILD_RELEASE -eq 1 ] && [ $RUN_UNIT -eq 0 ] && [ $RUN_INTEGRATION -eq 0 ]; then
+    make -j
+    echo "Release build completed"
+    exit 0
+elif [ $RUN_UNIT -eq 1 ]; then
+    echo "Building valkey-json and running unit tests..."
+    make -j unit
+fi
 
-# Running the Valkey JSON integration tests.
-echo "Running the integration tests..."
-cd $BUILD_DIR
-make -j test
+if [ $RUN_INTEGRATION -eq 1 ]; then
+    make -j
+    cd "$SCRIPT_DIR"
+    REQUIREMENTS_FILE="requirements.txt"
+    if command -v pip > /dev/null 2>&1; then
+        pip install -r "$SCRIPT_DIR/$REQUIREMENTS_FILE"
+    elif command -v pip3 > /dev/null 2>&1; then
+        pip3 install -r "$SCRIPT_DIR/$REQUIREMENTS_FILE"
+    else
+        echo "Error: Neither pip nor pip3 is available."
+        exit 1
+    fi
+    export MODULE_PATH="$BUILD_DIR/src/libjson.so"
+    cd "$BUILD_DIR"
+    echo "Running integration tests...${TEST_PATTERN}"
+    TEST_PATTERN=${TEST_PATTERN} make -j test
+fi
 
-echo "Build and Integration Tests succeeded"
+echo "Build script completed"
