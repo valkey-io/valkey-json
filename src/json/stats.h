@@ -84,7 +84,7 @@ uint32_t jsonstats_find_bucket(size_t size);
  * We don't track the logical bytes themselves here as they are tracked by Skyhook Metering.
  * We are using size_t to match Valkey Module API for Data Metering.
  */
-typedef struct {
+typedef struct _LogicalStats {
     std::atomic_size_t boolean_count;  // 16 bytes
     std::atomic_size_t number_count;  // 16 bytes
     std::atomic_size_t sum_extra_numeric_chars;  // 1 byte per char
