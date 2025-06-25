@@ -27,8 +27,27 @@ endif()
 project(ValkeyJSONModule VERSION 99.99.99 LANGUAGES C CXX) # Version is 99.99.99 for unstable branch
 
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-mismatched-tags -Wno-format")
+
+# Clang related adjustments
+set(COMPILER_IS_CLANG OFF)
 if (${CMAKE_C_COMPILER_ID} STREQUAL "Clang" OR ${CMAKE_C_COMPILER_ID} STREQUAL "AppleClang")
+    set(COMPILER_IS_CLANG ON)
+endif()
+
+if (COMPILER_IS_CLANG)
+    message(STATUS "Defining VALKEYMODULE_ATTR_COMMON => __attribute__((weak))")
     add_definitions(-DVALKEYMODULE_ATTR_COMMON=__attribute__\(\(weak\)\))
+endif()
+
+if(APPLE AND NOT COMPILER_IS_CLANG)
+    # Force clang compiler on macOS
+    find_program(CLANGPP "clang++")
+    find_program(CLANG "clang")
+    if(CLANG AND CLANGPP)
+          message(STATUS "Found ${CLANGPP}, ${CLANG}")
+          set(CMAKE_CXX_COMPILER ${CLANGPP})
+          set(CMAKE_C_COMPILER ${CLANG})
+    endif()
 endif()
 
 # ASAN build option
