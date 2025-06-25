@@ -174,7 +174,7 @@ JsonUtilCode dom_verify_value(ValkeyModuleCtx *ctx, JDocument *doc, const char *
     Selector selector;
     JsonUtilCode rc = selector.prepareSetValues(doc->GetJValue(), json_path);
     if (rc != JSONUTIL_SUCCESS) return rc;
-    
+
     JParser new_val;
     if (new_val.Parse(new_val_json, new_val_size).HasParseError()) {
         return new_val.GetParseErrorCode();
@@ -670,7 +670,7 @@ JsonUtilCode dom_object_keys(JDocument *doc, const char *path,
         jsn::vector<jsn::string> keys;
         if (v->IsObject()) {
             for (auto &m : v->GetObject()) {
-                keys.push_back(std::move(jsn::string(m.name.GetString(), m.name.GetStringLength())));
+                keys.push_back(jsn::string(m.name.GetString(), m.name.GetStringLength()));
             }
         }
         vec.push_back(keys);
@@ -1101,27 +1101,27 @@ JsonUtilCode dom_value_type(JDocument *doc, const char *path, jsn::vector<jsn::s
     for (auto &v : selector.getResultSet()) {
         switch (v.first->GetType()) {
             case rapidjson::kNullType:
-                vec.push_back(std::move(jsn::string(TYPE_NAMES[0])));
+                vec.push_back(jsn::string(TYPE_NAMES[0]));
                 break;
             case rapidjson::kTrueType:
             case rapidjson::kFalseType:
-                vec.push_back(std::move(jsn::string(TYPE_NAMES[1])));
+                vec.push_back(jsn::string(TYPE_NAMES[1]));
                 break;
             case rapidjson::kStringType:
-                vec.push_back(std::move(jsn::string(TYPE_NAMES[2])));
+                vec.push_back(jsn::string(TYPE_NAMES[2]));
                 break;
             case rapidjson::kNumberType: {
                 if (v.first->IsDouble())
-                    vec.push_back(std::move(jsn::string(TYPE_NAMES[3])));
+                    vec.push_back(jsn::string(TYPE_NAMES[3]));
                 else
-                    vec.push_back(std::move(jsn::string(TYPE_NAMES[4])));
+                    vec.push_back(jsn::string(TYPE_NAMES[4]));
                 break;
             }
             case rapidjson::kObjectType:
-                vec.push_back(std::move(jsn::string(TYPE_NAMES[5])));
+                vec.push_back(jsn::string(TYPE_NAMES[5]));
                 break;
             case rapidjson::kArrayType:
-                vec.push_back(std::move(jsn::string(TYPE_NAMES[6])));
+                vec.push_back(jsn::string(TYPE_NAMES[6]));
                 break;
             default:
                 ValkeyModule_Assert(false);
@@ -1513,7 +1513,7 @@ JValue rdbLoadJValue(load_params *params) {
             return array;
         }
         default:
-            ValkeyModule_LogIOError(params->rdb, "error", "Invalid metadata code %lx", code);
+            ValkeyModule_LogIOError(params->rdb, "error", "Invalid metadata code %llx", code);
             params->status = JSONUTIL_INVALID_RDB_FORMAT;
             return JValue();
     }
