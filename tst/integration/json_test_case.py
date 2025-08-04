@@ -15,8 +15,22 @@ class SimpleTestCase(ValkeyTestCase):
     '''
     @pytest.fixture(autouse=True)
     def setup_test(self, setup):
-        server_path = f"{os.path.dirname(os.path.realpath(__file__))}/.build/binaries/{os.environ['SERVER_VERSION']}/valkey-server"
-        self.server, self.client = self.create_server(testdir = self.testdir,  server_path=server_path)
+        use_external = os.environ.get("VALKEY_EXTERNAL_SERVER", "false").lower() == "true"
+        
+        if use_external:
+            # Use external server
+            external_host = os.environ.get("VALKEY_HOST", "localhost")
+            external_port = int(os.environ.get("VALKEY_PORT", "6379"))
+            self.server, self.client = self.create_server(
+                testdir=self.testdir,
+                bind_ip=external_host,
+                port=external_port,
+                external_server=True
+            )
+        else:
+            # Original local server
+            server_path = f"{os.path.dirname(os.path.realpath(__file__))}/.build/binaries/{os.environ['SERVER_VERSION']}/valkey-server"
+            self.server, self.client = self.create_server(testdir=self.testdir, server_path=server_path)
 
     def teardown(self):
         if self.is_connected():
@@ -47,9 +61,24 @@ class JsonTestCase(SimpleTestCase):
 
     @pytest.fixture(autouse=True)
     def setup_test(self, setup):
-        server_path = f"{os.path.dirname(os.path.realpath(__file__))}/.build/binaries/{os.environ['SERVER_VERSION']}/valkey-server"
-        args = {'loadmodule': os.getenv('MODULE_PATH'), "enable-debug-command": "local", 'enable-protected-configs': 'yes'}
-        self.server, self.client = self.create_server(testdir = self.testdir,  server_path=server_path, args=args)
+        use_external = os.environ.get("VALKEY_EXTERNAL_SERVER", "false").lower() == "true"
+        
+        if use_external:
+            # Use external server
+            external_host = os.environ.get("VALKEY_HOST", "localhost")
+            external_port = int(os.environ.get("VALKEY_PORT", "6379"))
+            self.server, self.client = self.create_server(
+                testdir=self.testdir,
+                bind_ip=external_host,
+                port=external_port,
+                external_server=True
+            )
+            logging.info("Using external valkey-bundle server with JSON module")
+        else:
+            # Original local server
+            server_path = f"{os.path.dirname(os.path.realpath(__file__))}/.build/binaries/{os.environ['SERVER_VERSION']}/valkey-server"
+            args = {'loadmodule': os.getenv('MODULE_PATH'), "enable-debug-command": "local", 'enable-protected-configs': 'yes'}
+            self.server, self.client = self.create_server(testdir=self.testdir, server_path=server_path, args=args)
 
         self.error_class = ErrorStringTester
 
