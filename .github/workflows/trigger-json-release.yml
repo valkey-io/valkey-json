@@ -1,4 +1,4 @@
-name: Trigger Extension Update - JSON
+name: Trigger Valkey Bundle Update - JSON
 
 on:
   release:
