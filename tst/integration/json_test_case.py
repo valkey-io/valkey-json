@@ -73,7 +73,6 @@ class JsonTestCase(SimpleTestCase):
                 port=external_port,
                 external_server=True
             )
-            logging.info("Using external valkey-bundle server with JSON module")
         else:
             # Original local server
             server_path = f"{os.path.dirname(os.path.realpath(__file__))}/.build/binaries/{os.environ['SERVER_VERSION']}/valkey-server"

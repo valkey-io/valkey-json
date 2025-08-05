@@ -39,7 +39,6 @@ class TestRdb(JsonTestCase):
                 port=external_port,
                 external_server=True
             )
-            logging.info("Using external valkey-bundle server for TestJsonBasic")
         else:
             # Original local server setup
             server_path = f"{os.path.dirname(os.path.realpath(__file__))}/.build/binaries/{os.environ['SERVER_VERSION']}/valkey-server"
