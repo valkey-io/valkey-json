@@ -36,8 +36,4 @@ jobs:
             {
               "version": "${{ steps.determine-vars.outputs.version }}",
               "component": "json"
-<<<<<<< HEAD
             }
-=======
-            }
->>>>>>> 6b5f54b (Changed payload variable name)
