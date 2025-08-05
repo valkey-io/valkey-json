@@ -26,7 +26,7 @@ jobs:
 
           echo "version=$VERSION" >> $GITHUB_OUTPUT
 
-      - name: Trigger extension update
+      - name: Trigger valkey-bundle update
         uses: peter-evans/repository-dispatch@v3
         with:
           token: ${{ secrets.EXTENSION_PAT }}
