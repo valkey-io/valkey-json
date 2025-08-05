@@ -27,15 +27,13 @@
  *    helper structs named as XXXCmdsArgs, and helper methods named as parseXXXCmdArgs, where XXX is command name.
  */
 
-#include "json/json.h"
 #include "json/dom.h"
-#include "json/rapidjson_includes.h"
-#include "json/alloc.h"
 #include "json/stats.h"
 #include "json/memory.h"
+#include "json/shared_api.h"
 #include "./include/valkeymodule.h"
+
 #include <string>
-#include <memory>
 #include <cmath>
 
 /* In unstable branch the module version is always "999999". */
@@ -171,6 +169,17 @@ bool json_is_instrument_enabled_dump_value_before_delete() {
 
 /* ============================== Helper Methods ============================== */
 
+/* Verify that an open Key is a JSON document 
+    * @param key - ValkeyModuleKey pointer.
+    * @return JSONUTIL_SUCCESS if the key is a valid document key, otherwise an error code.
+    */
+JsonUtilCode verify_open_doc_key(ValkeyModuleKey *key) {
+    if (ValkeyModule_KeyType(key) == VALKEYMODULE_KEYTYPE_EMPTY) return JSONUTIL_DOCUMENT_KEY_NOT_FOUND;
+    if (ValkeyModule_ModuleTypeGetType(key) != DocumentType) return JSONUTIL_NOT_A_DOCUMENT_KEY;
+    return JSONUTIL_SUCCESS;
+}
+
+
 /* Verify that the document key exists and is a document key.
  * @param key - OUTPUT parameter, pointer to ValkeyModuleKey pointer.
  */
@@ -178,9 +187,7 @@ STATIC JsonUtilCode verify_doc_key(ValkeyModuleCtx *ctx, ValkeyModuleString *rmK
                                                                                      bool readOnly = false) {
     *key = static_cast<ValkeyModuleKey*>(ValkeyModule_OpenKey(ctx, rmKey,
                                         readOnly?  VALKEYMODULE_READ : VALKEYMODULE_READ | VALKEYMODULE_WRITE));
-    if (ValkeyModule_KeyType(*key) == VALKEYMODULE_KEYTYPE_EMPTY) return JSONUTIL_DOCUMENT_KEY_NOT_FOUND;
-    if (ValkeyModule_ModuleTypeGetType(*key) != DocumentType) return JSONUTIL_NOT_A_DOCUMENT_KEY;
-    return JSONUTIL_SUCCESS;
+    return verify_open_doc_key(*key);                                        
 }
 
 /* Fetch JSON at a single path.
@@ -3035,6 +3042,8 @@ extern "C" int ValkeyModule_OnLoad(ValkeyModuleCtx *ctx) {
 
     // Register module configs
     if (registerModuleConfigs(ctx) == VALKEYMODULE_ERR) return VALKEYMODULE_ERR;
+
+    SharedAPI_Register(ctx);
 
     return VALKEYMODULE_OK;
 }
