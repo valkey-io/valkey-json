@@ -1,0 +1,11 @@
+# See https://github.com/crate-ci/typos/blob/master/docs/reference.md to configure typos
+
+[files]
+extend-exclude = [
+    ".git/",
+    "deps/",
+]
+
+[default.extend-words]
+Valkey = "Valkey"
+valkey = "valkey"
