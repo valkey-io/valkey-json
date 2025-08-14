@@ -4,8 +4,12 @@
 extend-exclude = [
     ".git/",
     "deps/",
+    "tst/"
 ]
 
 [default.extend-words]
 Valkey = "Valkey"
 valkey = "valkey"
+threadsave = "threadsave"
+ctrlChar_2ndPart = "ctrlChar_2ndPart"
+INSERTs = "INSERTs"
