@@ -4,12 +4,18 @@
 extend-exclude = [
     ".git/",
     "deps/",
-    "tst/"
+    "tst/",
+    "build/",
+    "cmake-build-debug/",
+    "rapidjson/",
+    "CMakeLists.txt"
 ]
 
 [default.extend-words]
 Valkey = "Valkey"
 valkey = "valkey"
 threadsave = "threadsave"
+
+[default.extend-identifiers]
 ctrlChar_2ndPart = "ctrlChar_2ndPart"
 INSERTs = "INSERTs"

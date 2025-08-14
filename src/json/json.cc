@@ -10,7 +10,7 @@
  * Design Considerations:
  * 1. All JSON CRUD operations should be delegated to the DOM module.
  * 2. Shared utility/helper code should reside in the UTIL module.
- * 3. When invoking a DOM or UTIL method tha returns a heap-allocated object, the caller must release the memory
+ * 3. When invoking a DOM or UTIL method the returns a heap-allocated object, the caller must release the memory
  *    after consuming it.
  * 4. The first line of every command handler should be: "ValkeyModule_AutoMemory(ctx);". This is for enabling
  *    auto memory management for the command.
