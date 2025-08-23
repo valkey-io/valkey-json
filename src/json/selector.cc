@@ -1,26 +1,28 @@
 #include "json/selector.h"
-#include "json/util.h"
-#include "json/json.h"
-#include "json/rapidjson_includes.h"
+
 #include <rapidjson/pointer.h>
-#include <iostream>
-#include <cstring>
+
 #include <algorithm>
+#include <cstring>
+#include <iostream>
 #include <iterator>
 
+#include "json/json.h"
+#include "json/rapidjson_includes.h"
+#include "json/util.h"
+
 #ifdef INSTRUMENT_V2PATH
-#define TRACE(level, msg) \
-std::cout << level << " " << msg << std::endl;
+#define TRACE(level, msg) std::cout << level << " " << msg << std::endl;
 #else
 #define TRACE(level, msg)
 #endif
 
-#define ENABLE_V2_SYNTAX    1
+#define ENABLE_V2_SYNTAX 1
 
 static const char DOUBLE_QUOTE = '"';
 static const char SINGLE_QUOTE = '\'';
 
-typedef rapidjson::GenericPointer<RJValue, RapidJsonAllocator> RJPointer;
+using RJPointer = rapidjson::GenericPointer<RJValue, RapidJsonAllocator>;
 
 struct JPointer : RJPointer {
     explicit JPointer(const jsn::string &path) : RJPointer(&allocator) {
@@ -28,7 +30,7 @@ struct JPointer : RJPointer {
         if (!IsValid()) error = JSONUTIL_INVALID_JSON_PATH;
     }
     bool HasError() { return error != JSONUTIL_SUCCESS; }
-    bool PathExists(JValue& doc) { return Get(doc) != nullptr; }
+    bool PathExists(JValue &doc) { return Get(doc) != nullptr; }
 
     // Reexport
     using RJPointer::Erase;
@@ -40,21 +42,17 @@ struct JPointer : RJPointer {
 thread_local int64_t current_depth = 0;  // parser's recursion depth
 
 class RecursionDepthTracker {
- public:
-    RecursionDepthTracker() {
-        current_depth++;
-    }
-    ~RecursionDepthTracker() {
-        current_depth--;
-    }
+   public:
+    RecursionDepthTracker() { current_depth++; }
+    ~RecursionDepthTracker() { current_depth--; }
     bool isTooDeep() { return current_depth > static_cast<int64_t>(json_get_max_parser_recursion_depth()); }
 };
 
-#define CHECK_RECURSION_DEPTH() \
+#define CHECK_RECURSION_DEPTH()       \
     RecursionDepthTracker _rdtracker; \
     if (_rdtracker.isTooDeep()) return JSONUTIL_PARSER_RECURSION_DEPTH_LIMIT_EXCEEDED;
 
-#define CHECK_RECURSIVE_DESCENT_TOKENS() \
+#define CHECK_RECURSIVE_DESCENT_TOKENS()                                           \
     if (lex.getRecursiveDescentTokens() > json_get_max_recursive_descent_tokens()) \
         return JSONUTIL_RECURSIVE_DESCENT_TOKEN_LIMIT_EXCEEDED;
 
@@ -113,62 +111,80 @@ void Lexer::init(const char *path) {
 
 Token::TokenType Lexer::peekToken() const {
     switch (*p) {
-        case '\0': return Token::END;
-        case '$': return Token::DOLLAR;
+        case '\0':
+            return Token::END;
+        case '$':
+            return Token::DOLLAR;
         case '.': {
-            if (*(p+1) == '.')
+            if (*(p + 1) == '.')
                 return Token::DOTDOT;
             else
                 return Token::DOT;
         }
-        case '*': return Token::WILDCARD;
-        case ':': return Token::COLON;
-        case ',': return Token::COMMA;
-        case '?': return Token::QUESTION_MARK;
-        case '@': return Token::AT;
-        case '[': return Token::LBRACKET;
-        case ']': return Token::RBRACKET;
-        case '(': return Token::LPAREN;
-        case ')': return Token::RPAREN;
-        case '\'': return Token::SINGLE_QUOTE;
-        case '"': return Token::DOUBLE_QUOTE;
-        case '+': return Token::PLUS;
-        case '-': return Token::MINUS;
-        case '/': return Token::DIV;
-        case '%': return Token::PCT;
-        case ' ': return Token::SPACE;
+        case '*':
+            return Token::WILDCARD;
+        case ':':
+            return Token::COLON;
+        case ',':
+            return Token::COMMA;
+        case '?':
+            return Token::QUESTION_MARK;
+        case '@':
+            return Token::AT;
+        case '[':
+            return Token::LBRACKET;
+        case ']':
+            return Token::RBRACKET;
+        case '(':
+            return Token::LPAREN;
+        case ')':
+            return Token::RPAREN;
+        case '\'':
+            return Token::SINGLE_QUOTE;
+        case '"':
+            return Token::DOUBLE_QUOTE;
+        case '+':
+            return Token::PLUS;
+        case '-':
+            return Token::MINUS;
+        case '/':
+            return Token::DIV;
+        case '%':
+            return Token::PCT;
+        case ' ':
+            return Token::SPACE;
         case '&': {
-            if (*(p+1) == '&')
+            if (*(p + 1) == '&')
                 return Token::AND;
             else
                 return Token::SPECIAL_CHAR;
         }
         case '|': {
-            if (*(p+1) == '|')
+            if (*(p + 1) == '|')
                 return Token::OR;
             else
                 return Token::SPECIAL_CHAR;
         }
         case '=': {
-            if (*(p+1) == '=')
+            if (*(p + 1) == '=')
                 return Token::EQ;
             else
                 return Token::ASSIGN;
         }
         case '!': {
-            if (*(p+1) == '=')
+            if (*(p + 1) == '=')
                 return Token::NE;
             else
                 return Token::NOT;
         }
         case '>': {
-            if (*(p+1) == '=')
+            if (*(p + 1) == '=')
                 return Token::GE;
             else
                 return Token::GT;
         }
         case '<': {
-            if (*(p+1) == '=')
+            if (*(p + 1) == '=')
                 return Token::LE;
             else
                 return Token::LT;
@@ -193,9 +209,9 @@ Token::TokenType Lexer::peekToken() const {
 Token Lexer::nextToken(const bool skipSpace) {
     next.type = peekToken();
     switch (next.type) {
-        case Token::END: return next;
-        case Token::DOTDOT:
-        {
+        case Token::END:
+            return next;
+        case Token::DOTDOT: {
             rdTokens++;
             next.strVal = std::string_view(p, 2);
             p++;
@@ -207,8 +223,7 @@ Token Lexer::nextToken(const bool skipSpace) {
         case Token::LE:
         case Token::EQ:
         case Token::AND:
-        case Token::OR:
-        {
+        case Token::OR: {
             next.strVal = std::string_view(p, 2);
             p++;
             p++;
@@ -216,14 +231,12 @@ Token Lexer::nextToken(const bool skipSpace) {
         }
         case Token::DIGIT:
         case Token::ALPHA:
-        case Token::SPECIAL_CHAR:
-        {
+        case Token::SPECIAL_CHAR: {
             next.strVal = std::string_view(p, 1);
             p++;
             break;
         }
-        case Token::SPACE:
-        {
+        case Token::SPACE: {
             if (skipSpace) {
                 while (*p == ' ') p++;
                 return nextToken();
@@ -270,7 +283,7 @@ JsonUtilCode Lexer::scanInteger(int64_t &val) {
     if (next.type == Token::DIGIT) {
         val = scanUnsignedInteger();
     } else {
-        int sign = (next.type == Token::PLUS? 1 : -1);
+        int sign = (next.type == Token::PLUS ? 1 : -1);
         nextToken();  // skip the PLUS/MINUS sign symbol
         if (next.type != Token::DIGIT) return JSONUTIL_VALUE_NOT_NUMBER;
         val = sign * scanUnsignedInteger();
@@ -309,8 +322,8 @@ JsonUtilCode Lexer::scanUnquotedMemberName(StringViewHelper &member_name) {
     p += length;
 
     member_name.setExternalView(std::string_view(p_start, len));
-    TRACE("DEBUG", "scanUnquotedMemberName token type: " << next.type << ", token val: "
-        << next.strVal << ", name: " << member_name.getView())
+    TRACE("DEBUG", "scanUnquotedMemberName token type: " << next.type << ", token val: " << next.strVal
+                                                         << ", name: " << member_name.getView())
     nextToken();  // advance to the next token
     return JSONUTIL_SUCCESS;
 }
@@ -419,7 +432,7 @@ JsonUtilCode Lexer::scanPathValue(StringViewHelper &output) {
                     return JSONUTIL_INVALID_JSON_PATH;
                 }
             } else {
-                if (*p == '\\' && *(p+1) == current_quote) {
+                if (*p == '\\' && *(p + 1) == current_quote) {
                     p++;
                     len++;
                 } else if (*p == current_quote) {
@@ -439,8 +452,8 @@ JsonUtilCode Lexer::scanPathValue(StringViewHelper &output) {
 
 /**
  * Scan double quoted string that may contain escaped characters.
-*/
-JsonUtilCode Lexer::scanDoubleQuotedString(JParser& parser) {
+ */
+JsonUtilCode Lexer::scanDoubleQuotedString(JParser &parser) {
     const char *p_start = next.strVal.data();
     size_t len = 1;
     ValkeyModule_Assert(*p_start == DOUBLE_QUOTE);
@@ -466,7 +479,7 @@ JsonUtilCode Lexer::scanDoubleQuotedString(JParser& parser) {
         return parser.GetParseErrorCode();
     }
     TRACE("DEBUG", "scanDoubleQuotedString before unescape: " << name << ", after unescape: "
-    << parser.GetJValue().GetStringView())
+                                                              << parser.GetJValue().GetStringView())
 
     nextToken();  // advance to the next token
     return JSONUTIL_SUCCESS;
@@ -474,7 +487,7 @@ JsonUtilCode Lexer::scanDoubleQuotedString(JParser& parser) {
 
 /**
  * Scan double quoted string that may contain escaped characters.
-*/
+ */
 JsonUtilCode Lexer::scanDoubleQuotedString(jsn::stringstream &ss) {
     JParser parser;
     JsonUtilCode rc = scanDoubleQuotedString(parser);
@@ -510,7 +523,7 @@ JsonUtilCode Lexer::scanSingleQuotedStringAndConvertToDoubleQuotedString(jsn::st
             case '\\': {  // unescape single quotes
                 // Since the underlying string must end with a null terminator, we can safely access
                 // the next character at index i+1.
-                if (sv[i+1] != '\'') {
+                if (sv[i + 1] != '\'') {
                     ss << sv[i];
                 }
                 break;
@@ -551,8 +564,7 @@ JsonUtilCode Lexer::scanSingleQuotedString(jsn::stringstream &ss) {
 
     if (escaped) {
         unescape(name, ss);
-        TRACE("DEBUG", "scanSingleQuotedString before unescape: " << name << ", after unescape: "
-        << ss.str())
+        TRACE("DEBUG", "scanSingleQuotedString before unescape: " << name << ", after unescape: " << ss.str())
     } else {
         ss << name;
         TRACE("DEBUG", "scanSingleQuotedString name: " << ss.str())
@@ -582,7 +594,7 @@ void Lexer::unescape(const std::string_view &input, jsn::stringstream &ss) {
                     ss << input[i];
                 } else {
                     // check if the next char is an escaped control character
-                    const char *ptr = strchr(ctrlChar_2ndPart, input[i+1]);
+                    const char *ptr = strchr(ctrlChar_2ndPart, input[i + 1]);
                     if (ptr != nullptr) {
                         i++;  // skip the backslash, which is used to escape the next character
                         // output the internal representation of the control character
@@ -609,8 +621,8 @@ JsonUtilCode Selector::getValues(JValue &root, const char *path) {
 }
 
 struct pathCompare {
- public:
-    bool operator() (const jsn::string& path1, const jsn::string& path2) const {
+   public:
+    bool operator()(const jsn::string &path1, const jsn::string &path2) const {
         // compare path depth
         JPointer ptr1 = JPointer(path1);
         JPointer ptr2 = JPointer(path2);
@@ -618,8 +630,8 @@ struct pathCompare {
         size_t depth2 = ptr2.GetTokenCount();
         if (depth1 != depth2) return depth1 > depth2;
 
-        const JPointer::Token* tokenArray1 = ptr1.GetTokens();
-        const JPointer::Token* tokenArray2 = ptr2.GetTokens();
+        const JPointer::Token *tokenArray1 = ptr1.GetTokens();
+        const JPointer::Token *tokenArray2 = ptr2.GetTokens();
         bool areBothLeavesIndex = (tokenArray1[depth1 - 1].index != rapidjson::kPointerInvalidIndex &&
                                    tokenArray2[depth2 - 1].index != rapidjson::kPointerInvalidIndex);
         if (!areBothLeavesIndex) {
@@ -628,12 +640,10 @@ struct pathCompare {
         }
 
         // compare path elements up to the parent of leaf
-        for (size_t i=0; i < depth1 - 1; i++) {
-            if (tokenArray1[i].index != tokenArray2[i].index)
-                return tokenArray1[i].index > tokenArray2[i].index;
+        for (size_t i = 0; i < depth1 - 1; i++) {
+            if (tokenArray1[i].index != tokenArray2[i].index) return tokenArray1[i].index > tokenArray2[i].index;
 
-            if (tokenArray1[i].length != tokenArray2[i].length)
-                return tokenArray1[i].length > tokenArray2[i].length;
+            if (tokenArray1[i].length != tokenArray2[i].length) return tokenArray1[i].length > tokenArray2[i].length;
 
             if (int cmp = std::memcmp(tokenArray1[i].name, tokenArray2[i].name, sizeof(char) * tokenArray1[i].length))
                 return cmp > 0;
@@ -655,11 +665,11 @@ JsonUtilCode Selector::deleteValues(JValue &root, const char *path, size_t &numV
 
     TRACE("DEBUG", "deleteValues total values to delete: " << resultSet.size());
     if (json_is_instrument_enabled_delete()) {
-        ValkeyModule_Log(nullptr, "warning", "deleting %zu values of doc %p at path %s",
-                        resultSet.size(), static_cast<void *>(&root), path);
+        ValkeyModule_Log(nullptr, "warning", "deleting %zu values of doc %p at path %s", resultSet.size(),
+                         static_cast<void *>(&root), path);
         if (!ValidateJValue(root)) {
             ValkeyModule_Log(nullptr, "warning", "ERROR: before delete, doc %p is NOT valid!",
-                            static_cast<void *>(&root));
+                             static_cast<void *>(&root));
         }
         if (json_is_instrument_enabled_dump_doc_before()) {
             ValkeyModule_Log(nullptr, "warning", "Dump document structure before delete:");
@@ -670,7 +680,7 @@ JsonUtilCode Selector::deleteValues(JValue &root, const char *path, size_t &numV
     if (resultSet.size() == 1) {
         if (json_is_instrument_enabled_delete()) {
             ValkeyModule_Log(nullptr, "warning", "deleting value %p of doc %p at path %s",
-                            static_cast<void *>(resultSet[0].first), static_cast<void *>(&root), path);
+                             static_cast<void *>(resultSet[0].first), static_cast<void *>(&root), path);
             if (json_is_instrument_enabled_dump_value_before_delete()) {
                 DumpRedactedJValue(*resultSet[0].first, nullptr, "warning");
             }
@@ -681,19 +691,19 @@ JsonUtilCode Selector::deleteValues(JValue &root, const char *path, size_t &numV
         for (auto &vInfo : resultSet) {
             if (json_is_instrument_enabled_delete()) {
                 ValkeyModule_Log(nullptr, "warning", "preparing to delete value %p of doc %p at path %s",
-                                static_cast<void *>(vInfo.first), static_cast<void *>(&root), vInfo.second.c_str());
+                                 static_cast<void *>(vInfo.first), static_cast<void *>(&root), vInfo.second.c_str());
                 if (json_is_instrument_enabled_dump_value_before_delete()) {
                     DumpRedactedJValue(*vInfo.first, nullptr, "warning");
                 }
             }
             path_set.insert(std::move(vInfo.second));
         }
-        for (auto it = path_set.begin(); it != path_set.end(); it++) {
+        for (const auto &it : path_set) {
             if (json_is_instrument_enabled_delete()) {
-                ValkeyModule_Log(nullptr, "warning", "deleting value of doc %p at path %s",
-                                static_cast<void *>(&root), (*it).c_str());
+                ValkeyModule_Log(nullptr, "warning", "deleting value of doc %p at path %s", static_cast<void *>(&root),
+                                 it.c_str());
             }
-            if (deleteValue(*it)) numValsDeleted++;
+            if (deleteValue(it)) numValsDeleted++;
         }
     }
 
@@ -701,7 +711,7 @@ JsonUtilCode Selector::deleteValues(JValue &root, const char *path, size_t &numV
     if (json_is_instrument_enabled_delete()) {
         if (!ValidateJValue(root)) {
             ValkeyModule_Log(nullptr, "warning", "ERROR: after delete, doc %p is NOT valid!!",
-                            static_cast<void *>(&root));
+                             static_cast<void *>(&root));
         }
         if (json_is_instrument_enabled_dump_doc_after()) {
             ValkeyModule_Log(nullptr, "warning", "Dump document structure after delete:");
@@ -766,10 +776,11 @@ JsonUtilCode Selector::commit(JValue &new_val) {
     auto &rs = getUniqueResultSet();
     if (!rs.empty()) {
         if (json_is_instrument_enabled_update()) {
-            ValkeyModule_Log(nullptr, "warning", "updating %zu values of doc %p", rs.size(), static_cast<void *>(&root));
+            ValkeyModule_Log(nullptr, "warning", "updating %zu values of doc %p", rs.size(),
+                             static_cast<void *>(&root));
             if (!ValidateJValue(*root)) {
                 ValkeyModule_Log(nullptr, "warning", "ERROR: before update, doc %p is NOT valid!",
-                                static_cast<void *>(root));
+                                 static_cast<void *>(root));
             }
             if (json_is_instrument_enabled_dump_doc_before()) {
                 ValkeyModule_Log(nullptr, "warning", "Dump document structure before update:");
@@ -782,7 +793,7 @@ JsonUtilCode Selector::commit(JValue &new_val) {
             if (ptr.HasError()) return ptr.error;
             if (json_is_instrument_enabled_update()) {
                 ValkeyModule_Log(nullptr, "warning", "updating value %p of doc %p at path %s",
-                                static_cast<void *>(rs[0].first), static_cast<void *>(root), rs[0].second.c_str());
+                                 static_cast<void *>(rs[0].first), static_cast<void *>(root), rs[0].second.c_str());
             }
             ptr.Swap(*root, new_val, allocator);
             TRACE("DEBUG", "commit updated value at " << rs[0].second);
@@ -798,8 +809,8 @@ JsonUtilCode Selector::commit(JValue &new_val) {
                 if (ptr.PathExists(*root)) {
                     if (json_is_instrument_enabled_update()) {
                         ValkeyModule_Log(nullptr, "warning", "updating value %p of doc %p at path %s",
-                                        static_cast<void *>(vInfo.first), static_cast<void *>(&root),
-                                        vInfo.second.c_str());
+                                         static_cast<void *>(vInfo.first), static_cast<void *>(&root),
+                                         vInfo.second.c_str());
                     }
                     ptr.Swap(*root, new_val_copy, allocator);
                     TRACE("DEBUG", "commit updated value at " << vInfo.second);
@@ -811,7 +822,7 @@ JsonUtilCode Selector::commit(JValue &new_val) {
         if (json_is_instrument_enabled_update()) {
             if (!ValidateJValue(*root)) {
                 ValkeyModule_Log(nullptr, "warning", "ERROR: after update, doc %p is NOT valid!",
-                                static_cast<void *>(root));
+                                 static_cast<void *>(root));
             }
             if (json_is_instrument_enabled_dump_doc_after()) {
                 ValkeyModule_Log(nullptr, "warning", "Dump document structure after update:");
@@ -823,11 +834,11 @@ JsonUtilCode Selector::commit(JValue &new_val) {
     // handling insert
     if (!insertPaths.empty()) {
         if (json_is_instrument_enabled_insert()) {
-            ValkeyModule_Log(nullptr, "warning", "inserting %zu values into doc %p",
-                            insertPaths.size(), static_cast<void *>(root));
+            ValkeyModule_Log(nullptr, "warning", "inserting %zu values into doc %p", insertPaths.size(),
+                             static_cast<void *>(root));
             if (!ValidateJValue(*root)) {
                 ValkeyModule_Log(nullptr, "warning", "ERROR: before insert, doc %p is NOT valid!",
-                                static_cast<void *>(root));
+                                 static_cast<void *>(root));
             }
             if (json_is_instrument_enabled_dump_doc_before()) {
                 ValkeyModule_Log(nullptr, "warning", "Dump document structure before insert:");
@@ -840,7 +851,7 @@ JsonUtilCode Selector::commit(JValue &new_val) {
             if (ptr.HasError()) return ptr.error;
             if (json_is_instrument_enabled_insert()) {
                 ValkeyModule_Log(nullptr, "warning", "inserting value into doc %p at path %s",
-                                static_cast<void *>(root), (*insertPaths.begin()).c_str());
+                                 static_cast<void *>(root), (*insertPaths.begin()).c_str());
             }
             ptr.Set(*root, new_val, allocator);
             TRACE("DEBUG", "commit inserted value at " << *insertPaths.begin());
@@ -852,7 +863,7 @@ JsonUtilCode Selector::commit(JValue &new_val) {
                 if (ptr.HasError()) return ptr.error;
                 if (json_is_instrument_enabled_insert()) {
                     ValkeyModule_Log(nullptr, "warning", "inserting value into doc %p at path %s",
-                                    static_cast<void *>(root), path.c_str());
+                                     static_cast<void *>(root), path.c_str());
                 }
                 ptr.Set(*root, new_val_copy, allocator);
                 TRACE("DEBUG", "commit inserted value at " << *insertPaths.begin());
@@ -863,7 +874,7 @@ JsonUtilCode Selector::commit(JValue &new_val) {
         if (json_is_instrument_enabled_insert()) {
             if (!ValidateJValue(*root)) {
                 ValkeyModule_Log(nullptr, "warning", "ERROR: after insert, doc %p is NOT valid!",
-                                static_cast<void *>(root));
+                                 static_cast<void *>(root));
             }
             if (json_is_instrument_enabled_dump_doc_after()) {
                 ValkeyModule_Log(nullptr, "warning", "Dump document structure after insert:");
@@ -893,8 +904,8 @@ JsonUtilCode Selector::init(JValue &root, const char *path, const Mode mode) {
 }
 
 JsonUtilCode Selector::eval() {
-    TRACE("DEBUG", "eval curr token: " << lex.currToken().type << ", remaining path: " << lex.p
-        << ", nodePath: " << nodePath)
+    TRACE("DEBUG",
+          "eval curr token: " << lex.currToken().type << ", remaining path: " << lex.p << ", nodePath: " << nodePath)
     CHECK_RECURSION_DEPTH();
     JsonUtilCode rc = parseSupportedPath();
     if (rc == JSONUTIL_SUCCESS && node != nullptr) {
@@ -913,17 +924,12 @@ JsonUtilCode Selector::eval() {
  * current path search ends, and we should continue exploring unexplored paths.
  */
 bool Selector::isSyntaxError(JsonUtilCode code) const {
-    return (code == JSONUTIL_INVALID_JSON_PATH ||
-            code == JSONUTIL_INVALID_MEMBER_NAME ||
-            code == JSONUTIL_INVALID_NUMBER ||
-            code == JSONUTIL_INVALID_IDENTIFIER ||
-            code == JSONUTIL_EMPTY_EXPR_TOKEN ||
-            code == JSONUTIL_ARRAY_INDEX_NOT_NUMBER ||
-            code == JSONUTIL_STEP_CANNOT_NOT_BE_ZERO ||
-            code == JSONUTIL_PARENT_ELEMENT_NOT_EXIST ||
-            code == JSONUTIL_PARSER_RECURSION_DEPTH_LIMIT_EXCEEDED ||
-            code == JSONUTIL_RECURSIVE_DESCENT_TOKEN_LIMIT_EXCEEDED ||
-            code == JSONUTIL_QUERY_STRING_SIZE_LIMIT_EXCEEDED);
+    return (
+        code == JSONUTIL_INVALID_JSON_PATH || code == JSONUTIL_INVALID_MEMBER_NAME || code == JSONUTIL_INVALID_NUMBER ||
+        code == JSONUTIL_INVALID_IDENTIFIER || code == JSONUTIL_EMPTY_EXPR_TOKEN ||
+        code == JSONUTIL_ARRAY_INDEX_NOT_NUMBER || code == JSONUTIL_STEP_CANNOT_NOT_BE_ZERO ||
+        code == JSONUTIL_PARENT_ELEMENT_NOT_EXIST || code == JSONUTIL_PARSER_RECURSION_DEPTH_LIMIT_EXCEEDED ||
+        code == JSONUTIL_RECURSIVE_DESCENT_TOKEN_LIMIT_EXCEEDED || code == JSONUTIL_QUERY_STRING_SIZE_LIMIT_EXCEEDED);
 }
 
 /**
@@ -948,11 +954,16 @@ JsonUtilCode Selector::parseRelativePath() {
     if (node == nullptr || lex.matchToken(Token::END)) return JSONUTIL_SUCCESS;
 
     switch (lex.currToken().type) {
-        case Token::END: return JSONUTIL_SUCCESS;
-        case Token::DOTDOT: return parseRecursivePath();
-        case Token::DOT: return parseDotPath();
-        case Token::LBRACKET: return parseBracketPath();
-        default: return parseQualifiedPath();
+        case Token::END:
+            return JSONUTIL_SUCCESS;
+        case Token::DOTDOT:
+            return parseRecursivePath();
+        case Token::DOT:
+            return parseDotPath();
+        case Token::LBRACKET:
+            return parseBracketPath();
+        default:
+            return parseQualifiedPath();
     }
 }
 
@@ -977,8 +988,9 @@ JsonUtilCode Selector::parseRecursivePath() {
  * 3. Selector::resultSet serves as the global result holding all selected values.
  */
 JsonUtilCode Selector::recursiveSearch(JValue &v, const char *p) {
-    TRACE("DEBUG", "recursiveSearch curr token " << lex.currToken().type << ", curr path: "<< lex.p
-        << ", nodePath: " << nodePath << ", currPathDepth: " << currPathDepth << ", maxPathDepth: " << maxPathDepth)
+    TRACE("DEBUG", "recursiveSearch curr token " << lex.currToken().type << ", curr path: " << lex.p
+                                                 << ", nodePath: " << nodePath << ", currPathDepth: " << currPathDepth
+                                                 << ", maxPathDepth: " << maxPathDepth)
     if (lex.currToken().type == Token::DOTDOT || lex.currToken().type == Token::DOT) {
         TRACE("DEBUG", "We have an ambiguous (and therefore invalid) sequence of 3+ dots")
         return JSONUTIL_INVALID_DOT_SEQUENCE;
@@ -992,7 +1004,7 @@ JsonUtilCode Selector::recursiveSearch(JValue &v, const char *p) {
     // At the current node, run the selector by calling eval().
     State state;
     snapshotState(state);
-    node = &v;  // points to the current visited value
+    node = &v;                 // points to the current visited value
     JsonUtilCode rc = eval();  // run the selector
     restoreState(state);
     if (isSyntaxError(rc)) return rc;
@@ -1005,21 +1017,22 @@ JsonUtilCode Selector::recursiveSearch(JValue &v, const char *p) {
             escape_member_name_for_json_pointer(m.name.GetStringView(), oss);
             nodePath.append("/").append(oss.str());
             incrPathDepth();
-            TRACE("DEBUG", "-> recursiveSearch descend to object member " << m.name.GetStringView()
-                << ", nodePath: " << nodePath << ", currPathDepth: " << currPathDepth << ", maxPathDepth: "
-                << maxPathDepth)
+            TRACE("DEBUG", "-> recursiveSearch descend to object member "
+                               << m.name.GetStringView() << ", nodePath: " << nodePath
+                               << ", currPathDepth: " << currPathDepth << ", maxPathDepth: " << maxPathDepth)
             rc = recursiveSearch(m.value, p);
             decrPathDepth();
             if (isSyntaxError(rc)) return rc;
             nodePath = path_copy;
         }
     } else if (v.IsArray()) {
-        for (int64_t i=0; i < v.Size(); i++) {
+        for (int64_t i = 0; i < v.Size(); i++) {
             jsn::string path_copy = nodePath;
             nodePath.append("/").append(std::to_string(i));
             incrPathDepth();
             TRACE("DEBUG", "-> recursiveSearch descend to array index " << i << ", nodePath: " << nodePath
-            << ", currPathDepth: " << currPathDepth << ", maxPathDepth: " << maxPathDepth)
+                                                                        << ", currPathDepth: " << currPathDepth
+                                                                        << ", maxPathDepth: " << maxPathDepth)
             rc = recursiveSearch(v.GetArray()[i], p);
             decrPathDepth();
             if (isSyntaxError(rc)) return rc;
@@ -1059,7 +1072,7 @@ JsonUtilCode Selector::parseBracketPath() {
  */
 JsonUtilCode Selector::parseBracketPathElement() {
     if (!lex.matchToken(Token::LBRACKET, true)) {
-        TRACE("ERROR", "parseBracketPathElement token [ is not seen"  << ", nodePath: " << nodePath)
+        TRACE("ERROR", "parseBracketPathElement token [ is not seen" << ", nodePath: " << nodePath)
         return JSONUTIL_INVALID_JSON_PATH;
     }
 
@@ -1267,8 +1280,9 @@ JsonUtilCode Selector::processWildcard() {
 JsonUtilCode Selector::processWildcardKey() {
     JsonUtilCode rc;
     for (auto &m : node->GetObject()) {
-        TRACE("DEBUG", "processWildcardKey continue parsing object member "
-            << m.name.GetStringView() << ", curr token: " << lex.currToken().type << ", remaining path: " << lex.p)
+        TRACE("DEBUG", "processWildcardKey continue parsing object member " << m.name.GetStringView()
+                                                                            << ", curr token: " << lex.currToken().type
+                                                                            << ", remaining path: " << lex.p)
         State state;
         snapshotState(state);
         StringViewHelper member_name;
@@ -1284,9 +1298,10 @@ JsonUtilCode Selector::processWildcardKey() {
 
 JsonUtilCode Selector::processWildcardIndex() {
     JsonUtilCode rc;
-    for (int64_t i=0; i < node->Size(); i++) {
-        TRACE("DEBUG", "processWildcardIndex continue parsing array index " << i
-            << ", curr token: " << lex.currToken().type << ", remaining path: " << lex.p << ", nodePath: " << nodePath)
+    for (int64_t i = 0; i < node->Size(); i++) {
+        TRACE("DEBUG", "processWildcardIndex continue parsing array index "
+                           << i << ", curr token: " << lex.currToken().type << ", remaining path: " << lex.p
+                           << ", nodePath: " << nodePath)
         rc = evalArrayMember(i);
         if (isSyntaxError(rc)) return rc;
     }
@@ -1317,8 +1332,7 @@ JsonUtilCode Selector::evalMember(JValue &m, const char *path_start) {
 
 JsonUtilCode Selector::evalObjectMember(const StringViewHelper &member_name, JValue &val) {
     if (!node->IsObject()) {
-        TRACE("DEBUG", "evalObjectMember Current node is not object. Cannot eval member "
-        << member_name.getView())
+        TRACE("DEBUG", "evalObjectMember Current node is not object. Cannot eval member " << member_name.getView())
         return JSONUTIL_JSON_ELEMENT_NOT_OBJECT;
     }
 
@@ -1329,8 +1343,9 @@ JsonUtilCode Selector::evalObjectMember(const StringViewHelper &member_name, JVa
     escape_member_name_for_json_pointer(member_name.getView(), oss);
     nodePath.append("/").append(oss.str());
     TRACE("DEBUG", "evalObjectMember object member " << member_name.getView()
-    << ", curr token: " << lex.currToken().type << ", remaining path: " << lex.p << ", nodePath: " << nodePath)
-    JsonUtilCode rc =  evalMember(val, lex.p);
+                                                     << ", curr token: " << lex.currToken().type
+                                                     << ", remaining path: " << lex.p << ", nodePath: " << nodePath)
+    JsonUtilCode rc = evalMember(val, lex.p);
 
     restoreState(state);
     return rc;
@@ -1348,7 +1363,7 @@ JsonUtilCode Selector::evalArrayMember(int64_t idx) {
 
     nodePath.append("/").append(std::to_string(idx));
     TRACE("DEBUG", "evalArrayMember array index " << idx << ", curr token: " << lex.currToken().type
-        << ", remaining path: " << lex.p << ", nodePath: " << nodePath)
+                                                  << ", remaining path: " << lex.p << ", nodePath: " << nodePath)
     JsonUtilCode rc = evalMember(node->GetArray()[idx], lex.p);
 
     restoreState(state);
@@ -1363,7 +1378,7 @@ JsonUtilCode Selector::traverseToObjectMember(const StringViewHelper &member_nam
         // with no matching values found. Neither should we indicate a syntax error that will fail the entire search,
         // because this is just a termination of one search path. Other path searches should continue.
         TRACE("DEBUG", "traverseToObjectMember Current node is not object. Cannot traverse to member "
-        << member_name.getView() << ", nodePath: " << nodePath)
+                           << member_name.getView() << ", nodePath: " << nodePath)
         if (mode != READ) return JSONUTIL_CANNOT_INSERT_MEMBER_INTO_NON_OBJECT_VALUE;
 
         // Null out the current node to signal termination of the current path search.
@@ -1373,18 +1388,17 @@ JsonUtilCode Selector::traverseToObjectMember(const StringViewHelper &member_nam
 
     JValue::MemberIterator it = node->FindMember(member_name.getView());
     if (it == node->MemberEnd()) {
-         TRACE("DEBUG", "traverseToObjectMember Member not found: "
-         << member_name.getView() << " len: "
-         << member_name.getView().length() << " mode:" << mode
-         << " cur node isObj? " << node->IsObject() << ", nodePath: " << nodePath)
+        TRACE("DEBUG", "traverseToObjectMember Member not found: "
+                           << member_name.getView() << " len: " << member_name.getView().length() << " mode:" << mode
+                           << " cur node isObj? " << node->IsObject() << ", nodePath: " << nodePath)
 #ifdef INSTRUMENT_V2PATH
-         dom_dump_value(*node);
+        dom_dump_value(*node);
 #endif
 
         if ((mode == INSERT || mode == INSERT_OR_UPDATE) && !isRecursiveSearch) {
             // A new key can be appended to an object if and only if it is the last child in the path
             TRACE("DEBUG", "traverseToObjectMember insert mode, peek next token: " << lex.peekToken()
-                << ", nodePath: " << nodePath);
+                                                                                   << ", nodePath: " << nodePath);
             if (lex.peekToken() == Token::END) {
                 jsn::string insert_path = nodePath;
                 insert_path.append("/").append(member_name.getView());
@@ -1392,8 +1406,10 @@ JsonUtilCode Selector::traverseToObjectMember(const StringViewHelper &member_nam
                 insertPaths.insert(std::move(insert_path));
                 incrPathDepth();
             } else {
-                TRACE("DEBUG", "traverseToObjectMember insert mode, cannot insert because current "
-                               "node is not the last child in the path, nodePath: " << nodePath)
+                TRACE("DEBUG",
+                      "traverseToObjectMember insert mode, cannot insert because current "
+                      "node is not the last child in the path, nodePath: "
+                          << nodePath)
                 setError(JSONUTIL_JSON_PATH_NOT_EXIST);
                 return JSONUTIL_JSON_PATH_NOT_EXIST;
             }
@@ -1408,8 +1424,7 @@ JsonUtilCode Selector::traverseToObjectMember(const StringViewHelper &member_nam
     escape_member_name_for_json_pointer(member_name.getView(), oss);
     nodePath.append("/").append(oss.str());
     TRACE("DEBUG", "traverseToObjectMember traversed to object member "
-    << member_name.getView() << ". remaining path: " << lex.p
-    << ", nodePath: " << nodePath)
+                       << member_name.getView() << ". remaining path: " << lex.p << ", nodePath: " << nodePath)
     node = &it->value;
     incrPathDepth();
     return JSONUTIL_SUCCESS;
@@ -1424,8 +1439,8 @@ JsonUtilCode Selector::traverseToArrayIndex(int64_t idx) {
         // the entire search, because this is just a termination of one search path. Other path searches should
         // continue.
 
-        TRACE("DEBUG", "traverseToArrayIndex Current node is not array. Cannot traverse to index " << idx
-            << ", nodePath: " << nodePath)
+        TRACE("DEBUG", "traverseToArrayIndex Current node is not array. Cannot traverse to index "
+                           << idx << ", nodePath: " << nodePath)
         // Null out the current node to signal termination of the current path search.
         node = nullptr;
         return JSONUTIL_SUCCESS;
@@ -1591,8 +1606,8 @@ JsonUtilCode Selector::processSubscript(const int64_t idx) {
 JsonUtilCode Selector::processSlice(int64_t start, int64_t end, const int64_t step) {
     if (!node->IsArray()) return JSONUTIL_JSON_ELEMENT_NOT_ARRAY;
     if (!lex.matchToken(Token::RBRACKET, true)) return JSONUTIL_INVALID_JSON_PATH;
-    TRACE("DEBUG", "processSlice start: " << start << " end: " << end << " step: "
-            << step << ", p: " << lex.p << ", nodePath: " << nodePath)
+    TRACE("DEBUG", "processSlice start: " << start << " end: " << end << " step: " << step << ", p: " << lex.p
+                                          << ", nodePath: " << nodePath)
     // handle negative index
     if (start < 0) start += node->Size();
     if (end < 0) end += node->Size();
@@ -1661,8 +1676,8 @@ JsonUtilCode Selector::processFilterResult(jsn::vector<int64_t> &result) {
     JsonUtilCode rc;
     if (node->IsArray()) {
         for (auto idx : result) {
-            TRACE("DEBUG", "processFilterResult proceed to array index " << idx << ". remaining path: "
-                << lex.p << ", nodePath: " << nodePath)
+            TRACE("DEBUG", "processFilterResult proceed to array index " << idx << ". remaining path: " << lex.p
+                                                                         << ", nodePath: " << nodePath)
             rc = evalArrayMember(idx);
             if (isSyntaxError(rc)) return rc;
         }
@@ -1750,7 +1765,7 @@ JsonUtilCode Selector::parseTerm(jsn::vector<int64_t> &result) {
  *   Number              ::= Integer | MemberNameInFilter | ScientificNumber
  *   QuotedString        ::= "\"" {char} "\""
  *   PartialPath         ::= "$" RelativePath
-*/
+ */
 JsonUtilCode Selector::parseFactor(jsn::vector<int64_t> &result) {
     CHECK_RECURSION_DEPTH();
     JsonUtilCode rc;
@@ -1770,9 +1785,8 @@ JsonUtilCode Selector::parseFactor(jsn::vector<int64_t> &result) {
 
                 lex.skipSpaces();
                 Token::TokenType tokenType = lex.currToken().type;
-                if (tokenType == Token::LT || tokenType == Token::LE ||
-                    tokenType == Token::GT || tokenType == Token::GE ||
-                    tokenType == Token::EQ || tokenType == Token::NE) {
+                if (tokenType == Token::LT || tokenType == Token::LE || tokenType == Token::GT ||
+                    tokenType == Token::GE || tokenType == Token::EQ || tokenType == Token::NE) {
                     Token::TokenType op = Token::UNKNOWN;
                     rc = parseComparisonOp(op);
                     if (rc != JSONUTIL_SUCCESS) return rc;
@@ -1859,7 +1873,7 @@ JsonUtilCode Selector::parseFactor(jsn::vector<int64_t> &result) {
 
             lex.skipSpaces();
             if (lex.currToken().type == Token::RPAREN || lex.currToken().type == Token::AND ||
-                    lex.currToken().type == Token::OR) {
+                lex.currToken().type == Token::OR) {
                 return processComparisonExpr(true, StringViewHelper(), op, v, result);
             } else {
                 // The next token must be member name
@@ -1984,8 +1998,7 @@ JsonUtilCode Selector::parseComparisonValue(JValue &v) {
 JsonUtilCode Selector::parseComparisonOp(Token::TokenType &op) {
     lex.skipSpaces();
     Token::TokenType tokenType = lex.currToken().type;
-    if (tokenType != Token::EQ && tokenType != Token::NE &&
-        tokenType != Token::LT && tokenType != Token::LE &&
+    if (tokenType != Token::EQ && tokenType != Token::NE && tokenType != Token::LT && tokenType != Token::LE &&
         tokenType != Token::GT && tokenType != Token::GE)
         return JSONUTIL_INVALID_JSON_PATH;
     op = tokenType;
@@ -2080,7 +2093,6 @@ JsonUtilCode Selector::processComparisonExprAtIndex(const int64_t idx, const Str
     return JSONUTIL_SUCCESS;
 }
 
-
 JsonUtilCode Selector::processComparisonExpr(const bool is_self, const StringViewHelper &member_name,
                                              const Token::TokenType op, const JValue &comparison_value,
                                              jsn::vector<int64_t> &result) {
@@ -2098,12 +2110,12 @@ JsonUtilCode Selector::processComparisonExpr(const bool is_self, const StringVie
             }
             if (evalOp(v, op, comparison_value)) result.push_back(i);
         }
-    } else if (node->IsObject()){
+    } else if (node->IsObject()) {
         JValue::MemberIterator it = node->FindMember(member_name.getView());
         if (it != node->MemberEnd()) {
             if (evalOp(&it->value, op, comparison_value)) result.push_back(0);
         }
-    } else if (is_self)  {
+    } else if (is_self) {
         if (evalOp(node, op, comparison_value)) result.push_back(0);
     }
     return JSONUTIL_SUCCESS;
@@ -2111,10 +2123,10 @@ JsonUtilCode Selector::processComparisonExpr(const bool is_self, const StringVie
 
 bool Selector::evalOp(const JValue *v, const Token::TokenType op, const JValue &comparison_value) {
     // We return false on LHS and RHS value type mismatch, but also treat kTrueType and kFalseType as the same type
-    if (v->GetType() != comparison_value.GetType() && !(
-            (v->GetType() == rapidjson::kTrueType || v->GetType() == rapidjson::kFalseType) &&
-            (comparison_value.GetType() == rapidjson::kTrueType || comparison_value.GetType() == rapidjson::kFalseType))
-       ) {
+    if (v->GetType() != comparison_value.GetType() &&
+        !((v->GetType() == rapidjson::kTrueType || v->GetType() == rapidjson::kFalseType) &&
+          (comparison_value.GetType() == rapidjson::kTrueType ||
+           comparison_value.GetType() == rapidjson::kFalseType))) {
         return false;
     }
     bool satisfied = false;
@@ -2286,8 +2298,7 @@ JsonUtilCode Selector::processAttributeFilter(const StringViewHelper &member_nam
             result.push_back(i);
         }
     } else if (node->IsObject()) {
-        if (node->FindMember(member_name.getView()) != node->MemberEnd())
-            result.push_back(0);
+        if (node->FindMember(member_name.getView()) != node->MemberEnd()) result.push_back(0);
     } else {
         return JSONUTIL_INVALID_JSON_PATH;
     }
@@ -2301,8 +2312,7 @@ JsonUtilCode Selector::processAttributeFilter(const StringViewHelper &member_nam
  * This method is optimized for being called multiple times to union n vectors.
  * The caller is responsible for initially syncing up set with r.
  */
-void Selector::vectorUnion(const jsn::vector<int64_t> &v, jsn::vector<int64_t> &r,
-                           jsn::unordered_set<int64_t> &set) {
+void Selector::vectorUnion(const jsn::vector<int64_t> &v, jsn::vector<int64_t> &r, jsn::unordered_set<int64_t> &set) {
     for (auto e : v) {
         auto res = set.emplace(e);
         if (res.second) r.push_back(e);
@@ -2371,7 +2381,7 @@ JsonUtilCode Selector::processUnion(jsn::vector<int64_t> union_indices) {
         // handle negative index
         if (i < 0) i += node->Size();
         // if the index is out of bounds, skip
-        if (i < 0 || i > node->Size()-1) continue;
+        if (i < 0 || i > node->Size() - 1) continue;
         rc = evalArrayMember(i);
         if (rc != JSONUTIL_SUCCESS) return rc;
     }
@@ -2386,22 +2396,20 @@ JsonUtilCode Selector::processUnion(jsn::vector<int64_t> union_indices) {
  * Collect values from the result set.
  * @param values OUTPUT parameter, stores collected values.
  */
-void Selector::getSelectedValues(jsn::vector<JValue*> &values) const {
-    std::transform(resultSet.begin(),
-                   resultSet.end(),
-                   std::back_inserter(values),
-                   [](const std::pair<JValue*, jsn::string> &p) { return p.first; });
+void Selector::getSelectedValues(jsn::vector<JValue *> &values) const {
+    std::transform(resultSet.begin(), resultSet.end(), std::back_inserter(values),
+                   [](const std::pair<JValue *, jsn::string> &p) { return p.first; });
 }
 
 /**
  * Get unique result set with order preserved.
  */
-const jsn::vector<Selector::ValueInfo>& Selector::getUniqueResultSet() {
+const jsn::vector<Selector::ValueInfo> &Selector::getUniqueResultSet() {
     if (resultSet.size() <= 1) return resultSet;
 
     TRACE("DEBUG", "getUniqueResultSet total values: " << resultSet.size());
     uniqueResultSet.clear();
-    jsn::unordered_set<JValue*> set;
+    jsn::unordered_set<JValue *> set;
     for (auto &v : resultSet) {
         auto res = set.emplace(v.first);
         if (res.second) uniqueResultSet.push_back(v);

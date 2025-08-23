@@ -58,11 +58,12 @@
  */
 
 #include <atomic>
-#include <string>
-#include <ostream>
-#include <string_view>
 #include <map>
+#include <ostream>
+#include <string>
+#include <string_view>
 #include <unordered_map>
+
 #include "json/alloc.h"
 
 #ifndef KEYTABLE_ASSERT
@@ -79,10 +80,10 @@
  * above and simply store the metadata adjacent to a full pointer (i.e., 32-bit systems).
  *
  */
-template<typename T>
+template <typename T>
 class PtrWithMetaData {
- public:
-    enum { METADATA_MASK = (1 << 19)-1 };           // Largest value that fits.
+   public:
+    enum { METADATA_MASK = (1 << 19) - 1 };  // Largest value that fits.
 
     const T& operator*() const { return *getPointer(); }
     const T* operator->() const { return getPointer(); }
@@ -94,7 +95,7 @@ class PtrWithMetaData {
     // C++ considers that as a conversion to a boolean. Which is implemented by this operator
     // To be clear, we include the Metadata in the comparison.
     //
-    operator bool() const { return bits != 0; }   // if (PtrWithMetaData) invokes this operator
+    operator bool() const { return bits != 0; }  // if (PtrWithMetaData) invokes this operator
 
     size_t getMetaData() const { return ror(bits, 48) & METADATA_MASK; }
     void setMetaData(size_t metadata) {
@@ -102,7 +103,7 @@ class PtrWithMetaData {
         bits = (bits & PTR_MASK) | ror(metadata, 16);
     }
     PtrWithMetaData() : bits(0) {}
-    PtrWithMetaData(T *ptr, size_t metadata) {
+    PtrWithMetaData(T* ptr, size_t metadata) {
         KEYTABLE_ASSERT(0 == (~PTR_MASK & reinterpret_cast<size_t>(ptr)));
         KEYTABLE_ASSERT(0 == (metadata & ~METADATA_MASK));
         bits = reinterpret_cast<size_t>(ptr) | ror(metadata, 16);
@@ -115,18 +116,16 @@ class PtrWithMetaData {
     bool operator!=(const PtrWithMetaData& rhs) const { return bits != rhs.bits; }
 
     friend std::ostream& operator<<(std::ostream& os, const PtrWithMetaData& ptr) {
-        return os << "Ptr:" << reinterpret_cast<const void *>(&*ptr) << " MetaData:" << ptr.getMetaData();
+        return os << "Ptr:" << reinterpret_cast<const void*>(&*ptr) << " MetaData:" << ptr.getMetaData();
     }
 
     void swap(PtrWithMetaData& rhs) { std::swap<size_t>(bits, rhs.bits); }
 
- private:
+   private:
     size_t bits;
-    T* getPointer() const { return MEMORY_VALIDATE<T>(reinterpret_cast<T *>(bits & PTR_MASK)); }
+    T* getPointer() const { return MEMORY_VALIDATE<T>(reinterpret_cast<T*>(bits & PTR_MASK)); }
     // Circular rotate right (count <= 64)
-    static constexpr size_t ror(size_t v, unsigned count) {
-        return (v >> count) | (v << (64-count));
-    }
+    static constexpr size_t ror(size_t v, unsigned count) { return (v >> count) | (v << (64 - count)); }
     static const size_t PTR_MASK = ~ror(METADATA_MASK, 16);
 };
 
@@ -142,14 +141,14 @@ struct KeyTable_Layout {
     //
     // Create a string layout. allocates some memory
     //
-    static KeyTable_Layout *makeLayout(void *(*malloc)(size_t), const char *ptr,
-                                       size_t len, size_t hash, bool noescape);
+    static KeyTable_Layout* makeLayout(void* (*malloc)(size_t), const char* ptr, size_t len, size_t hash,
+                                       bool noescape);
     //
     // Interrogate existing layout
     //
     size_t getRefCount() const { return refCount; }
     size_t getLength() const;
-    const char *getText() const;
+    const char* getText() const;
     bool IsStuck() const;
     bool getNoescape() const { return noescapeFlag != 0; }
     enum { POISON_VALUE = 0xdeadbeeffeedfeadull };
@@ -159,15 +158,15 @@ struct KeyTable_Layout {
     // Unit test
     static void setMaxRefCount(uint32_t maxRefCount);
 
- protected:
+   protected:
     KeyTable_Layout();               // Nobody gets to create one.
     friend struct KeyTable_Shard;    // Only class allowed to manipulate reference count
     bool incrRefCount() const;       // true => saturated
     size_t decrRefCount() const;     // returns current count
     size_t original_hash;            // Remember original hash
-    mutable uint32_t refCount:29;    // Ref count.
-    uint32_t noescapeFlag:1;         // String doesn't need to be escaped
-    uint32_t lengthBytes:2;          // 0, 1, 2 or 3 => 1, 2, 3 or 4 bytes of length
+    mutable uint32_t refCount : 29;  // Ref count.
+    uint32_t noescapeFlag : 1;       // String doesn't need to be escaped
+    uint32_t lengthBytes : 2;        // 0, 1, 2 or 3 => 1, 2, 3 or 4 bytes of length
     char bytes[1];                   // length bytes + text bytes
 } __attribute__((packed));           // Don't let compiler round size of up 8 bytes.
 
@@ -179,10 +178,11 @@ struct KeyTable_Handle {
     //
     const KeyTable_Layout& operator*() const { return *theHandle; }
     const KeyTable_Layout* operator->() const { return &*theHandle; }
-    const char *GetString() const { return theHandle->getText(); }
+    const char* GetString() const { return theHandle->getText(); }
     size_t GetStringLength() const { return theHandle->getLength(); }
-    const std::string_view GetStringView() const
-        { return std::string_view(theHandle->getText(), theHandle->getLength()); }
+    const std::string_view GetStringView() const {
+        return std::string_view(theHandle->getText(), theHandle->getLength());
+    }
     size_t GetHashcode() const { return theHandle.getMetaData(); }
     bool IsNoescape() const { return theHandle->getNoescape(); }
 
@@ -206,7 +206,7 @@ struct KeyTable_Handle {
     //
     // move semantics are allowed
     //
-    KeyTable_Handle(KeyTable_Handle&& rhs) {
+    KeyTable_Handle(KeyTable_Handle&& rhs) noexcept {
         theHandle = rhs.theHandle;
         rhs.theHandle.clear();
     }
@@ -219,27 +219,24 @@ struct KeyTable_Handle {
     operator bool() const { return bool(theHandle); }
 
     friend std::ostream& operator<<(std::ostream& os, const KeyTable_Handle& h) {
-        return os << "Handle:" << reinterpret_cast<const void *>(&*(h.theHandle))
-            << " Shard:" << h.theHandle.getMetaData()
-            << " RefCount: " << h->getRefCount()
-            << " : " << h.GetStringView();
+        return os << "Handle:" << reinterpret_cast<const void*>(&*(h.theHandle))
+                  << " Shard:" << h.theHandle.getMetaData() << " RefCount: " << h->getRefCount() << " : "
+                  << h.GetStringView();
     }
 
-    KeyTable_Handle() : theHandle() {}
+    KeyTable_Handle() = default;
     ~KeyTable_Handle() { KEYTABLE_ASSERT(!theHandle); }
 
-    void Swap(KeyTable_Handle& rhs) {
-        theHandle.swap(rhs.theHandle);
-    }
+    void Swap(KeyTable_Handle& rhs) { theHandle.swap(rhs.theHandle); }
 
- private:
+   private:
     friend struct KeyTable;
     friend struct KeyTable_Shard;
 
-    KeyTable_Handle(KeyTable_Layout *ptr, size_t hashCode) : theHandle(ptr, hashCode) {}
+    KeyTable_Handle(KeyTable_Layout* ptr, size_t hashCode) : theHandle(ptr, hashCode) {}
     void clear() { theHandle.clear(); }
 
-    PtrWithMetaData<KeyTable_Layout> theHandle;                   // The only actual data here.
+    PtrWithMetaData<KeyTable_Layout> theHandle;  // The only actual data here.
 };
 
 /*
@@ -252,16 +249,15 @@ struct KeyTable {
 
     enum { MAX_SHARDS = KeyTable_Handle::MAX_HASHCODE, MIN_SHARDS = 1 };
 
-
     //
     // Stuff to create a table. These get copied and can't be changed without
     // recreating the entire table.
     //
     struct Config {
-        void *(*malloc)(size_t);                            // Use this to allocate memory
-        void (*free)(void*);                                // Use this to free memory
-        size_t (*hash)(const char *, size_t);               // Hash function for strings
-        size_t numShards;                                   // Number of shards to create
+        void* (*malloc)(size_t);              // Use this to allocate memory
+        void (*free)(void*);                  // Use this to free memory
+        size_t (*hash)(const char*, size_t);  // Hash function for strings
+        size_t numShards;                     // Number of shards to create
     };
     //
     // Construct a table.
@@ -271,7 +267,7 @@ struct KeyTable {
     //
     // Make a handle for this string. The target string is copied when necessary.
     //
-    KeyTable_Handle makeHandle(const char *ptr, size_t len, bool noescape = false);
+    KeyTable_Handle makeHandle(const char* ptr, size_t len, bool noescape = false);
     KeyTable_Handle makeHandle(const std::string& s, bool noescape = false) {
         return makeHandle(s.c_str(), s.length(), noescape);
     }
@@ -283,22 +279,22 @@ struct KeyTable {
     //
     // Destroy a handle
     //
-    void destroyHandle(KeyTable_Handle &h);
+    void destroyHandle(KeyTable_Handle& h);
     //
     // Some of the configuration variables can be changed dynamically.
     //
     struct Factors {
-        float minLoad;          // LoadFactor() < minLoad => rehash down
-        float maxLoad;          // LoadFactor() > maxLoad => rehash up
-        float shrink;           // % to shrink by
-        float grow;             // % to grow by
-        Factors() :
-            // Default Factors for the hash table
-            minLoad(0.25f),                          // minLoad => .25
-            maxLoad(0.85f),                          // maxLoad => targets O(8) searches [see wikipedia]
-            shrink(0.5f),                            // shrink, remove 1/2 of elements.
-            grow(1.0f)                               // Grow by 100%
-            {}
+        float minLoad;  // LoadFactor() < minLoad => rehash down
+        float maxLoad;  // LoadFactor() > maxLoad => rehash up
+        float shrink;   // % to shrink by
+        float grow;     // % to grow by
+        Factors()
+            :                  // Default Factors for the hash table
+              minLoad(0.25f),  // minLoad => .25
+              maxLoad(0.85f),  // maxLoad => targets O(8) searches [see wikipedia]
+              shrink(0.5f),    // shrink, remove 1/2 of elements.
+              grow(1.0f)       // Grow by 100%
+        {}
     };
 
     //
@@ -310,7 +306,7 @@ struct KeyTable {
     // returns: NULL, If the factors are valid. Otherwise an error string
     // This is used to validate a set of factors before setting them.
     //
-    static const char *isValidFactors(const Factors& f);
+    static const char* isValidFactors(const Factors& f);
     //
     // Change to these factors if valid. This is modestly expensive as it grabs all shard locks
     // This will assert if the factors are invalid.
@@ -327,18 +323,18 @@ struct KeyTable {
      * the reading, there maybe slight inaccuracies in the presence of multi-thread operations.
      */
     struct Stats {
-        size_t size;                // Total number of unique strings in table
-        size_t bytes;               // Total bytes of strings
-        size_t handles;             // Number of outstanding handles
-        size_t maxTableSize;        // Largest Shard table
-        size_t minTableSize;        // Smallest Shard table
-        size_t totalTable;          // sum of table sizes
-        size_t stuckKeys;        // Number of strings that have hit the refcount max.
+        size_t size;          // Total number of unique strings in table
+        size_t bytes;         // Total bytes of strings
+        size_t handles;       // Number of outstanding handles
+        size_t maxTableSize;  // Largest Shard table
+        size_t minTableSize;  // Smallest Shard table
+        size_t totalTable;    // sum of table sizes
+        size_t stuckKeys;     // Number of strings that have hit the refcount max.
         //
         // These counters are reset after being read.
         //
-        size_t maxSearch;           // longest search sequence encountered
-        size_t rehashes;            // Number of rehashes
+        size_t maxSearch;  // longest search sequence encountered
+        size_t rehashes;   // Number of rehashes
         //
         // Include a copy of current settable factors. Makes testing easier
         //
@@ -360,27 +356,27 @@ struct KeyTable {
     //
     LongStats getLongStats(size_t topN) const;
 
-    KeyTable(const KeyTable& rhs) = delete;  // no copies
+    KeyTable(const KeyTable& rhs) = delete;        // no copies
     void operator=(const KeyTable& rhs) = delete;  // no assignment
 
-    std::string validate() const;  // Unit testing only
-    std::string validate_counts(std::unordered_map<const KeyTable_Layout *, size_t>& counts) const;  // Debug command
+    std::string validate() const;                                                                   // Unit testing only
+    std::string validate_counts(std::unordered_map<const KeyTable_Layout*, size_t>& counts) const;  // Debug command
 
     size_t getNumShards() const { return numShards; }
 
- private:
+   private:
     friend struct KeyTable_Shard;
     size_t shardNumberFromHash(size_t hash);
     size_t hashcodeFromHash(size_t hash);
     KeyTable_Shard* shards;
-    void *(*malloc)(size_t);                // Use this to allocate memory
-    void (*free)(void *);                   // Use this to free memory
-    size_t (*hash)(const char *, size_t);   // Hash function for strings
+    void* (*malloc)(size_t);              // Use this to allocate memory
+    void (*free)(void*);                  // Use this to free memory
+    size_t (*hash)(const char*, size_t);  // Hash function for strings
     size_t numShards;
-    std::atomic<size_t> stuckKeys;       // Stuck String count.
+    std::atomic<size_t> stuckKeys;  // Stuck String count.
     Factors factors;
 };
 
-extern KeyTable *keyTable;      // The singleton
+extern KeyTable* keyTable;  // The singleton
 
 #endif

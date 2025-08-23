@@ -1,13 +1,15 @@
 #include "json/stats.h"
+
 #include <pthread.h>
-#include <cstring>
+
 #include <atomic>
-#include <string>
+#include <cstring>
 #include <iostream>
 #include <sstream>
+#include <string>
 extern "C" {
-    #define VALKEYMODULE_EXPERIMENTAL_API
-    #include <./include/valkeymodule.h>
+#define VALKEYMODULE_EXPERIMENTAL_API
+#include <./include/valkeymodule.h>
 }
 
 #define STATIC /* decorator for static functions, remove so that backtrace symbols include these */
@@ -21,7 +23,7 @@ static pthread_key_t thread_local_mem_counter_key;
  * Use atomic integers due to possible multi-threading execution of rdb_load and
  * also the overhead of atomic operations are negligible.
  */
-typedef struct _JsonStats {
+struct JsonStats {
     std::atomic_ullong used_mem;  // global used memory counter
     std::atomic_ullong num_doc_keys;
     std::atomic_ullong max_depth_ever_seen;
@@ -37,15 +39,23 @@ typedef struct _JsonStats {
         defrag_count = 0;
         defrag_bytes = 0;
     }
-} JsonStats;
+};
 static JsonStats jsonstats;
 
 // histograms
 #define NUM_BUCKETS (11)
-static size_t buckets[] = {
-        0, 256, 1024, 4*1024, 16*1024, 64*1024, 256*1024, 1024*1024,
-        4*1024*1024, 16*1024*1024, 64*1024*1024, SIZE_MAX
-};
+static size_t buckets[] = {0,
+                           256,
+                           1024,
+                           4 * 1024,
+                           16 * 1024,
+                           64 * 1024,
+                           256 * 1024,
+                           1024 * 1024,
+                           4 * 1024 * 1024,
+                           16 * 1024 * 1024,
+                           64 * 1024 * 1024,
+                           SIZE_MAX};
 
 // static histogram showing document size distribution
 static size_t doc_hist[NUM_BUCKETS];
@@ -89,7 +99,7 @@ void jsonstats_increment_used_mem(size_t delta) {
 
     // update the thread local counter
     int64_t curr_val = reinterpret_cast<int64_t>(pthread_getspecific(thread_local_mem_counter_key));
-    pthread_setspecific(thread_local_mem_counter_key, reinterpret_cast<int64_t*>(curr_val + delta));
+    pthread_setspecific(thread_local_mem_counter_key, reinterpret_cast<int64_t *>(curr_val + delta));
 }
 
 void jsonstats_decrement_used_mem(size_t delta) {
@@ -99,20 +109,14 @@ void jsonstats_decrement_used_mem(size_t delta) {
 
     // update the thread local counter
     int64_t curr_val = reinterpret_cast<int64_t>(pthread_getspecific(thread_local_mem_counter_key));
-    pthread_setspecific(thread_local_mem_counter_key, reinterpret_cast<int64_t*>(curr_val - delta));
+    pthread_setspecific(thread_local_mem_counter_key, reinterpret_cast<int64_t *>(curr_val - delta));
 }
 
-unsigned long long jsonstats_get_used_mem() {
-    return jsonstats.used_mem;
-}
+unsigned long long jsonstats_get_used_mem() { return jsonstats.used_mem; }
 
-unsigned long long jsonstats_get_num_doc_keys() {
-    return jsonstats.num_doc_keys;
-}
+unsigned long long jsonstats_get_num_doc_keys() { return jsonstats.num_doc_keys; }
 
-unsigned long long jsonstats_get_max_depth_ever_seen() {
-    return jsonstats.max_depth_ever_seen;
-}
+unsigned long long jsonstats_get_max_depth_ever_seen() { return jsonstats.max_depth_ever_seen; }
 
 void jsonstats_update_max_depth_ever_seen(const size_t max_depth) {
     if (max_depth > jsonstats.max_depth_ever_seen) {
@@ -120,9 +124,7 @@ void jsonstats_update_max_depth_ever_seen(const size_t max_depth) {
     }
 }
 
-unsigned long long jsonstats_get_max_size_ever_seen() {
-    return jsonstats.max_size_ever_seen;
-}
+unsigned long long jsonstats_get_max_size_ever_seen() { return jsonstats.max_size_ever_seen; }
 
 void jsonstats_update_max_size_ever_seen(const size_t max_size) {
     if (max_size > jsonstats.max_size_ever_seen) {
@@ -130,21 +132,13 @@ void jsonstats_update_max_size_ever_seen(const size_t max_size) {
     }
 }
 
-unsigned long long jsonstats_get_defrag_count() {
-    return jsonstats.defrag_count;
-}
+unsigned long long jsonstats_get_defrag_count() { return jsonstats.defrag_count; }
 
-void jsonstats_increment_defrag_count() {
-    jsonstats.defrag_count++;
-}
+void jsonstats_increment_defrag_count() { jsonstats.defrag_count++; }
 
-unsigned long long jsonstats_get_defrag_bytes() {
-    return jsonstats.defrag_bytes;
-}
+unsigned long long jsonstats_get_defrag_bytes() { return jsonstats.defrag_bytes; }
 
-void jsonstats_increment_defrag_bytes(const size_t amount) {
-    jsonstats.defrag_bytes += amount;
-}
+void jsonstats_increment_defrag_bytes(const size_t amount) { jsonstats.defrag_bytes += amount; }
 
 /* Given a size (bytes), find histogram bucket index using binary search.
  */
@@ -211,7 +205,7 @@ STATIC void update_doc_hist(JDocument *doc, const size_t orig_size, const size_t
 void jsonstats_sprint_hist_buckets(char *buf, const size_t buf_size) {
     std::ostringstream oss;
     oss << "[";
-    for (size_t i=0; i < NUM_BUCKETS; i++) {
+    for (size_t i = 0; i < NUM_BUCKETS; i++) {
         if (i > 0) oss << ",";
         oss << buckets[i];
     }
@@ -225,7 +219,7 @@ void jsonstats_sprint_hist_buckets(char *buf, const size_t buf_size) {
 STATIC void sprint_hist(size_t *arr, const size_t len, char *buf, const size_t buf_size) {
     std::ostringstream oss;
     oss << "[";
-    for (size_t i=0; i < len; i++) {
+    for (size_t i = 0; i < len; i++) {
         if (i > 0) oss << ",";
         oss << arr[i];
     }
@@ -236,9 +230,7 @@ STATIC void sprint_hist(size_t *arr, const size_t len, char *buf, const size_t b
     buf[str.length()] = '\0';
 }
 
-void jsonstats_sprint_doc_hist(char *buf, const size_t buf_size) {
-    sprint_hist(doc_hist, NUM_BUCKETS, buf, buf_size);
-}
+void jsonstats_sprint_doc_hist(char *buf, const size_t buf_size) { sprint_hist(doc_hist, NUM_BUCKETS, buf, buf_size); }
 
 void jsonstats_sprint_read_hist(char *buf, const size_t buf_size) {
     sprint_hist(read_hist, NUM_BUCKETS, buf, buf_size);
@@ -288,4 +280,3 @@ void jsonstats_update_stats_on_delete(JDocument *doc, const bool is_delete_doc_k
     uint32_t bucket = jsonstats_find_bucket(deleted_val_size);
     delete_hist[bucket]++;
 }
-

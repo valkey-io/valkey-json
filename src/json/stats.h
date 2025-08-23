@@ -13,19 +13,14 @@
 
 #include "json/dom.h"
 
-typedef enum {
-    JSONSTATS_READ = 0,
-    JSONSTATS_INSERT,
-    JSONSTATS_UPDATE,
-    JSONSTATS_DELETE
-} JsonCommandType;
+enum JsonCommandType { JSONSTATS_READ = 0, JSONSTATS_INSERT, JSONSTATS_UPDATE, JSONSTATS_DELETE };
 
 /* Initialize statistics counters and thread local storage (TLS) keys. */
 JsonUtilCode jsonstats_init();
 
 /* Begin tracking memory usage.
  * @return value of the thread local counter.
-*/
+ */
 int64_t jsonstats_begin_track_mem();
 
 /* End tracking memory usage.
@@ -77,25 +72,24 @@ void jsonstats_sprint_delete_hist(char *buf, const size_t buf_size);
  */
 uint32_t jsonstats_find_bucket(size_t size);
 
-
 /* JSON logical statistics.
  * Used for internal tracking of elements for Skyhook Billing.
  * Using a similar structure to JsonStats.
  * We don't track the logical bytes themselves here as they are tracked by Skyhook Metering.
  * We are using size_t to match Valkey Module API for Data Metering.
  */
-typedef struct _LogicalStats {
-    std::atomic_size_t boolean_count;  // 16 bytes
-    std::atomic_size_t number_count;  // 16 bytes
+struct LogicalStats {
+    std::atomic_size_t boolean_count;            // 16 bytes
+    std::atomic_size_t number_count;             // 16 bytes
     std::atomic_size_t sum_extra_numeric_chars;  // 1 byte per char
-    std::atomic_size_t string_count;  // 16 bytes
-    std::atomic_size_t sum_string_chars;  // 1 byte per char
-    std::atomic_size_t null_count;  // 16 bytes
-    std::atomic_size_t array_count;  // 16 bytes
-    std::atomic_size_t sum_array_elements;  // internal metric
-    std::atomic_size_t object_count;  // 16 bytes
-    std::atomic_size_t sum_object_members;  // internal metric
-    std::atomic_size_t sum_object_key_chars;  // 1 byte per char
+    std::atomic_size_t string_count;             // 16 bytes
+    std::atomic_size_t sum_string_chars;         // 1 byte per char
+    std::atomic_size_t null_count;               // 16 bytes
+    std::atomic_size_t array_count;              // 16 bytes
+    std::atomic_size_t sum_array_elements;       // internal metric
+    std::atomic_size_t object_count;             // 16 bytes
+    std::atomic_size_t sum_object_members;       // internal metric
+    std::atomic_size_t sum_object_key_chars;     // 1 byte per char
 
     void reset() {
         boolean_count = 0;
@@ -110,7 +104,7 @@ typedef struct _LogicalStats {
         sum_object_members = 0;
         sum_object_key_chars = 0;
     }
-} LogicalStats;
+};
 extern LogicalStats logical_stats;
 
 #define DOUBLE_CHARS_CUTOFF 24

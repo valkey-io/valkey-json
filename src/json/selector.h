@@ -1,29 +1,52 @@
 #ifndef VALKEYJSONMODULE_JSON_SELECTOR_H_
 #define VALKEYJSONMODULE_JSON_SELECTOR_H_
 
+#include <string_view>
+
 #include "json/dom.h"
 #include "json/rapidjson_includes.h"
-#include <string_view>
 
 struct Token {
     enum TokenType {
         UNKNOWN = 0,
-        DOLLAR, DOT, DOTDOT, WILDCARD,
-        COLON, COMMA, AT, QUESTION_MARK,
-        LBRACKET, RBRACKET, LPAREN, RPAREN,
-        SINGLE_QUOTE, DOUBLE_QUOTE,
-        PLUS, MINUS, DIV, PCT,
-        EQ, NE, GT, LT, GE, LE, NOT, ASSIGN,
-        ALPHA, DIGIT, SPACE,
-        TRUE, FALSE, AND, OR,
+        DOLLAR,
+        DOT,
+        DOTDOT,
+        WILDCARD,
+        COLON,
+        COMMA,
+        AT,
+        QUESTION_MARK,
+        LBRACKET,
+        RBRACKET,
+        LPAREN,
+        RPAREN,
+        SINGLE_QUOTE,
+        DOUBLE_QUOTE,
+        PLUS,
+        MINUS,
+        DIV,
+        PCT,
+        EQ,
+        NE,
+        GT,
+        LT,
+        GE,
+        LE,
+        NOT,
+        ASSIGN,
+        ALPHA,
+        DIGIT,
+        SPACE,
+        TRUE,
+        FALSE,
+        AND,
+        OR,
         SPECIAL_CHAR,
         END
     };
 
-    Token()
-            : type(Token::UNKNOWN)
-            , strVal()
-    {}
+    Token() : type(Token::UNKNOWN) {}
     TokenType type;
     std::string_view strVal;
 };
@@ -35,7 +58,7 @@ struct Token {
  * Otherwise, the underlying string is owned by StringViewHelper.
  */
 struct StringViewHelper {
-    StringViewHelper() : str(), view() {}
+    StringViewHelper() = default;
     StringViewHelper(const StringViewHelper &svh) {
         str = svh.str;
         if (str.empty())
@@ -43,7 +66,7 @@ struct StringViewHelper {
         else
             view = std::string_view(str.c_str(), str.length());
     }
-    const std::string_view& getView() const { return view; }
+    const std::string_view &getView() const { return view; }
     void setInternalString(const jsn::string &s) {
         str = s;
         view = std::string_view(str.c_str(), str.length());
@@ -52,33 +75,26 @@ struct StringViewHelper {
         str = jsn::string(v);
         view = std::string_view(str.c_str(), str.length());
     }
-    void setExternalView(const std::string_view &sv) {
-        view = sv;
-    }
+    void setExternalView(const std::string_view &sv) { view = sv; }
 
- private:
+   private:
     jsn::string str;
     std::string_view view;
-    StringViewHelper& operator=(const StringViewHelper&);  // disable assignment operator
+    StringViewHelper &operator=(const StringViewHelper &);  // disable assignment operator
 };
 
 class Lexer {
- public:
-    Lexer()
-            : p(nullptr)
-            , next()
-            , path(nullptr)
-            , rdTokens(0)
-    {}
+   public:
+    Lexer() : p(nullptr), path(nullptr), rdTokens(0) {}
     void init(const char *path);
     Token::TokenType peekToken() const;
     Token nextToken(const bool skipSpace = false);
-    const Token& currToken() const { return next; }
+    const Token &currToken() const { return next; }
     bool matchToken(const Token::TokenType type, const bool skipSpace = false);
     JsonUtilCode scanInteger(int64_t &val);
     JsonUtilCode scanUnquotedMemberName(StringViewHelper &member_name);
     JsonUtilCode scanPathValue(StringViewHelper &output);
-    JsonUtilCode scanDoubleQuotedString(JParser& parser);
+    JsonUtilCode scanDoubleQuotedString(JParser &parser);
     JsonUtilCode scanDoubleQuotedString(jsn::stringstream &ss);
     JsonUtilCode scanSingleQuotedString(jsn::stringstream &ss);
     JsonUtilCode scanSingleQuotedStringAndConvertToDoubleQuotedString(jsn::stringstream &ss);
@@ -90,9 +106,9 @@ class Lexer {
     const char *p;  // current position in path
     Token next;
 
- private:
-    Lexer(const Lexer &t);  // disable copy constructor
-    Lexer& operator=(const Lexer &rhs);  // disable assignment constructor
+   private:
+    Lexer(const Lexer &t);               // disable copy constructor
+    Lexer &operator=(const Lexer &rhs);  // disable assignment constructor
     int64_t scanUnsignedInteger();
     const char *path;
     size_t rdTokens;  // number of recursive descent tokens
@@ -143,27 +159,21 @@ class Lexer {
  *    b) A new key can be appended to an object if and only if the key is the last child in the path.
  */
 class Selector {
- public:
+   public:
     explicit Selector(bool force_v2_path_behavior = false)
-            : isV2Path(force_v2_path_behavior)
-            , root(nullptr)
-            , node(nullptr)
-            , nodePath()
-            , lex()
-            , maxPathDepth(0)
-            , currPathDepth(0)
-            , resultSet()
-            , insertPaths()
-            , uniqueResultSet()
-            , mode(READ)
-            , isRecursiveSearch(false)
-            , error(JSONUTIL_SUCCESS)
-    {}
+        : isV2Path(force_v2_path_behavior),
+          root(nullptr),
+          node(nullptr),
+          maxPathDepth(0),
+          currPathDepth(0),
+          mode(READ),
+          isRecursiveSearch(false),
+          error(JSONUTIL_SUCCESS) {}
 
     // ValueInfo - (value, path) pair.
     //   first:  JValue pointer
     //   second: path to the value, which is in json pointer format.
-    typedef std::pair<JValue*, jsn::string> ValueInfo;
+    using ValueInfo = std::pair<JValue *, jsn::string>;
 
     /**
      * Entry point for READ query.
@@ -212,14 +222,14 @@ class Selector {
     bool hasUpdates() const { return !resultSet.empty(); }
     bool hasInserts() const { return !insertPaths.empty(); }
     size_t getMaxPathDepth() const { return maxPathDepth; }
-    const jsn::vector<ValueInfo>& getResultSet() const { return resultSet; }
-    void getSelectedValues(jsn::vector<JValue*> &values) const;
-    const jsn::vector<Selector::ValueInfo>& getUniqueResultSet();
+    const jsn::vector<ValueInfo> &getResultSet() const { return resultSet; }
+    void getSelectedValues(jsn::vector<JValue *> &values) const;
+    const jsn::vector<Selector::ValueInfo> &getUniqueResultSet();
     void dedupe();
 
     bool isV2Path;  // if false, it's legacy syntax
 
- private:
+   private:
     enum Mode {
         READ,
         INSERT,
@@ -229,13 +239,7 @@ class Selector {
     };
 
     struct State {
-        State()
-                : currNode(nullptr)
-                , nodePath()
-                , currPathPtr(nullptr)
-                , currToken()
-                , currPathDepth(0)
-        {}
+        State() : currNode(nullptr), currPathPtr(nullptr), currPathDepth(0) {}
         JValue *currNode;
         jsn::string nodePath;
         const char *currPathPtr;
@@ -364,7 +368,7 @@ class Selector {
 
     Mode mode;
     bool isRecursiveSearch;  // if we are doing a recursive search we do not wish to add new fields
-    JsonUtilCode error;  // JSONUTIL_SUCCESS indicates no error
+    JsonUtilCode error;      // JSONUTIL_SUCCESS indicates no error
 };
 
 #endif

@@ -1,39 +1,46 @@
 #include "json/dom.h"
-#include "json/json.h"
-#include "json/stats.h"
-#include "json/selector.h"
-#include <cstring>
-#include <memory>
-#include <iostream>
-#include <iomanip>
+
 #include <cmath>
+#include <cstring>
+#include <iomanip>
+#include <iostream>
+#include <memory>
+
+#include "json/json.h"
 #include "json/rapidjson_includes.h"
+#include "json/selector.h"
+#include "json/stats.h"
 
 #define STATIC /* decorator for static functions, remove so that backtrace symbols include these */
 
-#define CHECK_DOCUMENT_SIZE_LIMIT(ctx, curr_doc_size, input_json_val_size) \
-{ \
-    if (ctx != nullptr && !(ValkeyModule_GetContextFlags(ctx) & VALKEYMODULE_CTX_FLAGS_REPLICATED) && \
-        json_get_max_document_size() > 0 && (curr_doc_size + input_json_val_size > json_get_max_document_size())) { \
-         ValkeyModule_Log(ctx, "debug", \
-         "Document size limit is exceeded. The attempted operation will result in a document with %lu bytes of " \
-         "memory size.", curr_doc_size + input_json_val_size); \
-        return JSONUTIL_DOCUMENT_SIZE_LIMIT_EXCEEDED; \
-    } \
-}
+#define CHECK_DOCUMENT_SIZE_LIMIT(ctx, curr_doc_size, input_json_val_size)                                         \
+    {                                                                                                              \
+        if (ctx != nullptr && !(ValkeyModule_GetContextFlags(ctx) & VALKEYMODULE_CTX_FLAGS_REPLICATED) &&          \
+            json_get_max_document_size() > 0 &&                                                                    \
+            (curr_doc_size + input_json_val_size > json_get_max_document_size())) {                                \
+            ValkeyModule_Log(ctx, "debug",                                                                         \
+                             "Document size limit is exceeded. The attempted operation will result in a document " \
+                             "with %lu bytes of "                                                                  \
+                             "memory size.",                                                                       \
+                             curr_doc_size + input_json_val_size);                                                 \
+            return JSONUTIL_DOCUMENT_SIZE_LIMIT_EXCEEDED;                                                          \
+        }                                                                                                          \
+    }
 
-#define CHECK_DOCUMENT_PATH_LIMIT(ctx, selector, new_val) \
-{ \
-    size_t __depth_would_be = selector.getMaxPathDepth() + new_val.GetMaxDepth(); \
-    if (__depth_would_be > json_get_max_path_limit()) { \
-         ValkeyModule_Log(ctx, "debug", \
-         "Document path limit is exceeded. The attempted operation will result in a document with %lu nesting" \
-         " levels.", __depth_would_be); \
-        return JSONUTIL_DOCUMENT_PATH_LIMIT_EXCEEDED; \
-    } else { \
-        jsonstats_update_max_depth_ever_seen(__depth_would_be); \
-    } \
-}
+#define CHECK_DOCUMENT_PATH_LIMIT(ctx, selector, new_val)                                                             \
+    {                                                                                                                 \
+        size_t __depth_would_be = selector.getMaxPathDepth() + new_val.GetMaxDepth();                                 \
+        if (__depth_would_be > json_get_max_path_limit()) {                                                           \
+            ValkeyModule_Log(                                                                                         \
+                ctx, "debug",                                                                                         \
+                "Document path limit is exceeded. The attempted operation will result in a document with %lu nesting" \
+                " levels.",                                                                                           \
+                __depth_would_be);                                                                                    \
+            return JSONUTIL_DOCUMENT_PATH_LIMIT_EXCEEDED;                                                             \
+        } else {                                                                                                      \
+            jsonstats_update_max_depth_ever_seen(__depth_would_be);                                                   \
+        }                                                                                                             \
+    }
 
 // the one true allocator
 RapidJsonAllocator allocator;
@@ -47,11 +54,9 @@ RapidJsonAllocator::RapidJsonAllocator() {
     ValkeyModule_Assert(this == &allocator);  // Only this one is allowed :)
 }
 
-JValue& dom_get_value(JDocument &doc) {
-    return doc.GetJValue();
-}
+JValue &dom_get_value(JDocument &doc) { return doc.GetJValue(); }
 
-JParser& JParser::Parse(const char *json, size_t len) {
+JParser &JParser::Parse(const char *json, size_t len) {
     int64_t begin_val = jsonstats_begin_track_mem();
     RJParser::Parse(json, len);
     int64_t delta = jsonstats_end_track_mem(begin_val);
@@ -60,43 +65,31 @@ JParser& JParser::Parse(const char *json, size_t len) {
     return *this;
 }
 
-JParser& JParser::Parse(const std::string_view &sv) {
-    return Parse(sv.data(), sv.length());
-}
+JParser &JParser::Parse(const std::string_view &sv) { return Parse(sv.data(), sv.length()); }
 
 jsn::string validate(const JDocument *doc) {
     std::string s = doc->GetJValue().Validate();
-    return jsn::string(s.c_str(), s.length());
+    return {s.c_str(), s.length()};
 }
 
-STATIC JDocument *create_doc() {
-    return new JDocument();
-}
+STATIC JDocument *create_doc() { return new JDocument(); }
 
 void dom_free_doc(JDocument *doc) {
     ValkeyModule_Assert(doc != nullptr);
     delete doc;
 }
 
-size_t dom_get_doc_size(const JDocument *doc) {
-    return doc->size;
-}
+size_t dom_get_doc_size(const JDocument *doc) { return doc->size; }
 
 size_t dom_get_doc_size_no_opt(const JDocument *doc) {
     return sizeof(JDocument) + doc->GetJValue().ComputeMallocedSize();
 }
 
-void dom_set_doc_size(JDocument *doc, const size_t size) {
-    doc->size = size;
-}
+void dom_set_doc_size(JDocument *doc, const size_t size) { doc->size = size; }
 
-size_t dom_get_bucket_id(const JDocument *doc) {
-    return doc->bucket_id;
-}
+size_t dom_get_bucket_id(const JDocument *doc) { return doc->bucket_id; }
 
-void dom_set_bucket_id(JDocument *doc, const uint32_t bucket_id) {
-    doc->bucket_id = bucket_id;
-}
+void dom_set_bucket_id(JDocument *doc, const uint32_t bucket_id) { doc->bucket_id = bucket_id; }
 
 JsonUtilCode dom_parse(ValkeyModuleCtx *ctx, const char *json_buf, const size_t buf_len, JDocument **doc) {
     *doc = nullptr;
@@ -145,7 +138,7 @@ STATIC void serialize_value(const JValue &val, size_t initialLevel, const PrintF
     }
 }
 
-STATIC void serialize_value(const JValue &val, size_t initialLevel, const PrintFormat *format, ReplyBuffer& oss) {
+STATIC void serialize_value(const JValue &val, size_t initialLevel, const PrintFormat *format, ReplyBuffer &oss) {
     size_t max_depth = 0;
     rapidjson::PrettyWriter<ReplyBuffer> writer(oss);
     if (has_custom_format(format)) {
@@ -170,7 +163,7 @@ void dom_serialize_value(const JValue &val, const PrintFormat *format, rapidjson
 }
 
 JsonUtilCode dom_verify_value(ValkeyModuleCtx *ctx, JDocument *doc, const char *json_path, const char *new_val_json,
-                           size_t new_val_size) {
+                              size_t new_val_size) {
     Selector selector;
     JsonUtilCode rc = selector.prepareSetValues(doc->GetJValue(), json_path);
     if (rc != JSONUTIL_SUCCESS) return rc;
@@ -208,25 +201,25 @@ JsonUtilCode dom_set_value(ValkeyModuleCtx *ctx, JDocument *doc, const char *jso
     return JSONUTIL_SUCCESS;
 }
 
-template<typename OutputBuffer>
-STATIC void PutString(OutputBuffer& oss, const char *str) {
+template <typename OutputBuffer>
+STATIC void PutString(OutputBuffer &oss, const char *str) {
     while (*str) oss.Put(*str++);
 }
 
-template<typename OutputBuffer>
-STATIC void PutEscapedString(OutputBuffer& oss, const char *str) {
+template <typename OutputBuffer>
+STATIC void PutEscapedString(OutputBuffer &oss, const char *str) {
     JValue tmp;
     tmp.SetString(str, strlen(str));
     serialize_value(tmp, 0, nullptr, oss);
 }
 
 // Build stringified JSON array directly from a vector of values.
-template<typename T>
-STATIC void build_json_array(const jsn::vector<JValue*> &values, const PrintFormat *format, T &oss) {
+template <typename T>
+STATIC void build_json_array(const jsn::vector<JValue *> &values, const PrintFormat *format, T &oss) {
     bool has_format = has_custom_format(format);
     oss.Put('[');
     if (has_format && format->newline) PutString(oss, format->newline);
-    for (size_t i=0; i < values.size(); i++) {
+    for (size_t i = 0; i < values.size(); i++) {
         if (has_format && format->indent) PutString(oss, format->indent);
         serialize_value(*values[i], 1, format, oss);
         if (i < values.size() - 1) oss.Put(',');
@@ -235,13 +228,13 @@ STATIC void build_json_array(const jsn::vector<JValue*> &values, const PrintForm
     oss.Put(']');
 }
 
-template STATIC void build_json_array(const jsn::vector<JValue*> &values, const PrintFormat *format, ReplyBuffer &oss);
-template STATIC void build_json_array(const jsn::vector<JValue*> &values, const PrintFormat *format,
-        rapidjson::StringBuffer &oss);
+template STATIC void build_json_array(const jsn::vector<JValue *> &values, const PrintFormat *format, ReplyBuffer &oss);
+template STATIC void build_json_array(const jsn::vector<JValue *> &values, const PrintFormat *format,
+                                      rapidjson::StringBuffer &oss);
 
-template<typename T>
-JsonUtilCode dom_get_value_as_str(JDocument *doc, const char *json_path, const PrintFormat *format,
-                                  T &oss, const bool update_stats) {
+template <typename T>
+JsonUtilCode dom_get_value_as_str(JDocument *doc, const char *json_path, const PrintFormat *format, T &oss,
+                                  const bool update_stats) {
     Selector selector;
     JsonUtilCode rc = selector.getValues(*doc, json_path);
     if (rc != JSONUTIL_SUCCESS) {
@@ -250,7 +243,7 @@ JsonUtilCode dom_get_value_as_str(JDocument *doc, const char *json_path, const P
         if (selector.isSyntaxError(rc)) return rc;
     }
 
-    jsn::vector<JValue*> values;
+    jsn::vector<JValue *> values;
     selector.getSelectedValues(values);
 
     // If legacy path, return either the first value, or NONEXISTENT error if no value is found.
@@ -285,8 +278,8 @@ template JsonUtilCode dom_get_value_as_str(JDocument *doc, const char *json_path
 template JsonUtilCode dom_get_value_as_str(JDocument *doc, const char *json_path, const PrintFormat *format,
                                            rapidjson::StringBuffer &oss, const bool update_stats);
 
-STATIC void appendPathAndValue(const char *key, const JValue &val, const bool isLastPath,
-                               const bool has_format, const PrintFormat *format, ReplyBuffer &oss) {
+STATIC void appendPathAndValue(const char *key, const JValue &val, const bool isLastPath, const bool has_format,
+                               const PrintFormat *format, ReplyBuffer &oss) {
     if (has_format && format->indent) PutString(oss, format->indent);
     PutEscapedString(oss, key);
     oss.Put(':');
@@ -296,7 +289,7 @@ STATIC void appendPathAndValue(const char *key, const JValue &val, const bool is
     if (has_format && format->newline) PutString(oss, format->newline);
 }
 
-STATIC void appendPathAndValues(const char *key, const jsn::vector<JValue*> &values, const bool isLastPath,
+STATIC void appendPathAndValues(const char *key, const jsn::vector<JValue *> &values, const bool isLastPath,
                                 const bool has_format, const PrintFormat *format, ReplyBuffer &oss) {
     if (has_format && format->indent) PutString(oss, format->indent);
     PutEscapedString(oss, key);
@@ -305,7 +298,7 @@ STATIC void appendPathAndValues(const char *key, const jsn::vector<JValue*> &val
     oss.Put('[');
     if (has_format && format->newline) PutString(oss, format->newline);
 
-    for (size_t i=0; i < values.size(); i++) {
+    for (size_t i = 0; i < values.size(); i++) {
         if (has_format && format->indent) {
             PutString(oss, format->indent);
             PutString(oss, format->indent);
@@ -322,8 +315,7 @@ STATIC void appendPathAndValues(const char *key, const jsn::vector<JValue*> &val
 }
 
 STATIC JsonUtilCode buildJsonForMultiPaths(JDocument *doc, const char **paths, const int num_paths,
-                                           const bool is_v2path, const PrintFormat *format,
-                                           ReplyBuffer &oss) {
+                                           const bool is_v2path, const PrintFormat *format, ReplyBuffer &oss) {
     bool has_format = has_custom_format(format);
     Selector selector(is_v2path);
     JsonUtilCode rc;
@@ -337,7 +329,7 @@ STATIC JsonUtilCode buildJsonForMultiPaths(JDocument *doc, const char **paths, c
             if (selector.isSyntaxError(rc)) return rc;
         }
 
-        jsn::vector<JValue*> values;
+        jsn::vector<JValue *> values;
         selector.getSelectedValues(values);
 
         if (!is_v2path) {  // legacy path
@@ -354,8 +346,8 @@ STATIC JsonUtilCode buildJsonForMultiPaths(JDocument *doc, const char **paths, c
     return JSONUTIL_SUCCESS;
 }
 
-JsonUtilCode dom_get_values_as_str(JDocument *doc, const char **paths, const int num_paths,
-                                   PrintFormat *format, ReplyBuffer &oss, const bool update_stats) {
+JsonUtilCode dom_get_values_as_str(JDocument *doc, const char **paths, const int num_paths, PrintFormat *format,
+                                   ReplyBuffer &oss, const bool update_stats) {
     // If there are multiple paths mixed with both v1 and v2 syntax, the returned value should conform to the V2
     // behavior (returning an array of values).
     // We can't start processing the first element until we know if we should conform to V1 or V2 behavior.
@@ -387,7 +379,7 @@ JsonUtilCode dom_delete_value(JDocument *doc, const char *json_path, size_t &num
 }
 
 // check if there is at least one number value
-STATIC bool has_number_value(jsn::vector<JValue*> &values) {
+STATIC bool has_number_value(jsn::vector<JValue *> &values) {
     for (auto &v : values) {
         if (v->IsNumber()) return true;
     }
@@ -402,7 +394,7 @@ JsonUtilCode dom_increment_by(JDocument *doc, const char *json_path, const JValu
     is_v2_path = selector.isV2Path;
     if (rc != JSONUTIL_SUCCESS) return rc;
 
-    jsn::vector<JValue*> values;
+    jsn::vector<JValue *> values;
     selector.getSelectedValues(values);
 
     // Legacy path:
@@ -450,7 +442,7 @@ JsonUtilCode dom_multiply_by(JDocument *doc, const char *json_path, const JValue
     is_v2_path = selector.isV2Path;
     if (rc != JSONUTIL_SUCCESS) return rc;
 
-    jsn::vector<JValue*> values;
+    jsn::vector<JValue *> values;
     selector.getSelectedValues(values);
 
     // Legacy path:
@@ -484,7 +476,7 @@ JsonUtilCode dom_multiply_by(JDocument *doc, const char *json_path, const JValue
 }
 
 // check if there is at least one boolean value
-STATIC bool has_boolean_value(jsn::vector<JValue*> &values) {
+STATIC bool has_boolean_value(jsn::vector<JValue *> &values) {
     for (auto &v : values) {
         if (v->IsBool()) return true;
     }
@@ -502,7 +494,7 @@ JsonUtilCode dom_toggle(JDocument *doc, const char *path, jsn::vector<int> &vec,
         if (selector.isSyntaxError(rc)) return rc;
     }
 
-    jsn::vector<JValue*> values;
+    jsn::vector<JValue *> values;
     selector.getSelectedValues(values);
 
     // Legacy path
@@ -518,7 +510,7 @@ JsonUtilCode dom_toggle(JDocument *doc, const char *path, jsn::vector<int> &vec,
             bool res = v.first->GetBool();
             res = !res;
             v.first->SetBool(res);
-            vec.push_back(res? 1 : 0);
+            vec.push_back(res ? 1 : 0);
         } else {
             vec.push_back(-1);  // -1 means the source value is not boolean
         }
@@ -527,7 +519,7 @@ JsonUtilCode dom_toggle(JDocument *doc, const char *path, jsn::vector<int> &vec,
 }
 
 // check if there is at least one string value
-STATIC bool has_string_value(jsn::vector<JValue*> &values) {
+STATIC bool has_string_value(jsn::vector<JValue *> &values) {
     for (auto &v : values) {
         if (v->IsString()) return true;
     }
@@ -545,7 +537,7 @@ JsonUtilCode dom_string_length(JDocument *doc, const char *path, jsn::vector<siz
         if (selector.isSyntaxError(rc)) return rc;
     }
 
-    jsn::vector<JValue*> values;
+    jsn::vector<JValue *> values;
     selector.getSelectedValues(values);
 
     // Legacy path
@@ -574,7 +566,7 @@ JsonUtilCode dom_string_append(JDocument *doc, const char *path, const char *jso
     is_v2_path = selector.isV2Path;
     if (rc != JSONUTIL_SUCCESS) return rc;
 
-    jsn::vector<JValue*> values;
+    jsn::vector<JValue *> values;
     selector.getSelectedValues(values);
 
     // Legacy path:
@@ -604,7 +596,7 @@ JsonUtilCode dom_string_append(JDocument *doc, const char *path, const char *jso
 }
 
 // check if there is at least one object value
-STATIC bool has_object_value(jsn::vector<JValue*> &values) {
+STATIC bool has_object_value(jsn::vector<JValue *> &values) {
     for (auto &v : values) {
         if (v->IsObject()) return true;
     }
@@ -622,7 +614,7 @@ JsonUtilCode dom_object_length(JDocument *doc, const char *path, jsn::vector<siz
         if (selector.isSyntaxError(rc)) return rc;
     }
 
-    jsn::vector<JValue*> values;
+    jsn::vector<JValue *> values;
     selector.getSelectedValues(values);
 
     // Legacy path
@@ -643,8 +635,8 @@ JsonUtilCode dom_object_length(JDocument *doc, const char *path, jsn::vector<siz
     return JSONUTIL_SUCCESS;
 }
 
-JsonUtilCode dom_object_keys(JDocument *doc, const char *path,
-                             jsn::vector<jsn::vector<jsn::string>> &vec, bool &is_v2_path) {
+JsonUtilCode dom_object_keys(JDocument *doc, const char *path, jsn::vector<jsn::vector<jsn::string>> &vec,
+                             bool &is_v2_path) {
     vec.clear();
     Selector selector;
     JsonUtilCode rc = selector.getValues(doc->GetJValue(), path);
@@ -655,7 +647,7 @@ JsonUtilCode dom_object_keys(JDocument *doc, const char *path,
         if (selector.isSyntaxError(rc)) return rc;
     }
 
-    jsn::vector<JValue*> values;
+    jsn::vector<JValue *> values;
     selector.getSelectedValues(values);
 
     // Legacy path
@@ -679,7 +671,7 @@ JsonUtilCode dom_object_keys(JDocument *doc, const char *path,
 }
 
 // check if there is at least one array value
-STATIC bool has_array_value(jsn::vector<JValue*> &values) {
+STATIC bool has_array_value(jsn::vector<JValue *> &values) {
     for (auto &v : values) {
         if (v->IsArray()) return true;
     }
@@ -697,7 +689,7 @@ JsonUtilCode dom_array_length(JDocument *doc, const char *path, jsn::vector<size
         if (selector.isSyntaxError(rc)) return rc;
     }
 
-    jsn::vector<JValue*> values;
+    jsn::vector<JValue *> values;
     selector.getSelectedValues(values);
 
     // Legacy path
@@ -718,16 +710,15 @@ JsonUtilCode dom_array_length(JDocument *doc, const char *path, jsn::vector<size
     return JSONUTIL_SUCCESS;
 }
 
-JsonUtilCode dom_array_append(ValkeyModuleCtx *ctx, JDocument *doc, const char *path,
-                              const char **jsons, size_t *json_lens, const size_t num_values,
-                              jsn::vector<size_t> &vec, bool &is_v2_path) {
+JsonUtilCode dom_array_append(ValkeyModuleCtx *ctx, JDocument *doc, const char *path, const char **jsons,
+                              size_t *json_lens, const size_t num_values, jsn::vector<size_t> &vec, bool &is_v2_path) {
     vec.clear();
     Selector selector;
     JsonUtilCode rc = selector.getValues(doc->GetJValue(), path);
     is_v2_path = selector.isV2Path;
     if (rc != JSONUTIL_SUCCESS) return rc;
 
-    jsn::vector<JValue*> values;
+    jsn::vector<JValue *> values;
     selector.getSelectedValues(values);
 
     // Legacy path:
@@ -741,7 +732,7 @@ JsonUtilCode dom_array_append(ValkeyModuleCtx *ctx, JDocument *doc, const char *
     // parse json values
     jsn::vector<JParser> appendVals(num_values);
     size_t totalJValueSize = 0;
-    for (size_t i=0; i < num_values; i++) {
+    for (size_t i = 0; i < num_values; i++) {
         if (appendVals[i].Parse(jsons[i], json_lens[i]).HasParseError()) {
             return appendVals[i].GetParseErrorCode();
         }
@@ -752,7 +743,7 @@ JsonUtilCode dom_array_append(ValkeyModuleCtx *ctx, JDocument *doc, const char *
 
     for (auto &v : selector.getUniqueResultSet()) {
         if (v.first->IsArray()) {
-            for (size_t i=0; i < num_values; i++) {
+            for (size_t i = 0; i < num_values; i++) {
                 // Need to make a copy of the value because after the first call of JValue::PushBack,
                 // the object is moved and can no longer be pushed into anther array.
                 JValue copy(appendVals[i], allocator);
@@ -781,15 +772,15 @@ STATIC void internal_array_pop(JValue &arrVal, int64_t index, jsn::vector<rapidj
     vec.push_back(std::move(oss));
 }
 
-JsonUtilCode dom_array_pop(JDocument *doc, const char *path, int64_t index,
-                           jsn::vector<rapidjson::StringBuffer> &vec, bool &is_v2_path) {
+JsonUtilCode dom_array_pop(JDocument *doc, const char *path, int64_t index, jsn::vector<rapidjson::StringBuffer> &vec,
+                           bool &is_v2_path) {
     vec.clear();
     Selector selector;
     JsonUtilCode rc = selector.getValues(doc->GetJValue(), path);
     is_v2_path = selector.isV2Path;
     if (rc != JSONUTIL_SUCCESS) return rc;
 
-    jsn::vector<JValue*> values;
+    jsn::vector<JValue *> values;
     selector.getSelectedValues(values);
 
     // Legacy path:
@@ -816,8 +807,8 @@ JsonUtilCode dom_array_pop(JDocument *doc, const char *path, int64_t index,
     return JSONUTIL_SUCCESS;
 }
 
-STATIC JsonUtilCode internal_array_insert(JValue &arrVal, jsn::vector<JParser> &insertVals,
-                                          const size_t num_values, int64_t index, jsn::vector<size_t> &vec) {
+STATIC JsonUtilCode internal_array_insert(JValue &arrVal, jsn::vector<JParser> &insertVals, const size_t num_values,
+                                          int64_t index, jsn::vector<size_t> &vec) {
     size_t size = arrVal.Size();
 
     // Negative index values are interpreted as starting from the end.
@@ -829,7 +820,7 @@ STATIC JsonUtilCode internal_array_insert(JValue &arrVal, jsn::vector<JParser> &
     if (index < 0 || index > static_cast<int64_t>(size)) return JSONUTIL_INDEX_OUT_OF_ARRAY_BOUNDARIES;
 
     // append num_values empty values
-    for (size_t i=0; i < num_values; i++) {
+    for (size_t i = 0; i < num_values; i++) {
         JValue empty;
         arrVal.PushBack(empty, allocator);
     }
@@ -840,7 +831,7 @@ STATIC JsonUtilCode internal_array_insert(JValue &arrVal, jsn::vector<JParser> &
     }
 
     // overwrite values [index..index+num_values-1]
-    for (int64_t i=index; i < index + static_cast<int64_t>(num_values); i++) {
+    for (int64_t i = index; i < index + static_cast<int64_t>(num_values); i++) {
         // Need to make a copy of the value to insert because after the value is assigned,
         // is is moved and can no longer be assigned into anther value.
         JValue copy(insertVals[i - index].GetJValue(), allocator);
@@ -851,16 +842,15 @@ STATIC JsonUtilCode internal_array_insert(JValue &arrVal, jsn::vector<JParser> &
     return JSONUTIL_SUCCESS;
 }
 
-JsonUtilCode dom_array_insert(ValkeyModuleCtx *ctx, JDocument *doc, const char *path, int64_t index,
-                              const char **jsons, size_t *json_lens, const size_t num_values,
-                              jsn::vector<size_t> &vec, bool &is_v2_path) {
+JsonUtilCode dom_array_insert(ValkeyModuleCtx *ctx, JDocument *doc, const char *path, int64_t index, const char **jsons,
+                              size_t *json_lens, const size_t num_values, jsn::vector<size_t> &vec, bool &is_v2_path) {
     vec.clear();
     Selector selector;
     JsonUtilCode rc = selector.getValues(doc->GetJValue(), path);
     is_v2_path = selector.isV2Path;
     if (rc != JSONUTIL_SUCCESS) return rc;
 
-    jsn::vector<JValue*> values;
+    jsn::vector<JValue *> values;
     selector.getSelectedValues(values);
 
     // Legacy path:
@@ -874,7 +864,7 @@ JsonUtilCode dom_array_insert(ValkeyModuleCtx *ctx, JDocument *doc, const char *
     // parse json values
     jsn::vector<JParser> insertVals(num_values);
     size_t totalJValueSize = 0;
-    for (size_t i=0; i < num_values; i++) {
+    for (size_t i = 0; i < num_values; i++) {
         if (insertVals[i].Parse(jsons[i], json_lens[i]).HasParseError()) {
             return insertVals[i].GetParseErrorCode();
         }
@@ -914,23 +904,21 @@ STATIC void internal_array_trim(JValue &arrVal, int64_t start, int64_t stop, jsn
         return;
     }
 
-    if (stop < size-1)
-        arrVal.Erase(arrVal.Begin() + stop + 1, arrVal.Begin() + size);
-    if (start > 0)
-        arrVal.Erase(arrVal.Begin(), arrVal.Begin() + start);
+    if (stop < size - 1) arrVal.Erase(arrVal.Begin() + stop + 1, arrVal.Begin() + size);
+    if (start > 0) arrVal.Erase(arrVal.Begin(), arrVal.Begin() + start);
 
     vec.push_back(arrVal.Size());
 }
 
-JsonUtilCode dom_array_trim(JDocument *doc, const char *path, int64_t start, int64_t stop,
-                            jsn::vector<size_t> &vec, bool &is_v2_path) {
+JsonUtilCode dom_array_trim(JDocument *doc, const char *path, int64_t start, int64_t stop, jsn::vector<size_t> &vec,
+                            bool &is_v2_path) {
     vec.clear();
     Selector selector;
     JsonUtilCode rc = selector.getValues(doc->GetJValue(), path);
     is_v2_path = selector.isV2Path;
     if (rc != JSONUTIL_SUCCESS) return rc;
 
-    jsn::vector<JValue*> values;
+    jsn::vector<JValue *> values;
     selector.getSelectedValues(values);
 
     // Legacy path:
@@ -984,7 +972,7 @@ JsonUtilCode dom_clear(JDocument *doc, const char *path, size_t &elements_cleare
                 elements_cleared++;
             }
         } else if (v.first->IsInt64()) {
-            if (v.first->GetInt64() !=0) {
+            if (v.first->GetInt64() != 0) {
                 v.first->SetInt64(0);
                 elements_cleared++;
             }
@@ -1027,7 +1015,7 @@ STATIC void internal_array_index_of(const JValue &arrVal, const JValue &inputVal
         return;
     }
 
-    for (int64_t i=start; i < stop; i++) {
+    for (int64_t i = start; i < stop; i++) {
         if (arrVal[i] == inputVal) {
             vec.push_back(i);
             return;
@@ -1037,9 +1025,8 @@ STATIC void internal_array_index_of(const JValue &arrVal, const JValue &inputVal
     vec.push_back(-1);  // not found
 }
 
-JsonUtilCode dom_array_index_of(JDocument *doc, const char *path, const char *scalar_val,
-                                const size_t scalar_val_len, int64_t start, int64_t stop,
-                                jsn::vector<int64_t> &vec, bool &is_v2_path) {
+JsonUtilCode dom_array_index_of(JDocument *doc, const char *path, const char *scalar_val, const size_t scalar_val_len,
+                                int64_t start, int64_t stop, jsn::vector<int64_t> &vec, bool &is_v2_path) {
     vec.clear();
     Selector selector;
     JsonUtilCode rc = selector.getValues(doc->GetJValue(), path);
@@ -1050,7 +1037,7 @@ JsonUtilCode dom_array_index_of(JDocument *doc, const char *path, const char *sc
         if (selector.isSyntaxError(rc)) return rc;
     }
 
-    jsn::vector<JValue*> values;
+    jsn::vector<JValue *> values;
     selector.getSelectedValues(values);
 
     // Legacy path
@@ -1131,7 +1118,7 @@ JsonUtilCode dom_value_type(JDocument *doc, const char *path, jsn::vector<jsn::s
     return JSONUTIL_SUCCESS;
 }
 
-STATIC void dom_reply_with_resp_internal(ValkeyModuleCtx *ctx, const JValue& val) {
+STATIC void dom_reply_with_resp_internal(ValkeyModuleCtx *ctx, const JValue &val) {
     switch (val.GetType()) {
         case rapidjson::kObjectType: {
             ValkeyModule_ReplyWithArray(ctx, VALKEYMODULE_POSTPONED_ARRAY_LEN);
@@ -1246,7 +1233,7 @@ JsonUtilCode dom_mem_size(JDocument *doc, const char *path, jsn::vector<size_t> 
 
     for (auto &v : selector.getResultSet()) {
         if (jsonutil_is_root_path(path)) {
-            vec.push_back(dom_get_doc_size_no_opt(static_cast<const JDocument*>(v.first)));
+            vec.push_back(dom_get_doc_size_no_opt(static_cast<const JDocument *>(v.first)));
         } else {
             vec.push_back(sizeof(*v.first) + v.first->ComputeMallocedSize());
         }
@@ -1254,14 +1241,12 @@ JsonUtilCode dom_mem_size(JDocument *doc, const char *path, jsn::vector<size_t> 
     return JSONUTIL_SUCCESS;
 }
 
-STATIC size_t num_fields_internal(JValue& v) {
+STATIC size_t num_fields_internal(JValue &v) {
     size_t num_fields = 1;
     if (v.IsObject()) {
-        for (auto &m : v.GetObject())
-            num_fields += num_fields_internal(m.value);
+        for (auto &m : v.GetObject()) num_fields += num_fields_internal(m.value);
     } else if (v.IsArray()) {
-        for (auto &m : v.GetArray())
-            num_fields += num_fields_internal(m);
+        for (auto &m : v.GetArray()) num_fields += num_fields_internal(m);
     }
     return num_fields;
 }
@@ -1292,21 +1277,18 @@ JsonUtilCode dom_num_fields(JDocument *doc, const char *path, jsn::vector<size_t
 
     for (auto &v : selector.getResultSet()) {
         size_t count = num_fields_internal(*v.first);
-        if (v.first->IsObject() || v.first->IsArray())
-            count--;  // exclude the container itself
+        if (v.first->IsObject() || v.first->IsArray()) count--;  // exclude the container itself
         vec.push_back(count);
     }
     return JSONUTIL_SUCCESS;
 }
 
-STATIC void find_path_depth_internal(JValue& v, size_t d, size_t *max_depth) {
+STATIC void find_path_depth_internal(JValue &v, size_t d, size_t *max_depth) {
     *max_depth = std::max(d, *max_depth);
     if (v.IsObject()) {
-        for (auto &m : v.GetObject())
-            find_path_depth_internal(m.value, d+1, max_depth);
+        for (auto &m : v.GetObject()) find_path_depth_internal(m.value, d + 1, max_depth);
     } else if (v.IsArray()) {
-        for (auto &m : v.GetArray())
-            find_path_depth_internal(m, d+1, max_depth);
+        for (auto &m : v.GetArray()) find_path_depth_internal(m, d + 1, max_depth);
     }
 }
 
@@ -1337,14 +1319,14 @@ JDocument *dom_copy(const JDocument *src) {
  * Each JValue in RDB file format has a type code followed by type-specific data
  */
 enum meta_codes {
-    JSON_METACODE_NULL    = 0x01,   // Nothing follows
-    JSON_METACODE_STRING  = 0x02,   // Followed by the string
-    JSON_METACODE_DOUBLE  = 0x04,   // Followed by the double
-    JSON_METACODE_INTEGER = 0x08,   // Coded as a 64-bit Signed Integer
-    JSON_METACODE_BOOLEAN = 0x10,   // Coded as the string '1' or '0'
-    JSON_METACODE_OBJECT  = 0x20,   // Followed by a member count, and then N "pairs"
-    JSON_METACODE_ARRAY   = 0x40,   // Followed by a element count and then n JValue elements
-    JSON_METACODE_PAIR    = 0x80    // Codes an object Memory, a string(member name) and a JValue
+    JSON_METACODE_NULL = 0x01,     // Nothing follows
+    JSON_METACODE_STRING = 0x02,   // Followed by the string
+    JSON_METACODE_DOUBLE = 0x04,   // Followed by the double
+    JSON_METACODE_INTEGER = 0x08,  // Coded as a 64-bit Signed Integer
+    JSON_METACODE_BOOLEAN = 0x10,  // Coded as the string '1' or '0'
+    JSON_METACODE_OBJECT = 0x20,   // Followed by a member count, and then N "pairs"
+    JSON_METACODE_ARRAY = 0x40,    // Followed by a element count and then n JValue elements
+    JSON_METACODE_PAIR = 0x80      // Codes an object Memory, a string(member name) and a JValue
 };
 
 //
@@ -1423,7 +1405,7 @@ STATIC JValue readStringAsJValue(ValkeyModuleIO *rdb) {
         return v;
     } else {
         ValkeyModule_LogIOError(rdb, "error", "Unable to read string or double");
-        return JValue();
+        return {};
     }
 }
 
@@ -1432,24 +1414,24 @@ STATIC JValue readLegacyDoubleAsJValue(ValkeyModuleIO *rdb) {
     double d = ValkeyModule_LoadDouble(rdb);
     char str[BUF_SIZE_DOUBLE_JSON];
     size_t str_len = jsonutil_double_to_string(d, str, sizeof(str));
-        JValue v(str, str_len, allocator, false, /* isdouble */ true);
-        return v;
+    JValue v(str, str_len, allocator, false, /* isdouble */ true);
+    return v;
 }
 
 /*
  * One instance of this is passed to all recursive invocations of rdbLoadJValue
  */
-typedef struct load_params {
+struct load_params {
     ValkeyModuleIO *rdb;
     unsigned nestLevel;
     JsonUtilCode status;
-} load_params;
+};
 
 JValue rdbLoadJValue(load_params *params) {
     uint64_t code = ValkeyModule_LoadUnsigned(params->rdb);
     switch (code) {
         case JSON_METACODE_NULL:
-            return JValue();
+            return {};
         case JSON_METACODE_STRING:
             return readStringAsJValue(params->rdb);
         case JSON_METACODE_DOUBLE:
@@ -1462,12 +1444,14 @@ JValue rdbLoadJValue(load_params *params) {
             char c = (s && strlen == 1) ? *s : 0;
             ValkeyModule_Free(s);
             switch (c) {
-                case '1': return JValue(true);
-                case '0': return JValue(false);
+                case '1':
+                    return JValue(true);
+                case '0':
+                    return JValue(false);
                 default:
                     params->status = JSONUTIL_INVALID_RDB_FORMAT;
                     ValkeyModule_LogIOError(params->rdb, "error", "invalid boolean format");
-                    return JValue();
+                    return {};
             }
         }
         case JSON_METACODE_OBJECT: {
@@ -1477,7 +1461,7 @@ JValue rdbLoadJValue(load_params *params) {
             if (params->nestLevel >= json_get_max_path_limit()) {
                 ValkeyModule_LogIOError(params->rdb, "error", "document path limit exceeded");
                 params->status = JSONUTIL_DOCUMENT_PATH_LIMIT_EXCEEDED;
-                return JValue();
+                return {};
             }
             params->nestLevel++;
             while (members--) {
@@ -1486,7 +1470,7 @@ JValue rdbLoadJValue(load_params *params) {
                     params->status = JSONUTIL_INVALID_RDB_FORMAT;
                     ValkeyModule_LogIOError(params->rdb, "error", "Invalid pair code");
                     params->nestLevel--;
-                    return JValue();
+                    return {};
                 }
                 JValue key = readStringAsJValue(params->rdb);
                 JValue value = rdbLoadJValue(params);
@@ -1503,7 +1487,7 @@ JValue rdbLoadJValue(load_params *params) {
             if (params->nestLevel >= json_get_max_path_limit()) {
                 params->status = JSONUTIL_DOCUMENT_PATH_LIMIT_EXCEEDED;
                 ValkeyModule_LogIOError(params->rdb, "error", "document path limit exceeded");
-                return JValue();
+                return {};
             }
             params->nestLevel++;
             while (length--) {
@@ -1513,9 +1497,9 @@ JValue rdbLoadJValue(load_params *params) {
             return array;
         }
         default:
-            ValkeyModule_LogIOError(params->rdb, "error", "Invalid metadata code %llx", code);
+            ValkeyModule_LogIOError(params->rdb, "error", "Invalid metadata code %lx", code);
             params->status = JSONUTIL_INVALID_RDB_FORMAT;
-            return JValue();
+            return {};
     }
 }
 
@@ -1558,7 +1542,7 @@ JsonUtilCode dom_load(JDocument **doc, ValkeyModuleIO *ctx, int encver) {
 //
 // Compute Digest
 //
-STATIC void compute_digest(ValkeyModuleDigest *ctx, const JValue& v) {
+STATIC void compute_digest(ValkeyModuleDigest *ctx, const JValue &v) {
     switch (v.GetType()) {
         case rapidjson::Type::kNullType:
             ValkeyModule_DigestAddLongLong(ctx, -1);
@@ -1614,9 +1598,7 @@ STATIC void compute_digest(ValkeyModuleDigest *ctx, const JValue& v) {
     }
 }
 
-void dom_compute_digest(ValkeyModuleDigest *ctx, const JDocument *doc) {
-    compute_digest(ctx, doc->GetJValue());
-}
+void dom_compute_digest(ValkeyModuleDigest *ctx, const JDocument *doc) { compute_digest(ctx, doc->GetJValue()); }
 
 void dom_dump_value(JValue &v) {
     (void)v;
@@ -1628,7 +1610,4 @@ void dom_dump_value(JValue &v) {
 
 /* ========================= functions consumed by unit tests ======================== */
 
-jsn::string dom_get_string(JDocument *d) {
-    return d->GetString();
-}
-
+jsn::string dom_get_string(JDocument *d) { return d->GetString(); }

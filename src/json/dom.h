@@ -29,20 +29,21 @@
 #ifndef VALKEYJSONMODULE_JSON_DOM_H_
 #define VALKEYJSONMODULE_JSON_DOM_H_
 
-#include <stdlib.h>
+#include <cstdlib>
 #include <string>
-#include "json/util.h"
+
 #include "json/alloc.h"
 #include "json/rapidjson_includes.h"
+#include "json/util.h"
 
 class ReplyBuffer : public rapidjson::StringBuffer {
- public:
-    ReplyBuffer(ValkeyModuleCtx *_ctx, bool) : rapidjson::StringBuffer(), ctx(_ctx) {}
-    ReplyBuffer() : rapidjson::StringBuffer(), ctx(nullptr) {}
+   public:
+    ReplyBuffer(ValkeyModuleCtx *_ctx, bool) : ctx(_ctx) {}
+    ReplyBuffer() : ctx(nullptr) {}
     void Initialize(ValkeyModuleCtx *_ctx, bool) { ctx = _ctx; }
     void Reply() { ValkeyModule_ReplyWithStringBuffer(ctx, GetString(), GetLength()); }
 
- private:
+   private:
     ValkeyModuleCtx *ctx;
 };
 
@@ -58,28 +59,20 @@ extern "C" {
  * RapidJSON to use a custom allocator.
  */
 class RapidJsonAllocator {
- public:
+   public:
     RapidJsonAllocator();
 
-    void *Malloc(size_t size) {
-        return dom_alloc(size);
-    }
+    void *Malloc(size_t size) { return dom_alloc(size); }
 
     void *Realloc(void *originalPtr, size_t /*originalSize*/, size_t newSize) {
         return dom_realloc(originalPtr, newSize);
     }
 
-    static void Free(void *ptr) RAPIDJSON_NOEXCEPT {
-        dom_free(ptr);
-    }
+    static void Free(void *ptr) RAPIDJSON_NOEXCEPT { dom_free(ptr); }
 
-    bool operator==(const RapidJsonAllocator&) const RAPIDJSON_NOEXCEPT {
-        return true;
-    }
+    bool operator==(const RapidJsonAllocator &) const RAPIDJSON_NOEXCEPT { return true; }
 
-    bool operator!=(const RapidJsonAllocator&) const RAPIDJSON_NOEXCEPT {
-        return false;
-    }
+    bool operator!=(const RapidJsonAllocator &) const RAPIDJSON_NOEXCEPT { return false; }
 
     static const bool kNeedFree = true;
 };
@@ -112,9 +105,9 @@ class RapidJsonAllocator {
  *                      contained by the JDocument.
  */
 
-typedef rapidjson::GenericValue<rapidjson::UTF8<>, RapidJsonAllocator> RJValue;
+using RJValue = rapidjson::GenericValue<rapidjson::UTF8<>, RapidJsonAllocator>;
 // A JValue is an RJValue without any local augmentation of change.
-typedef RJValue JValue;
+using JValue = RJValue;
 
 extern RapidJsonAllocator allocator;
 
@@ -123,27 +116,27 @@ extern RapidJsonAllocator allocator;
  * to access the underlying JValue. This improves readability at the usage point.
  */
 struct JDocument : JValue {
-    JDocument() : JValue(), size(0), bucket_id(0) {}
-    JValue& GetJValue() { return *this; }
-    const JValue& GetJValue() const { return *this; }
-    void SetJValue(JValue& rhs) { *static_cast<JValue *>(this) = rhs; }
-    size_t size:56;        // Size of this document, maintained by the JSON layer, not here.
-    size_t bucket_id:8;    // document histogram's bucket id. maintained by JSON layer, not here
+    JDocument() : size(0), bucket_id(0) {}
+    JValue &GetJValue() { return *this; }
+    const JValue &GetJValue() const { return *this; }
+    void SetJValue(JValue &rhs) { *static_cast<JValue *>(this) = rhs; }
+    size_t size : 56;      // Size of this document, maintained by the JSON layer, not here.
+    size_t bucket_id : 8;  // document histogram's bucket id. maintained by JSON layer, not here
     void *operator new(size_t size) { return dom_alloc(size); }
     void operator delete(void *ptr) { return dom_free(ptr); }
 
- private:
+   private:
     //
     // Since JDocument objects are 1:1 with Valkey Keys, you can't ever have an array of them.
     //
-    void *operator new[](size_t);       // Not defined anywhere, causes link error if used
-    void operator delete[](void *);     // Not defined anywhere, causes link error if used
+    void *operator new[](size_t);    // Not defined anywhere, causes link error if used
+    void operator delete[](void *);  // Not defined anywhere, causes link error if used
 };
 
 //
 // typedef the RapidJSON objects we care about, name them RJxxxxx for clarity
 //
-typedef rapidjson::GenericDocument<rapidjson::UTF8<>, RapidJsonAllocator> RJParser;
+using RJParser = rapidjson::GenericDocument<rapidjson::UTF8<>, RapidJsonAllocator>;
 
 /**
  * A JParser privately inherits from RJParser, which inherits from RJValue. You must use the
@@ -151,15 +144,15 @@ typedef rapidjson::GenericDocument<rapidjson::UTF8<>, RapidJsonAllocator> RJPars
  *
  */
 struct JParser : RJParser {
-    JParser() : RJParser(&allocator), allocated_size(0) {}
+    JParser() : RJParser(&allocator) {}
     //
     // Make these inner routines publicly visible
     //
-    using RJParser::ParseStream;
-    using RJParser::HasParseError;
     using RJParser::GetMaxDepth;
+    using RJParser::HasParseError;
+    using RJParser::ParseStream;
     // Access the contained JValue
-    JValue& GetJValue() { return *this; }
+    JValue &GetJValue() { return *this; }
     //
     // Translate rapidJSON parse error code into JsonUtilCode.
     //
@@ -178,8 +171,8 @@ struct JParser : RJParser {
     // When we parse an incoming string, we want to know how much member this will consume.
     // So track it and retain it.
     //
-    JParser& Parse(const char *json, size_t len);
-    JParser& Parse(const std::string_view &sv);
+    JParser &Parse(const char *json, size_t len);
+    JParser &Parse(const std::string_view &sv);
     //
     // This object holds a JValue which is the root of the parsed tree. The dom_alloc/dom_free
     // machinery will track all memory allocations outside of this object, but the root JValue
@@ -189,8 +182,8 @@ struct JParser : RJParser {
     //
     size_t GetJValueSize() const { return allocated_size + sizeof(RJValue); }
 
- private:
-    size_t allocated_size;
+   private:
+    size_t allocated_size{};
 };
 
 /* Parse input JSON string, validate syntax, and return a document object.
@@ -240,18 +233,18 @@ void dom_set_bucket_id(JDocument *doc, const uint32_t bucket_id);
 void dom_serialize(JDocument *doc, const PrintFormat *format, rapidjson::StringBuffer &oss);
 
 /**
-  * Serialize a value into the given string stream.
-  * @param format - controls format of returned JSON string.
-  *        if NULL, return JSON in compact format (no space, no indent, no newline).
-  * @param oss - output stream
-  * @param json_len - OUTPUT param, *json_len is length of JSON string.
-  */
+ * Serialize a value into the given string stream.
+ * @param format - controls format of returned JSON string.
+ *        if NULL, return JSON in compact format (no space, no indent, no newline).
+ * @param oss - output stream
+ * @param json_len - OUTPUT param, *json_len is length of JSON string.
+ */
 void dom_serialize_value(const JValue &val, const PrintFormat *format, rapidjson::StringBuffer &oss);
 
 /**
  * Get the root value of the document.
  */
-JValue& dom_get_value(JDocument &doc);
+JValue &dom_get_value(JDocument &doc);
 
 /* Verify value at the path.
  * @param json_path: path that is compliant to the JSON Path syntax.
@@ -259,11 +252,11 @@ JValue& dom_get_value(JDocument &doc);
  * @param is_update_only - indicates to update an existing value.
  * @return JSONUTIL_SUCCESS for success, other code for failure.
  */
-JsonUtilCode dom_verify_value(ValkeyModuleCtx *ctx, JDocument *doc, const char *json_path, const char *new_val_json, 
-                            size_t new_val_len);
+JsonUtilCode dom_verify_value(ValkeyModuleCtx *ctx, JDocument *doc, const char *json_path, const char *new_val_json,
+                              size_t new_val_len);
 
-
-inline JsonUtilCode dom_verify_value(ValkeyModuleCtx *ctx, JDocument *doc, const char *json_path, const char *new_val_json) {
+inline JsonUtilCode dom_verify_value(ValkeyModuleCtx *ctx, JDocument *doc, const char *json_path,
+                                     const char *new_val_json) {
     return dom_verify_value(ctx, doc, json_path, new_val_json, strlen(new_val_json));
 }
 
@@ -276,13 +269,10 @@ inline JsonUtilCode dom_verify_value(ValkeyModuleCtx *ctx, JDocument *doc, const
 JsonUtilCode dom_set_value(ValkeyModuleCtx *ctx, JDocument *doc, const char *json_path, const char *new_val_json,
                            size_t new_val_len, const bool is_create_only = false, const bool is_update_only = false);
 
-
 inline JsonUtilCode dom_set_value(ValkeyModuleCtx *ctx, JDocument *doc, const char *json_path, const char *new_val_json,
-                           const bool is_create_only = false, const bool is_update_only = false) {
+                                  const bool is_create_only = false, const bool is_update_only = false) {
     return dom_set_value(ctx, doc, json_path, new_val_json, strlen(new_val_json), is_create_only, is_update_only);
 }
-
-
 
 /* Get JSON value at the path.
  * If the path is invalid, the method will return error code JSONUTIL_INVALID_JSON_PATH.
@@ -293,9 +283,9 @@ inline JsonUtilCode dom_set_value(ValkeyModuleCtx *ctx, JDocument *doc, const ch
  * @param oss - output stream
  * @return JSONUTIL_SUCCESS for success, other code for failure.
  */
-template<typename T>
-JsonUtilCode dom_get_value_as_str(JDocument *doc, const char *json_path, const PrintFormat *format,
-                                  T &oss, const bool update_stats = true);
+template <typename T>
+JsonUtilCode dom_get_value_as_str(JDocument *doc, const char *json_path, const PrintFormat *format, T &oss,
+                                  const bool update_stats = true);
 
 /* Get JSON values at multiple paths. Values at multiple paths will be aggregated into a JSON object,
  * in which each path is a key.
@@ -305,10 +295,10 @@ JsonUtilCode dom_get_value_as_str(JDocument *doc, const char *json_path, const P
  * @param format - controls format of returned JSON string.
  *        if NULL, return JSON in compact format (no space, no indent, no newline).
  * @param oss - output stream, the string represents an aggregated JSON object in which each path is a key.
-* @return JSONUTIL_SUCCESS if success. Other codes indicate failure.
-*/
-JsonUtilCode dom_get_values_as_str(JDocument *doc, const char **paths, const int num_paths,
-                                   PrintFormat *format, ReplyBuffer &oss, const bool update_stats = true);
+ * @return JSONUTIL_SUCCESS if success. Other codes indicate failure.
+ */
+JsonUtilCode dom_get_values_as_str(JDocument *doc, const char **paths, const int num_paths, PrintFormat *format,
+                                   ReplyBuffer &oss, const bool update_stats = true);
 
 /**
  * Delete JSON values at the given path.
@@ -337,7 +327,6 @@ JsonUtilCode dom_multiply_by(JDocument *doc, const char *json_path, const JValue
  */
 JsonUtilCode dom_toggle(JDocument *doc, const char *path, jsn::vector<int> &vec, bool &is_v2_path);
 
-
 /* Get the length of a JSON string value.
  * @param vec OUTPUT parameter, a vector of string lengths
  * @return JSONUTIL_SUCCESS if success. Other codes indicate failure.
@@ -364,8 +353,8 @@ JsonUtilCode dom_object_length(JDocument *doc, const char *path, jsn::vector<siz
  *        number of objects. In the second level vector, number of items is number keys in the object.
  * @return JSONUTIL_SUCCESS if success. Other codes indicate failure.
  */
-JsonUtilCode dom_object_keys(JDocument *doc, const char *path,
-                             jsn::vector<jsn::vector<jsn::string>> &vec, bool &is_v2_path);
+JsonUtilCode dom_object_keys(JDocument *doc, const char *path, jsn::vector<jsn::vector<jsn::string>> &vec,
+                             bool &is_v2_path);
 
 /**
  * Get number of elements in the array at the given path.
@@ -379,9 +368,8 @@ JsonUtilCode dom_array_length(JDocument *doc, const char *path, jsn::vector<size
  * @param vec OUTPUT parameter, a vector of new array lengths
  * @return JSONUTIL_SUCCESS if success. Other codes indicate failure.
  */
-JsonUtilCode dom_array_append(ValkeyModuleCtx *ctx, JDocument *doc, const char *path,
-                              const char **jsons, size_t *json_lens, const size_t num_values,
-                              jsn::vector<size_t> &vec, bool &is_v2_path);
+JsonUtilCode dom_array_append(ValkeyModuleCtx *ctx, JDocument *doc, const char *path, const char **jsons,
+                              size_t *json_lens, const size_t num_values, jsn::vector<size_t> &vec, bool &is_v2_path);
 
 /**
  * Remove and return element from the index in the array.
@@ -392,8 +380,8 @@ JsonUtilCode dom_array_append(ValkeyModuleCtx *ctx, JDocument *doc, const char *
  * @param vec - OUTPUT parameter, a vector of string streams, each containing JSON string of the popped element
  * @return JSONUTIL_SUCCESS if success. Other codes indicate failure.
  */
-JsonUtilCode dom_array_pop(JDocument *doc, const char *path, int64_t index,
-                           jsn::vector<rapidjson::StringBuffer> &vec, bool &is_v2_path);
+JsonUtilCode dom_array_pop(JDocument *doc, const char *path, int64_t index, jsn::vector<rapidjson::StringBuffer> &vec,
+                           bool &is_v2_path);
 
 /**
  * Insert one or more json values into the array at path before the index.
@@ -404,9 +392,8 @@ JsonUtilCode dom_array_pop(JDocument *doc, const char *path, int64_t index,
  * @param vec OUTPUT parameter, a vector of new array lengths
  * @return JSONUTIL_SUCCESS if success. Other codes indicate failure.
  */
-JsonUtilCode dom_array_insert(ValkeyModuleCtx *ctx, JDocument *doc, const char *path, int64_t index,
-                              const char **jsons, size_t *json_lens, const size_t num_values,
-                              jsn::vector<size_t> &vec, bool &is_v2_path);
+JsonUtilCode dom_array_insert(ValkeyModuleCtx *ctx, JDocument *doc, const char *path, int64_t index, const char **jsons,
+                              size_t *json_lens, const size_t num_values, jsn::vector<size_t> &vec, bool &is_v2_path);
 
 /**
  * Clear all the elements in an array or object.
@@ -429,9 +416,8 @@ JsonUtilCode dom_clear(JDocument *doc, const char *path, size_t &elements_cleare
  * @param vec, OUTPUT parameter, a vector of new array lengths
  * @return JSONUTIL_SUCCESS if success. Other codes indicate failure.
  */
-JsonUtilCode dom_array_trim(JDocument *doc, const char *path, int64_t start, int64_t stop,
-                            jsn::vector<size_t> &vec, bool &is_v2_path);
-
+JsonUtilCode dom_array_trim(JDocument *doc, const char *path, int64_t start, int64_t stop, jsn::vector<size_t> &vec,
+                            bool &is_v2_path);
 
 /**
  * Search for the first occurrence of a scalar JSON value in an array.
@@ -444,9 +430,8 @@ JsonUtilCode dom_array_trim(JDocument *doc, const char *path, int64_t start, int
  * @param vec OUTPUT parameter, a vector of matching indexes. -1 means value not found.
  * @return JSONUTIL_SUCCESS if success. Other codes indicate failure.
  */
-JsonUtilCode dom_array_index_of(JDocument *doc, const char *path, const char *scalar_val,
-                                const size_t scalar_val_len, int64_t start, int64_t stop,
-                                jsn::vector<int64_t> &vec, bool &is_v2_path);
+JsonUtilCode dom_array_index_of(JDocument *doc, const char *path, const char *scalar_val, const size_t scalar_val_len,
+                                int64_t start, int64_t stop, jsn::vector<int64_t> &vec, bool &is_v2_path);
 
 /* Get type of a JSON value.
  * @param vec, OUTPUT parameter, a vector of value types.
@@ -558,7 +543,7 @@ bool ValidateJValue(JValue &v);
 //    DumpRedactedJValue(os, v);        // Don't specify level or index parameters, let them default
 //    ValkeyModule_Log(...., os.str());
 //
-void DumpRedactedJValue(std::ostream& os, const JValue &v, size_t level = 0, int index = -1);
+void DumpRedactedJValue(std::ostream &os, const JValue &v, size_t level = 0, int index = -1);
 //
 // Same as above, except targets the Valkey Log
 //

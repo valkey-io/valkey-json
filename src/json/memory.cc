@@ -1,10 +1,10 @@
-#include <stdlib.h>
-#include <string.h>
+#include "json/memory.h"
 
 #include <atomic>
+#include <cstdlib>
+#include <cstring>
 #include <iostream>
 
-#include "json/memory.h"
 #include "json/dom.h"
 
 extern "C" {
@@ -23,9 +23,7 @@ bool memoryTrapsEnabled = false;
 
 static std::atomic<size_t> totalMemoryUsage;
 
-size_t memory_usage() {
-    return totalMemoryUsage;
-}
+size_t memory_usage() { return totalMemoryUsage; }
 
 /*
  * When Traps are disabled, The following code is used
@@ -68,10 +66,10 @@ STATIC void *memory_realloc_without_traps(void *ptr, size_t new_size) {
 // but that function can be fairly expensive, so by duplicating here we optimize the run-time cost.
 //
 struct trap_prefix {
-    mutable uint64_t length:40;
-    mutable uint64_t valid_prefix:24;
-    enum { VALID = 0xdeadbe, INVALID = 0xf00dad};
-    static       trap_prefix *from_ptr(      void *p) { return reinterpret_cast<      trap_prefix *>(p) - 1; }
+    mutable uint64_t length : 40;
+    mutable uint64_t valid_prefix : 24;
+    enum { VALID = 0xdeadbe, INVALID = 0xf00dad };
+    static trap_prefix *from_ptr(void *p) { return reinterpret_cast<trap_prefix *>(p) - 1; }
     static const trap_prefix *from_ptr(const void *p) { return reinterpret_cast<const trap_prefix *>(p) - 1; }
 };
 
@@ -90,7 +88,7 @@ struct trap_suffix {
 };
 
 bool memory_validate_ptr(const void *ptr, bool crashOnError) {
-    if (!ptr) return true;   // Null pointers are valid.
+    if (!ptr) return true;  // Null pointers are valid.
     auto prefix = trap_prefix::from_ptr(ptr);
     if (prefix->valid_prefix != trap_prefix::VALID) {
         if (crashOnError) {
@@ -109,16 +107,15 @@ bool memory_validate_ptr(const void *ptr, bool crashOnError) {
         size_t available_size = malloc_size - (sizeof(trap_prefix) + sizeof(trap_suffix));
         size_t dump_size = available_size > 256 ? 256 : available_size;
         ValkeyModule_Log(nullptr, "error", "Validation Failure memory overrun @%p size:%zu", ptr, available_size);
-        auto data = static_cast<const void * const*>(ptr);
+        auto data = static_cast<const void *const *>(ptr);
         while (dump_size > (4 * sizeof(void *))) {
-            ValkeyModule_Log(nullptr, "error", "Memory[%p]: %p %p %p %p",
-                            static_cast<const void *>(data), data[0], data[1], data[2], data[3]);
+            ValkeyModule_Log(nullptr, "error", "Memory[%p]: %p %p %p %p", static_cast<const void *>(data), data[0],
+                             data[1], data[2], data[3]);
             data += 4;
             dump_size -= 4 * sizeof(void *);
         }
         while (dump_size) {
-            ValkeyModule_Log(nullptr, "error", "Memory[%p]: %p",
-                            static_cast<const void *>(data), data[0]);
+            ValkeyModule_Log(nullptr, "error", "Memory[%p]: %p", static_cast<const void *>(data), data[0]);
             data++;
             dump_size -= sizeof(void *);
         }
@@ -174,8 +171,8 @@ STATIC void *memory_realloc_with_traps(void *orig_ptr, size_t new_size) {
 //
 bool memory_traps_control(bool enable) {
     if (totalMemoryUsage != 0) {
-        ValkeyModule_Log(nullptr, "warning",
-           "Attempt to enable/disable memory traps ignored, %zu outstanding memory.", totalMemoryUsage.load());
+        ValkeyModule_Log(nullptr, "warning", "Attempt to enable/disable memory traps ignored, %zu outstanding memory.",
+                         totalMemoryUsage.load());
         return false;
     }
     if (enable) {
@@ -264,7 +261,7 @@ bool ValidateJValue(JValue &v) {
 //  std::ostringstream os;
 //  DumpRedactedJValue(os, <jvalue>);
 //
-void DumpRedactedJValue(std::ostream& os, const JValue &v, size_t level, int index) {
+void DumpRedactedJValue(std::ostream &os, const JValue &v, size_t level, int index) {
     for (size_t i = 0; i < (3 * level); ++i) os << ' ';  // Indent
     os << "@" << reinterpret_cast<const void *>(&v) << " ";
     if (index != -1) os << '[' << index << ']' << ' ';
@@ -294,7 +291,7 @@ void DumpRedactedJValue(std::ostream& os, const JValue &v, size_t level, int ind
             os << " @" << v.trap_GetMallocPointer(false) << '\n';
             index = 0;
             for (auto m = v.MemberBegin(); m != v.MemberEnd(); ++m) {
-                DumpRedactedJValue(os, m->value, level+1, index);
+                DumpRedactedJValue(os, m->value, level + 1, index);
                 index++;
             }
         }
@@ -305,7 +302,7 @@ void DumpRedactedJValue(std::ostream& os, const JValue &v, size_t level, int ind
         } else {
             os << " @" << v.trap_GetMallocPointer(false) << "\n";
             for (size_t index = 0; index < v.Size(); ++index) {
-                DumpRedactedJValue(os, v[index], level+1, int(index));
+                DumpRedactedJValue(os, v[index], level + 1, int(index));
             }
         }
     } else {
@@ -321,20 +318,20 @@ class ValkeyLogStreamBuf : public std::streambuf {
     ValkeyModuleCtx *ctx;
     const char *level;
 
- public:
+   public:
     ValkeyLogStreamBuf(ValkeyModuleCtx *_ctx, const char *_level) : ctx(_ctx), level(_level) {}
-    ~ValkeyLogStreamBuf() {
+    ~ValkeyLogStreamBuf() override {
         if (!line.empty()) {
             ValkeyModule_Log(ctx, level, "%s", line.c_str());
         }
     }
-    std::streamsize xsputn(const char *p, std::streamsize n) {
+    std::streamsize xsputn(const char *p, std::streamsize n) override {
         for (std::streamsize i = 0; i < n; ++i) {
             overflow(p[i]);
         }
         return n;
     }
-    int overflow(int c) {
+    int overflow(int c) override {
         if (c == '\n' || c == EOF) {
             ValkeyModule_Log(ctx, level, "%s", line.c_str());
             line.resize(0);

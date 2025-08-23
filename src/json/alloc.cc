@@ -1,8 +1,10 @@
-#include "json/memory.h"
 #include "json/alloc.h"
-#include "json/stats.h"
+
 #include <cstdio>
 #include <cstring>
+
+#include "json/memory.h"
+#include "json/stats.h"
 
 extern "C" {
 #define VALKEYMODULE_EXPERIMENTAL_API
@@ -46,13 +48,13 @@ void *dom_realloc(void *orig_ptr, size_t new_size) {
 
 char *dom_strdup(const char *s) {
     size_t size = strlen(s) + 1;
-    char *dup = static_cast<char*>(dom_alloc(size));
+    char *dup = static_cast<char *>(dom_alloc(size));
     strncpy(dup, s, size);
     return dup;
 }
 
 char *dom_strndup(const char *s, const size_t n) {
-    char *dup = static_cast<char*>(dom_alloc(n + 1));
+    char *dup = static_cast<char *>(dom_alloc(n + 1));
     strncpy(dup, s, n);
     dup[n] = '\0';
     return dup;

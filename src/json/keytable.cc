@@ -1,11 +1,11 @@
-#include <stddef.h>
-#include <stdint.h>
-#include <memory>
-#include <sstream>
-#include <mutex>
-#include <unordered_map>
+#include <cstddef>
+#include <cstdint>
 #include <cstring>
 #include <iostream>
+#include <memory>
+#include <mutex>
+#include <sstream>
+#include <unordered_map>
 
 extern "C" {
 #include <./include/valkeymodule.h>
@@ -48,15 +48,15 @@ extern "C" {
 size_t MAX_FAST_TABLE_SIZE = PtrWithMetaData<KeyTable_Layout>::METADATA_MASK + 1;
 
 struct KeyTable_Shard {
-    typedef PtrWithMetaData<KeyTable_Layout> EntryType;
-    size_t capacity;                        // Number of entries in table
-    size_t size;                            // Number of current entries
-    size_t bytes;                           // number of bytes of all current entries
-    size_t handles;                         // number of handles outstanding
-    size_t maxSearch;                       // Max length of a search, since last read
-    EntryType *entries;                     // Array of String Entries
-    std::mutex mutex;                       // lock for this shard, mutable for "validate"
-    uint32_t rehashes;                      // number of rehashes, since last read
+    using EntryType = PtrWithMetaData<KeyTable_Layout>;
+    size_t capacity;     // Number of entries in table
+    size_t size;         // Number of current entries
+    size_t bytes;        // number of bytes of all current entries
+    size_t handles;      // number of handles outstanding
+    size_t maxSearch;    // Max length of a search, since last read
+    EntryType* entries;  // Array of String Entries
+    std::mutex mutex;    // lock for this shard, mutable for "validate"
+    uint32_t rehashes;   // number of rehashes, since last read
     static constexpr size_t MIN_TABLE_SIZE = 4;
 
     //
@@ -81,7 +81,7 @@ struct KeyTable_Shard {
         entries = new (t.malloc(capacity * sizeof(EntryType))) EntryType[capacity];
     }
 
-    KeyTable_Shard() : mutex() {
+    KeyTable_Shard()  {
         capacity = 0;
         size = 0;
         bytes = 0;
@@ -108,15 +108,13 @@ struct KeyTable_Shard {
         entries = nullptr;
     }
 
-    ~KeyTable_Shard() {
-        KEYTABLE_ASSERT(entries == nullptr);
-    }
+    ~KeyTable_Shard() { KEYTABLE_ASSERT(entries == nullptr); }
 
     float loadFactor() { return float(size) / float(capacity); }
 
     size_t hashIndex(size_t hash) const { return hash % capacity; }
 
-    KeyTable_Layout *insert(KeyTable& t, size_t hsh, const char *ptr, size_t len, bool noescape) {
+    KeyTable_Layout* insert(KeyTable& t, size_t hsh, const char* ptr, size_t len, bool noescape) {
         std::scoped_lock lck(mutex);
         while (loadFactor() > t.getFactors().maxLoad) {
             //
@@ -126,15 +124,15 @@ struct KeyTable_Shard {
             resizeTable(t, newSize);
             if (newSize >= MAX_FAST_TABLE_SIZE) {
                 ValkeyModule_Log(nullptr, "warning",
-                                "Fast KeyTable Shard size exceeded, increase "
-                                "json.key-table-num-shards to improve performance");
+                                 "Fast KeyTable Shard size exceeded, increase "
+                                 "json.key-table-num-shards to improve performance");
             }
         }
         size_t ix = hashIndex(hsh);
         size_t metadata = hsh & EntryType::METADATA_MASK;
         MEMORY_VALIDATE(entries);
         for (size_t searches = 0; searches < capacity; ++searches) {
-            EntryType &entry = entries[ix];
+            EntryType& entry = entries[ix];
             if (!entry) {
                 //
                 // Empty, insert it here.
@@ -144,12 +142,11 @@ struct KeyTable_Shard {
                 bytes += len;
                 maxSearch = std::max(searches, maxSearch);
 
-                KeyTable_Layout *p = KeyTable_Layout::makeLayout(t.malloc, ptr, len, hsh, noescape);
+                KeyTable_Layout* p = KeyTable_Layout::makeLayout(t.malloc, ptr, len, hsh, noescape);
                 entry = EntryType(p, metadata);
                 return p;
-            } else if (entry.getMetaData() == metadata &&    // Early out, don't hit the cache line....
-                        len == entry->getLength() &&
-                        0 == std::memcmp(ptr, entry->getText(), len)) {
+            } else if (entry.getMetaData() == metadata &&  // Early out, don't hit the cache line....
+                       len == entry->getLength() && 0 == std::memcmp(ptr, entry->getText(), len)) {
                 //
                 // easy case. String already present, just bump the refcount and we're done.
                 // Use saturating arithmetic so it never fails. If you manage to legitimately
@@ -186,13 +183,13 @@ struct KeyTable_Shard {
         return result;
     }
 
-    KeyTable_Layout *clone(KeyTable& t, const KeyTable_Handle& h) {
+    KeyTable_Layout* clone(KeyTable& t, const KeyTable_Handle& h) {
         std::scoped_lock lck(mutex);
         handles++;
         if (h->incrRefCount()) {
             t.stuckKeys++;
         }
-        return const_cast<KeyTable_Layout *>(&*h);
+        return const_cast<KeyTable_Layout*>(&*h);
     }
 
     void destroyHandle(const KeyTable& t, KeyTable_Handle& h, size_t hsh) {
@@ -200,7 +197,7 @@ struct KeyTable_Shard {
         handles--;
         if (h->decrRefCount() > 0) {
             h.clear();  // Kill the handle
-            return;  // Easy case, still referenced.
+            return;     // Easy case, still referenced.
         }
         //
         // Ok, we need to remove this string from the hashtable.
@@ -221,14 +218,14 @@ struct KeyTable_Shard {
                 size--;
                 h.theHandle->poisonOriginalHash();
                 t.free(&*h.theHandle);
-                h.clear();        // Kill the handle
+                h.clear();  // Kill the handle
                 entries[ix].clear();
                 //
                 // Now reestablish the invariant of the algorithm by scanning forward until
                 // we hit another empty cell. While we're scanning we may have to move keys down
                 // into the newly freed slot.
                 //
-                size_t empty_ix = ix;  // Remember where the empty slot is.
+                size_t empty_ix = ix;          // Remember where the empty slot is.
                 if (++ix >= capacity) ix = 0;  // Next entry
                 while (entries[ix]) {
                     KEYTABLE_ASSERT(!entries[empty_ix]);
@@ -267,11 +264,11 @@ struct KeyTable_Shard {
 
     void resizeTable(const KeyTable& t, size_t newSize) {
         uint64_t startTime = ValkeyModule_Milliseconds();
-        if (capacity == newSize) return;      // Nothing to do.
-        KEYTABLE_ASSERT(newSize >= size);     // Otherwise it won't fit.
+        if (capacity == newSize) return;   // Nothing to do.
+        KEYTABLE_ASSERT(newSize >= size);  // Otherwise it won't fit.
         rehashes++;
         MEMORY_VALIDATE(entries);
-        EntryType *oldEntries = entries;
+        EntryType* oldEntries = entries;
         size_t oldCapacity = capacity;
         makeTable(t, newSize);
         for (size_t i = 0; i < oldCapacity; ++i) {
@@ -295,15 +292,14 @@ struct KeyTable_Shard {
                 }
                 KEYTABLE_ASSERT(false);  // can't fail if
             }
-        nextOldEntry:{}
+        nextOldEntry: {}
         }
         t.free(oldEntries);
         uint64_t duration = ValkeyModule_Milliseconds() - startTime;
         if (duration == 0) duration = 1;
         uint64_t keys_per_second = (size / duration) * 1000;
-        ValkeyModule_Log(nullptr, "notice",
-                        "Keytable Resize to %zu completed in %llu ms (%llu / sec)",
-                        capacity, duration, keys_per_second);
+        ValkeyModule_Log(nullptr, "notice", "Keytable Resize to %zu completed in %lu ms (%lu / sec)", capacity,
+                         duration, keys_per_second);
     }
 
     //
@@ -311,8 +307,8 @@ struct KeyTable_Shard {
     //
     std::string validate(const KeyTable& t, size_t shardNumber) const {
         std::scoped_lock lck(const_cast<std::mutex&>(this->mutex));  // Cheat on the mutex
-        size_t this_refs  = 0;
-        size_t this_size  = 0;
+        size_t this_refs = 0;
+        size_t this_size = 0;
         size_t this_bytes = 0;
         for (size_t i = 0; i < capacity; ++i) {
             EntryType e = entries[i];
@@ -340,8 +336,7 @@ struct KeyTable_Shard {
                         // Error
                         std::ostringstream os;
                         os << "Found invalid empty location at slot " << ix << " While validating"
-                           << " key in slot " << i << " From NativeSlot:" << nativeIx
-                           << " TableSize:" << capacity;
+                           << " key in slot " << i << " From NativeSlot:" << nativeIx << " TableSize:" << capacity;
                         return os.str();
                     }
                     if (++ix >= capacity) ix = 0;
@@ -349,19 +344,16 @@ struct KeyTable_Shard {
             }
         }
         // compare the counts. The summed refcounts only match handle counts if no stuck strings
-        if (this_size != size ||
-            (t.stuckKeys == 0 ? this_refs != handles : false) ||
-            this_bytes != bytes) {
+        if (this_size != size || (t.stuckKeys == 0 ? this_refs != handles : false) || this_bytes != bytes) {
             std::ostringstream os;
-            os << "Count mismatch for shard: " << shardNumber << " Capacity:" << capacity
-                << " Handles:" << handles << " sum(refcounts):" << this_refs
-                << " Size:" << size << " this_size:" << this_size
-                << " Bytes:" << bytes << " this_bytes:" << this_bytes;
+            os << "Count mismatch for shard: " << shardNumber << " Capacity:" << capacity << " Handles:" << handles
+               << " sum(refcounts):" << this_refs << " Size:" << size << " this_size:" << this_size
+               << " Bytes:" << bytes << " this_bytes:" << this_bytes;
             return os.str();
         }
-        return std::string();  // Empty means no failure.
+        return {};  // Empty means no failure.
     }
-    std::string validate_counts(std::unordered_map<const KeyTable_Layout *, size_t>& counts) const {
+    std::string validate_counts(std::unordered_map<const KeyTable_Layout*, size_t>& counts) const {
         std::string result;
         std::scoped_lock lck(const_cast<std::mutex&>(this->mutex));  // Cheat on the mutex
         for (size_t i = 0; i < capacity; ++i) {
@@ -369,11 +361,8 @@ struct KeyTable_Shard {
             if (e) {
                 if (counts[&*e] != e->getRefCount()) {
                     std::ostringstream os;
-                    os
-                        << "Found bad count for key: " << e->getText()
-                        << " Found: " << e->getRefCount()
-                        << " Expected:" << counts[&*e]
-                        << "\n";
+                    os << "Found bad count for key: " << e->getText() << " Found: " << e->getRefCount()
+                       << " Expected:" << counts[&*e] << "\n";
                     result += os.str();
                 } else {
                     counts.erase(&*e);
@@ -420,16 +409,11 @@ struct KeyTable_Shard {
 /*
  * Setup the KeyTable itself.
  */
-KeyTable::KeyTable(const Config& cfg) :
-    malloc(cfg.malloc),
-    free(cfg.free),
-    hash(cfg.hash),
-    numShards(cfg.numShards),
-    stuckKeys(0)
-{
+KeyTable::KeyTable(const Config& cfg)
+    : malloc(cfg.malloc), free(cfg.free), hash(cfg.hash), numShards(cfg.numShards), stuckKeys(0) {
     KEYTABLE_ASSERT(numShards > 0);
     KEYTABLE_ASSERT(malloc && free && hash);
-    shards = new(malloc(numShards * sizeof(KeyTable_Shard))) KeyTable_Shard[numShards];
+    shards = new (malloc(numShards * sizeof(KeyTable_Shard))) KeyTable_Shard[numShards];
     for (size_t i = 0; i < numShards; ++i) shards[i].makeTable(*this, 1);
     KEYTABLE_ASSERT(!isValidFactors(factors));
 }
@@ -452,7 +436,7 @@ std::string KeyTable::validate() const {
     return s;
 }
 
-std::string KeyTable::validate_counts(std::unordered_map<const KeyTable_Layout *, size_t>& counts) const {
+std::string KeyTable::validate_counts(std::unordered_map<const KeyTable_Layout*, size_t>& counts) const {
     std::string result;
     result = validate();
     if (!result.empty()) return result;
@@ -479,7 +463,6 @@ std::string KeyTable::validate_counts(std::unordered_map<const KeyTable_Layout *
 }
 
 KeyTable::Stats KeyTable::getStats() const {
-
     Stats s{};
 
     //
@@ -510,24 +493,20 @@ KeyTable::LongStats KeyTable::getLongStats(size_t topN) const {
 /*
  * Take 19 bits from hash, avoid the low end of the hash value as this is used for the per-shard index.
  */
-size_t KeyTable::shardNumberFromHash(size_t hash) {
-    return (hash >> 40) % numShards;
-}
+size_t KeyTable::shardNumberFromHash(size_t hash) { return (hash >> 40) % numShards; }
 
-size_t KeyTable::hashcodeFromHash(size_t hash) {
-    return hash & KeyTable_Handle::MAX_HASHCODE;
-}
+size_t KeyTable::hashcodeFromHash(size_t hash) { return hash & KeyTable_Handle::MAX_HASHCODE; }
 
 /*
  * Upsert a string, returns a handle for this insertion.
  *
  * This function hashes the string and dispatches the operation to the appropriate shard.
  */
-KeyTable_Handle KeyTable::makeHandle(const char *ptr, size_t len, bool noescape) {
+KeyTable_Handle KeyTable::makeHandle(const char* ptr, size_t len, bool noescape) {
     size_t hsh = hash(ptr, len);
     size_t shardNum = shardNumberFromHash(hsh);
-    KeyTable_Layout *s = shards[shardNum].insert(*this, hsh, ptr, len, noescape);
-    return KeyTable_Handle(s, hashcodeFromHash(hsh));
+    KeyTable_Layout* s = shards[shardNum].insert(*this, hsh, ptr, len, noescape);
+    return {s, hashcodeFromHash(hsh)};
 }
 
 /*
@@ -536,8 +515,8 @@ KeyTable_Handle KeyTable::makeHandle(const char *ptr, size_t len, bool noescape)
 KeyTable_Handle KeyTable::clone(const KeyTable_Handle& h) {
     size_t hsh = hash(h.GetString(), h.GetStringLength());
     size_t shardNum = shardNumberFromHash(hsh);
-    KeyTable_Layout *s = shards[shardNum].clone(*this, h);
-    return KeyTable_Handle(s, hashcodeFromHash(hsh));
+    KeyTable_Layout* s = shards[shardNum].clone(*this, h);
+    return {s, hashcodeFromHash(hsh)};
 }
 
 /*
@@ -567,7 +546,7 @@ void KeyTable::setFactors(const Factors& f) {
     }
 }
 
-const char *KeyTable::isValidFactors(const Factors& f) {
+const char* KeyTable::isValidFactors(const Factors& f) {
     //
     // first the easy ones....
     //
@@ -596,9 +575,7 @@ const char *KeyTable::isValidFactors(const Factors& f) {
 // Maximum legal refcount. 2^29-1
 static uint32_t MAX_REF_COUNT = 0x1FFFFFFF;
 
-bool KeyTable_Layout::IsStuck() const {
-    return refCount >= MAX_REF_COUNT;
-}
+bool KeyTable_Layout::IsStuck() const { return refCount >= MAX_REF_COUNT; }
 
 bool KeyTable_Layout::incrRefCount() const {
     if (IsStuck()) {
@@ -619,24 +596,17 @@ size_t KeyTable_Layout::getLength() const {
     // Length is stored in little-endian format
     size_t len = 0;
     for (size_t i = 0; i <= lengthBytes; ++i) {
-        len |= *reinterpret_cast<const uint8_t *>(bytes+i) << (i * 8);
+        len |= *reinterpret_cast<const uint8_t*>(bytes + i) << (i * 8);
     }
     return len;
 }
 
-const char *KeyTable_Layout::getText() const {
-    return bytes + lengthBytes + 1;
-}
+const char* KeyTable_Layout::getText() const { return bytes + lengthBytes + 1; }
 
-KeyTable_Layout *KeyTable_Layout::makeLayout(void *(*malloc)(size_t), const char *ptr, size_t len,
-                                             size_t hash, bool noescape) {
-    size_t lengthBytes = (len <= 0xFF) ? 1 :
-                         (len <= 0xFFFF) ? 2:
-                         (len <= 0xFFFFFF) ? 3:
-                         (len <= 0xFFFFFFFF) ? 4 :
-                         0;
-    KeyTable_Layout *p = reinterpret_cast<KeyTable_Layout*>(malloc(
-            sizeof(KeyTable_Layout) + lengthBytes + len));
+KeyTable_Layout* KeyTable_Layout::makeLayout(void* (*malloc)(size_t), const char* ptr, size_t len, size_t hash,
+                                             bool noescape) {
+    size_t lengthBytes = (len <= 0xFF) ? 1 : (len <= 0xFFFF) ? 2 : (len <= 0xFFFFFF) ? 3 : (len <= 0xFFFFFFFF) ? 4 : 0;
+    KeyTable_Layout* p = reinterpret_cast<KeyTable_Layout*>(malloc(sizeof(KeyTable_Layout) + lengthBytes + len));
     p->original_hash = hash;
     p->noescapeFlag = noescape;
     p->refCount = 1;
@@ -649,11 +619,9 @@ KeyTable_Layout *KeyTable_Layout::makeLayout(void *(*malloc)(size_t), const char
     return p;
 }
 
-
 // Unit test only.
 void KeyTable_Layout::setMaxRefCount(uint32_t maxRefCount) {
     KEYTABLE_ASSERT(sizeof(KeyTable_Layout) == 5 + 8);
-    KEYTABLE_ASSERT(maxRefCount <= MAX_REF_COUNT);           // can only shrink it.
+    KEYTABLE_ASSERT(maxRefCount <= MAX_REF_COUNT);  // can only shrink it.
     MAX_REF_COUNT = maxRefCount;
 }
-

@@ -16,7 +16,7 @@
 #ifndef VALKEYJSONMODULE_ALLOC_H_
 #define VALKEYJSONMODULE_ALLOC_H_
 
-#include <stddef.h>
+#include <cstddef>
 
 #include "json/memory.h"
 
