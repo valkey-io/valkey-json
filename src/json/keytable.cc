@@ -81,7 +81,7 @@ struct KeyTable_Shard {
         entries = new (t.malloc(capacity * sizeof(EntryType))) EntryType[capacity];
     }
 
-    KeyTable_Shard()  {
+    KeyTable_Shard() {
         capacity = 0;
         size = 0;
         bytes = 0;

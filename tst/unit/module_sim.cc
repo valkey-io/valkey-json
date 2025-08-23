@@ -1,22 +1,23 @@
 #undef NDEBUG
-#include <assert.h>
-#include <stdarg.h>
-#include <signal.h>
+#include "module_sim.h"
 
-#include <map>
-#include <cstdlib>
-#include <cstdio>
-#include <ctime>
-#include <cstdint>
-#include <iostream>
-#include <gtest/gtest.h>
 #include <gmock/gmock.h>
+#include <gtest/gtest.h>
+
+#include <cassert>
+#include <csignal>
+#include <cstdarg>
+#include <cstdint>
+#include <cstdio>
+#include <cstdlib>
+#include <ctime>
+#include <iostream>
+#include <map>
 
 #include "json/alloc.h"
 #include "json/dom.h"
-#include "json/stats.h"
 #include "json/selector.h"
-#include "module_sim.h"
+#include "json/stats.h"
 
 //
 // Simulate underlying zmalloc stuff, including malloc-size
@@ -98,4 +99,3 @@ void setupValkeyModulePointers() {
     ValkeyModule_Milliseconds = test_Milliseconds;
     memory_traps_control(true);
 }
-

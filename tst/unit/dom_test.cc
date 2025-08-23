@@ -287,7 +287,7 @@ TEST_F(DomTest, testSerialize_CustomFormatArray) {
         {"{\"a\":0}", "{\n\t\"a\":.0\n}"},
         {"{\"a\":0,\"b\":1}", "{\n\t\"a\":.0,\n\t\"b\":.1\n}"},
         {"{\"a\":{\"b\":1}}", "{\n\t\"a\":.{\n\t\t\"b\":.1\n\t}\n}"}};
-    for (auto p : tests) {
+    for (const auto &p : tests) {
         JDocument *doc;
         JsonUtilCode rc = dom_parse(nullptr, p.first.c_str(), p.first.length(), &doc);
         EXPECT_EQ(rc, JSONUTIL_SUCCESS);

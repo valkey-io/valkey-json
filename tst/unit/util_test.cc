@@ -1,18 +1,21 @@
-#include <stdint.h>
+#include "json/util.h"
+
+#include <gtest/gtest.h>
+
+#include <cstdint>
 #include <cstdlib>
 #include <cstring>
 #include <string>
-#include <gtest/gtest.h>
-#include "json/util.h"
-#include "json/dom.h"
+
 #include "json/alloc.h"
+#include "json/dom.h"
 #include "json/stats.h"
 #include "module_sim.h"
 
 extern size_t dummy_malloc_size(void *);
 
 class UtilTest : public ::testing::Test {
- protected:
+   protected:
     void SetUp() override {
         JsonUtilCode rc = jsonstats_init();
         ASSERT_EQ(rc, JSONUTIL_SUCCESS);
@@ -21,7 +24,7 @@ class UtilTest : public ::testing::Test {
 };
 
 TEST_F(UtilTest, testCodeToMessage) {
-    for (JsonUtilCode code=JSONUTIL_SUCCESS; code < JSONUTIL_LAST; code = JsonUtilCode(code + 1)) {
+    for (JsonUtilCode code = JSONUTIL_SUCCESS; code < JSONUTIL_LAST; code = JsonUtilCode(code + 1)) {
         const char *msg = jsonutil_code_to_message(code);
         EXPECT_TRUE(msg != nullptr);
         if (code == JSONUTIL_SUCCESS || code == JSONUTIL_WRONG_NUM_ARGS ||
@@ -58,8 +61,8 @@ TEST_F(UtilTest, testIsInt64) {
     EXPECT_TRUE(jsonutil_is_int64(INT16_MIN));
     EXPECT_TRUE(jsonutil_is_int64(INT32_MAX));
     EXPECT_TRUE(jsonutil_is_int64(INT32_MIN));
-    EXPECT_TRUE(jsonutil_is_int64(INT64_MAX >> 1));
-    EXPECT_TRUE(jsonutil_is_int64(8223372036854775807LL));
+    EXPECT_TRUE(jsonutil_is_int64(static_cast<double>(INT64_MAX >> 1)));
+    EXPECT_TRUE(jsonutil_is_int64(static_cast<double>(8223372036854775807LL)));
     EXPECT_TRUE(jsonutil_is_int64(INT64_MIN));
     EXPECT_FALSE(jsonutil_is_int64(1e28));      // out of range of int64
     EXPECT_FALSE(jsonutil_is_int64(1.7e308));   // out of range of int64

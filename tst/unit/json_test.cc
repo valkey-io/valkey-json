@@ -1,24 +1,26 @@
-#include <cstdlib>
-#include <cstddef>
-#include <cstring>
-#include <cstdio>
-#include <cstdint>
-#include <cmath>
-#include <memory>
-#include <deque>
-#include <vector>
-#include <string>
-#include <sstream>
-#include <utility>
-#include <iostream>
-#include <unordered_map>
-#include <map>
-#include <set>
 #include <gtest/gtest.h>
-#include "json/dom.h"
+
+#include <cmath>
+#include <cstddef>
+#include <cstdint>
+#include <cstdio>
+#include <cstdlib>
+#include <cstring>
+#include <deque>
+#include <iostream>
+#include <map>
+#include <memory>
+#include <set>
+#include <sstream>
+#include <string>
+#include <unordered_map>
+#include <utility>
+#include <vector>
+
 #include "json/alloc.h"
-#include "json/stats.h"
+#include "json/dom.h"
 #include "json/selector.h"
+#include "json/stats.h"
 
 extern void SetupAllocFuncs(size_t numShards);
 
@@ -155,9 +157,10 @@ TEST_F(JsonTest, testArrIndex_object) {
 }
 
 TEST_F(JsonTest, testArrIndex_nested_search) {
-    const char *input = "{\"level0\":{\"level1_0\":{\"level2\":"
-                         "[1,2,3, [25, [4,5,{\"c\":\"d\"}]]]},"
-                         "\"level1_1\":{\"level2\": [[{\"a\":[2,5]}, true, null]]}}}";
+    const char *input =
+        "{\"level0\":{\"level1_0\":{\"level2\":"
+        "[1,2,3, [25, [4,5,{\"c\":\"d\"}]]]},"
+        "\"level1_1\":{\"level2\": [[{\"a\":[2,5]}, true, null]]}}}";
 
     JDocument *doc;
     JsonUtilCode rc = dom_parse(nullptr, input, strlen(input), &doc);

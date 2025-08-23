@@ -65,6 +65,7 @@
 #include <unordered_map>
 
 #include "json/alloc.h"
+#include "rapidjson/rapidjson.h"
 
 #ifndef KEYTABLE_ASSERT
 #define KEYTABLE_ASSERT(x) RAPIDJSON_ASSERT(x)

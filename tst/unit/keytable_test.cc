@@ -1,29 +1,31 @@
-#include <cstdlib>
-#include <cstddef>
-#include <cstring>
-#include <cstdio>
-#include <cstdint>
-#include <memory>
-#include <deque>
-#include <string>
-#include <sstream>
-#include <random>
-#include <limits>
-#include <vector>
-#include <cmath>
-#include <gtest/gtest.h>
-#include "json/dom.h"
-#include "json/alloc.h"
-#include "json/stats.h"
 #include "json/keytable.h"
+
+#include <gtest/gtest.h>
+
+#include <cmath>
+#include <cstddef>
+#include <cstdint>
+#include <cstdio>
+#include <cstdlib>
+#include <cstring>
+#include <deque>
+#include <limits>
+#include <memory>
+#include <random>
+#include <sstream>
+#include <string>
+#include <vector>
+
+#include "json/alloc.h"
+#include "json/dom.h"
 #include "json/memory.h"
+#include "json/stats.h"
 #include "module_sim.h"
 
-class PtrWithMetaDataTest : public ::testing::Test {
-};
+class PtrWithMetaDataTest : public ::testing::Test {};
 
 TEST_F(PtrWithMetaDataTest, t) {
-    memory_traps_control(false);   // Necessary so that MEMORY_VALIDATE buried in getPointer doesn't croak on bad memory
+    memory_traps_control(false);  // Necessary so that MEMORY_VALIDATE buried in getPointer doesn't croak on bad memory
     EXPECT_EQ(0x7FFFF, PtrWithMetaData<size_t>::METADATA_MASK);
     for (size_t i = 1; i & 0x7FFFF; i <<= 1) {
         size_t var = 0xdeadbeeffeedfeddull;
@@ -49,12 +51,11 @@ static size_t hash1(const char *ptr, size_t len) {
     return len;
 }
 
-extern size_t MAX_FAST_TABLE_SIZE;      // in keytable.cc
+extern size_t MAX_FAST_TABLE_SIZE;  // in keytable.cc
 
 class KeyTableTest : public ::testing::Test {
- protected:
-    void SetUp() override {
-    }
+   protected:
+    void SetUp() override {}
 
     void TearDown() override {
         if (t) {
@@ -80,8 +81,8 @@ TEST_F(KeyTableTest, layoutTest) {
     Setup1();
 
     size_t bias = 10;
-    for (size_t slen : {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16,
-                        0xFF, 0x100, 0xFFFF, 0x10000, 0xFFFFFF, 0x1000000}) {
+    for (size_t slen : {0,  1,  2,  3,  4,  5,    6,     7,      8,       9,        10,       11,
+                        12, 13, 14, 15, 16, 0xFF, 0x100, 0xFFFF, 0x10000, 0xFFFFFF, 0x1000000}) {
         std::string s;
         s.resize(slen);
         for (size_t i = 0; i < slen; ++i) {
@@ -196,7 +197,7 @@ TEST_F(KeyTableTest, SimpleRehash) {
         h.push_back(t->makeHandle(k));
         keys.push_back(k);
         auto s = t->getStats();
-        EXPECT_EQ(s.size, i+1);
+        EXPECT_EQ(s.size, i + 1);
         EXPECT_EQ(s.rehashes, 0);
         EXPECT_EQ(t->validate(), "");
         k += '*';
@@ -209,7 +210,7 @@ TEST_F(KeyTableTest, SimpleRehash) {
         h.push_back(t->makeHandle(k));
         keys.push_back(k);
         auto s = t->getStats();
-        EXPECT_EQ(s.size, i+1);
+        EXPECT_EQ(s.size, i + 1);
         EXPECT_EQ(s.rehashes, i == 4 ? 1 : 0);
         EXPECT_EQ(t->validate(), "");
         k += '*';
@@ -244,10 +245,8 @@ TEST_F(KeyTableTest, SimpleRehash) {
 // is only 10x of the max length (from the random distribution)
 //
 std::default_random_engine generator(0);
-std::uniform_int_distribution dice(0, 10000);       // there are actually ~10x this number of unique strings
-size_t make_rand() {
-    return dice(generator);
-}
+std::uniform_int_distribution dice(0, 10000);  // there are actually ~10x this number of unique strings
+size_t make_rand() { return dice(generator); }
 
 std::string make_key() {
     size_t len = make_rand();
@@ -262,14 +261,14 @@ TEST_F(KeyTableTest, BigTest) {
     //
     // Make a zillion keys, Yes, there will be lots of duplicates -> Intentionally
     //
-    for (size_t ft : { 1 << 8, 1 << 10, 1 << 12}) {
+    for (size_t ft : {1 << 8, 1 << 10, 1 << 12}) {
         MAX_FAST_TABLE_SIZE = ft;
         for (size_t numShards : {1, 2}) {
             for (size_t numKeys : {1000}) {
                 Setup1(numShards);
                 auto f = t->getFactors();
-                f.grow = 1.1;           // Grow slowly
-                f.maxLoad = .95;        // Let the table get REALLY full between hashes
+                f.grow = 1.1;     // Grow slowly
+                f.maxLoad = .95;  // Let the table get REALLY full between hashes
                 t->setFactors(f);
                 std::vector<KeyTable_Handle> h;
                 std::vector<std::string> k;
@@ -282,14 +281,14 @@ TEST_F(KeyTableTest, BigTest) {
                 }
                 auto s = t->getStats();
                 EXPECT_EQ(s.handles, k.size());
-                EXPECT_LT(s.size, k.size());            // must have at least one duplicate
-                EXPECT_GT(s.rehashes, 5);              // should have had several rehashes
+                EXPECT_LT(s.size, k.size());  // must have at least one duplicate
+                EXPECT_GT(s.rehashes, 5);     // should have had several rehashes
                 //
                 // now delete them SLOWLY with lots of rehashes
                 //
                 f = t->getFactors();
                 f.shrink = .05;  // Shrink slowly
-                f.minLoad = .9;        // Let the table get REALLY full between hashes
+                f.minLoad = .9;  // Let the table get REALLY full between hashes
                 t->setFactors(f);
                 for (size_t i = 0; i < numKeys; ++i) {
                     t->destroyHandle(h[i]);
@@ -372,11 +371,13 @@ TEST_F(KeyTableTest, BigShard) {
     s = t->getStats();
     EXPECT_EQ(s.size, TABLE_SIZE);
     EXPECT_LE(s.rehashes, 0);
-    EXPECT_EQ(s.handles, 2*TABLE_SIZE);
+    EXPECT_EQ(s.handles, 2 * TABLE_SIZE);
     //
     // Now, delete each handle once. Basically nothing about the table should change
     //
-    for (auto& h : handles1) { t->destroyHandle(h); }
+    for (auto &h : handles1) {
+        t->destroyHandle(h);
+    }
     s = t->getStats();
     EXPECT_EQ(s.size, TABLE_SIZE);
     EXPECT_EQ(s.handles, TABLE_SIZE);
@@ -385,7 +386,9 @@ TEST_F(KeyTableTest, BigShard) {
     //
     // Now empty the table
     //
-    for (auto& h : handles2) { t->destroyHandle(h); }
+    for (auto &h : handles2) {
+        t->destroyHandle(h);
+    }
     s = t->getStats();
     EXPECT_EQ(s.size, 0);
     EXPECT_EQ(s.handles, 0);

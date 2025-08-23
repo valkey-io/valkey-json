@@ -1,30 +1,31 @@
 #undef NDEBUG
-#include <assert.h>
-#include <stdarg.h>
-#include <signal.h>
-
-#include <cstdlib>
-#include <cstddef>
-#include <cstring>
-#include <cstdio>
-#include <cstdint>
-#include <cmath>
-#include <memory>
-#include <deque>
-#include <vector>
-#include <string>
-#include <sstream>
-#include <utility>
-#include <iostream>
-#include <unordered_map>
-#include <map>
-#include <set>
-#include <gtest/gtest.h>
 #include <gmock/gmock.h>
+#include <gtest/gtest.h>
+
+#include <cassert>
+#include <cmath>
+#include <csignal>
+#include <cstdarg>
+#include <cstddef>
+#include <cstdint>
+#include <cstdio>
+#include <cstdlib>
+#include <cstring>
+#include <deque>
+#include <iostream>
+#include <map>
+#include <memory>
+#include <set>
+#include <sstream>
+#include <string>
+#include <unordered_map>
+#include <utility>
+#include <vector>
+
 #include "json/alloc.h"
 #include "json/dom.h"
-#include "json/stats.h"
 #include "json/selector.h"
+#include "json/stats.h"
 #include "module_sim.h"
 
 extern size_t hash_function(const char *, size_t);
@@ -45,7 +46,7 @@ static void SetupAllocFuncs(size_t numShards) {
 }
 
 class TrapsTest : public ::testing::Test {
- protected:
+   protected:
     void SetUp() override {
         JsonUtilCode rc = jsonstats_init();
         ASSERT_EQ(rc, JSONUTIL_SUCCESS);
@@ -157,7 +158,7 @@ TEST_F(TrapsTest, handle_corruption) {
 //
 TEST_F(TrapsTest, jvalue_validation) {
     std::string json =
-            "{ \"a\":1, \"b\":[1,2,\"this is a long string\",\"shortstr\",false,true,1.0,1.23456789012345,null]}";
+        "{ \"a\":1, \"b\":[1,2,\"this is a long string\",\"shortstr\",false,true,1.0,1.23456789012345,null]}";
     JParser parser;
     JValue *v = new JValue;
     *v = parser.Parse(json.c_str(), json.length()).GetJValue();

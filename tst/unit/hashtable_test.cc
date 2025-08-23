@@ -1,23 +1,25 @@
-#include <cstdlib>
-#include <cstddef>
-#include <cstring>
-#include <cstdio>
-#include <cstdint>
-#include <memory>
-#include <deque>
-#include <map>
-#include <string>
-#include <sstream>
-#include <random>
-#include <limits>
-#include <vector>
-#include <cmath>
-#include <utility>
 #include <gtest/gtest.h>
-#include "json/dom.h"
+
+#include <cmath>
+#include <cstddef>
+#include <cstdint>
+#include <cstdio>
+#include <cstdlib>
+#include <cstring>
+#include <deque>
+#include <limits>
+#include <map>
+#include <memory>
+#include <random>
+#include <sstream>
+#include <string>
+#include <utility>
+#include <vector>
+
 #include "json/alloc.h"
-#include "json/stats.h"
+#include "json/dom.h"
 #include "json/keytable.h"
+#include "json/stats.h"
 #include "module_sim.h"
 
 // Cheap, predictable hash
@@ -27,9 +29,8 @@ static size_t hash1(const char *ptr, size_t len) {
 }
 
 class HashTableTest : public ::testing::Test {
- protected:
-    void SetUp() override {
-    }
+   protected:
+    void SetUp() override {}
     size_t original_malloced;
     void TearDown() override {
         if (keyTable) {
@@ -65,9 +66,7 @@ TEST_F(HashTableTest, simple) {
     EXPECT_EQ(malloced, 0);
 }
 
-static JValue makeKey(size_t i) {
-    return std::move(JValue().SetString(std::to_string(i), allocator));
-}
+static JValue makeKey(size_t i) { return std::move(JValue().SetString(std::to_string(i), allocator)); }
 
 static JValue makeArray(size_t sz, size_t offset = 0) {
     JValue j;
@@ -173,7 +172,7 @@ TEST_F(HashTableTest, CopyMembers) {
             EXPECT_EQ(rapidjson::hashTableStats.convertToHT, 0);
             s = keyTable->getStats();
             EXPECT_EQ(s.size, sz);
-            EXPECT_EQ(s.handles, sz*2);
+            EXPECT_EQ(s.handles, sz * 2);
             for (size_t i = 0; i < sz; ++i) {
                 EXPECT_EQ(v[makeKey(i)].GetArray(), makeArrayArray(i, i));
                 EXPECT_EQ(v2[makeKey(i)].GetArray(), makeArrayArray(i, i));
