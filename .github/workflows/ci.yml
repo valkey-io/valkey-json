@@ -8,7 +8,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        server_version: ['unstable', '8.0', '8.1']
+        server_version: ['unstable', '8.0', '8.1', '9.0']
     steps:
       - name: Checkout valkey
         uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # v4.1.1
@@ -33,7 +33,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        server_version: ['unstable', '8.0', '8.1']
+        server_version: ['unstable', '8.0', '8.1', '9.0']
     steps:
       - uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # v4.1.1
       - name: Set the server version
@@ -46,7 +46,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        server_version: ['unstable', '8.0', '8.1']
+        server_version: ['unstable', '8.0', '8.1', '9.0']
     steps:
       - uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # v4.1.1
       - name: Set the server version
@@ -67,7 +67,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        server_version: ['unstable', '8.0', '8.1']
+        server_version: ['unstable', '8.0', '8.1', '9.0']
     steps:
       - uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # v4.1.1
       - name: Set the server version
