@@ -4340,11 +4340,11 @@ class TestJsonBasic(JsonTestCase):
         DATA = '''
         {
             "0": 0,
-            "1": null,
+            "1": true,
             "2": "string",
-            "3": [0.0, 1.1, "vector"],
+            "3": [0.0, 1.1, 2.0],
             "4": {},
-            "5": {"0": 1, "1": "string"},
+            "5": {"0": 1, "1": "string"}
         }
         '''
         client = self.server.get_new_client()
