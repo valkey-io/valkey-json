@@ -5,8 +5,8 @@
  * This file includes all RapidJSON Files (modified or original). Any RAPIDJSON-global #defines, etc. belong here
  */
 
-#if defined(__amd64__) || defined(__amd64) || defined(__x86_64__) || \
-    defined(__x86_64) || defined(_M_X64) || defined(_M_AMD64)
+#if defined(__amd64__) || defined(__amd64) || defined(__x86_64__) || defined(__x86_64) || defined(_M_X64) || \
+    defined(_M_AMD64)
 #define RAPIDJSON_SSE42 1
 #endif
 
@@ -16,8 +16,9 @@
 
 #define RAPIDJSON_48BITPOINTER_OPTIMIZATION 1
 
-#include "rapidjson/prettywriter.h"
-#include "rapidjson/document.h"
 #include <rapidjson/encodings.h>
+
+#include "rapidjson/document.h"
+#include "rapidjson/prettywriter.h"
 
 #endif

@@ -3,14 +3,13 @@
 #ifndef VALKEYJSONMODULE_MEMORY_H_
 #define VALKEYJSONMODULE_MEMORY_H_
 
-#include <stddef.h>
-
-#include <vector>
-#include <set>
-#include <unordered_set>
+#include <cstddef>
 #include <iostream>
-#include <string>
+#include <set>
 #include <sstream>
+#include <string>
+#include <unordered_set>
+#include <vector>
 
 //
 // Trap implementation
@@ -72,7 +71,7 @@ bool memory_validate_ptr(const void *ptr, bool crashOnError = true);
 //
 // This version validates memory, but crashes on an invalid pointer
 //
-template<typename t>
+template <typename t>
 static inline t *MEMORY_VALIDATE(t *ptr, bool validate = true) {
     extern bool memoryTrapsEnabled;
     if (memoryTrapsEnabled && validate) memory_validate_ptr(ptr, true);
@@ -82,7 +81,7 @@ static inline t *MEMORY_VALIDATE(t *ptr, bool validate = true) {
 //
 // This version validates memory, but doesn't crash
 //
-template<typename t>
+template <typename t>
 static inline bool IS_VALID_MEMORY(t *ptr) {
     return memory_validate_ptr(ptr, false);
 }
@@ -90,62 +89,61 @@ static inline bool IS_VALID_MEMORY(t *ptr) {
 //
 // Classes for STL Containers that utilize memory usage and trap logic.
 //
-namespace jsn
-{
+namespace jsn {
 //
 // Our custom allocator
 //
-template <typename T> class stl_allocator {
-    public:
-        using value_type = T;
-        stl_allocator() = default;
-        stl_allocator(const stl_allocator<T>&) noexcept = default;
-        stl_allocator(stl_allocator<T>&&) noexcept = default;
-        template <class U>
-        constexpr stl_allocator(const stl_allocator<U>&) noexcept {}
+template <typename T>
+class stl_allocator {
+   public:
+    using value_type = T;
+    stl_allocator() = default;
+    stl_allocator(const stl_allocator<T> &) noexcept = default;
+    stl_allocator(stl_allocator<T> &&) noexcept = default;
+    template <class U>
+    constexpr stl_allocator(const stl_allocator<U> &) noexcept {}
 
-        T* allocate(std::size_t n) {
-            return static_cast<T*>(memory_alloc(n * sizeof(T)));
-        }
+    T *allocate(std::size_t n) { return static_cast<T *>(memory_alloc(n * sizeof(T))); }
 
-        void deallocate(T* p, std::size_t n) {
-            (void)n; 
-            memory_free(p);
-        }
-    
-    private:
-        static void* memory_alloc(std::size_t size) {
-            return std::malloc(size);
-        }
+    void deallocate(T *p, std::size_t n) {
+        (void)n;
+        memory_free(p);
+    }
 
-        static void memory_free(void* p) {
-            std::free(p);
-        }
+   private:
+    static void *memory_alloc(std::size_t size) { return std::malloc(size); }
+
+    static void memory_free(void *p) { std::free(p); }
 };
 
 template <typename T, typename U>
-bool operator==(const stl_allocator<T>&, const stl_allocator<U>&) { return true; }
+bool operator==(const stl_allocator<T> &, const stl_allocator<U> &) {
+    return true;
+}
 
 template <typename T, typename U>
-bool operator!=(const stl_allocator<T>&, const stl_allocator<U>&) { return false; }
+bool operator!=(const stl_allocator<T> &, const stl_allocator<U> &) {
+    return false;
+}
 
-template<class Elm> using vector = std::vector<Elm, stl_allocator<Elm>>;
+template <class Elm>
+using vector = std::vector<Elm, stl_allocator<Elm>>;
 
-template<class Key, class Compare = std::less<Key>> using set = std::set<Key, Compare, stl_allocator<Key>>;
+template <class Key, class Compare = std::less<Key>>
+using set = std::set<Key, Compare, stl_allocator<Key>>;
 
-template<class Key, class Hash = std::hash<Key>, class KeyEqual = std::equal_to<Key>>
-        using unordered_set = std::unordered_set<Key, Hash, KeyEqual, stl_allocator<Key>>;
+template <class Key, class Hash = std::hash<Key>, class KeyEqual = std::equal_to<Key>>
+using unordered_set = std::unordered_set<Key, Hash, KeyEqual, stl_allocator<Key>>;
 
-typedef std::basic_string<char, std::char_traits<char>, stl_allocator<char>> string;
-typedef std::basic_stringstream<char, std::char_traits<char>, stl_allocator<char>> stringstream;
+using string = std::basic_string<char, std::char_traits<char>, stl_allocator<char>>;
+using stringstream = std::basic_stringstream<char, std::char_traits<char>, stl_allocator<char>>;
 
 }  // namespace jsn
 
 // custom specialization of std::hash can be injected in namespace std
-template<>
-struct std::hash<jsn::string>
-{
-    std::size_t operator()(const jsn::string& s) const noexcept {
+template <>
+struct std::hash<jsn::string> {
+    std::size_t operator()(const jsn::string &s) const noexcept {
         return std::hash<std::string_view>{}(std::string_view(s.c_str(), s.length()));
     }
 };
@@ -154,11 +152,7 @@ struct std::hash<jsn::string>
 // Everything below this line is private to this module, it's here for usage by unit tests
 //
 
-typedef enum MEMORY_TRAPS_CORRUPTION {
-    CORRUPT_PREFIX,
-    CORRUPT_LENGTH,
-    CORRUPT_SUFFIX
-} memTrapsCorruption_t;
+enum memTrapsCorruption_t { CORRUPT_PREFIX, CORRUPT_LENGTH, CORRUPT_SUFFIX };
 
 void memory_corrupt_memory(const void *ptr, memTrapsCorruption_t corrupt);
 void memory_uncorrupt_memory(const void *ptr, memTrapsCorruption_t corrupt);

@@ -1,31 +1,34 @@
-#include <cstdlib>
-#include <cstddef>
-#include <cstring>
-#include <cstdio>
-#include <cstdint>
-#include <cmath>
-#include <memory>
-#include <deque>
-#include <string>
-#include <sstream>
-#include <utility>
-#include <iostream>
-#include <unordered_map>
-#include <map>
-#include <gtest/gtest.h>
 #include "json/dom.h"
+
+#include <gtest/gtest.h>
+
+#include <cmath>
+#include <cstddef>
+#include <cstdint>
+#include <cstdio>
+#include <cstdlib>
+#include <cstring>
+#include <deque>
+#include <iostream>
+#include <map>
+#include <memory>
+#include <sstream>
+#include <string>
+#include <unordered_map>
+#include <utility>
+
 #include "json/alloc.h"
-#include "json/stats.h"
 #include "json/selector.h"
+#include "json/stats.h"
 #include "module_sim.h"
 
-jsn::string& getReplyString() {
+jsn::string &getReplyString() {
     static jsn::string replyString;
     return replyString;
 }
 
-static void appendReplyString(const jsn::string& s) {
-    jsn::string& rs = getReplyString();
+static void appendReplyString(const jsn::string &s) {
+    jsn::string &rs = getReplyString();
     rs = rs + s;
 }
 
@@ -39,18 +42,14 @@ const char *GetString(ReplyBuffer *b) {
     return getReplyString().c_str();
 }
 
-void Clear(rapidjson::StringBuffer *b) {
-    b->Clear();
-}
+void Clear(rapidjson::StringBuffer *b) { b->Clear(); }
 
 void Clear(ReplyBuffer *b) {
     getReplyString().clear();
     b->Clear();
 }
 
-size_t cobsize(ValkeyModuleCtx *) {
-    return 0;
-}
+size_t cobsize(ValkeyModuleCtx *) { return 0; }
 
 extern size_t hash_function(const char *, size_t);
 
@@ -67,68 +66,72 @@ void SetupAllocFuncs(size_t numShards) {
     c.hash = hash_function;
     c.numShards = numShards;
     keyTable = new KeyTable(c);
-    ValkeyModule_ReplyWithStringBuffer             = cs_replyWithBuffer;
+    ValkeyModule_ReplyWithStringBuffer = cs_replyWithBuffer;
     getReplyString().clear();
 }
 
 class DomTest : public ::testing::Test {
- protected:
-    const char *json1 = "{"
-                            "\"firstName\":\"John\","
-                            "\"lastName\":\"Smith\","
-                            "\"age\":27,"
-                            "\"weight\":135.17,"
-                            "\"isAlive\":true,"
-                            "\"address\":{"
-                                "\"street\":\"21 2nd Street\","
-                                "\"city\":\"New York\","
-                                "\"state\":\"NY\","
-                                "\"zipcode\":\"10021-3100\""
-                            "},"
-                            "\"phoneNumbers\":["
-                                "{"
-                                    "\"type\":\"home\","
-                                    "\"number\":\"212 555-1234\""
-                                "},"
-                                "{"
-                                    "\"type\":\"office\","
-                                    "\"number\":\"646 555-4567\""
-                                "}"
-                            "],"
-                            "\"children\":[],"
-                            "\"spouse\":null,"
-                            "\"groups\":{}"
-                        "}";
+   protected:
+    const char *json1 =
+        "{"
+        "\"firstName\":\"John\","
+        "\"lastName\":\"Smith\","
+        "\"age\":27,"
+        "\"weight\":135.17,"
+        "\"isAlive\":true,"
+        "\"address\":{"
+        "\"street\":\"21 2nd Street\","
+        "\"city\":\"New York\","
+        "\"state\":\"NY\","
+        "\"zipcode\":\"10021-3100\""
+        "},"
+        "\"phoneNumbers\":["
+        "{"
+        "\"type\":\"home\","
+        "\"number\":\"212 555-1234\""
+        "},"
+        "{"
+        "\"type\":\"office\","
+        "\"number\":\"646 555-4567\""
+        "}"
+        "],"
+        "\"children\":[],"
+        "\"spouse\":null,"
+        "\"groups\":{}"
+        "}";
     JDocument *doc1;
-    const char* json2 = "{"
-                            "\"firstName\":\"John\","
-                            "\"lastName\":\"Smith\","
-                            "\"age\":27,"
-                            "\"weight\":135.17,"
-                            "\"isAlive\":true,"
-                            "\"spouse\":null,"
-                            "\"children\":[],"
-                            "\"groups\":{}"
-                        "}";
+    const char *json2 =
+        "{"
+        "\"firstName\":\"John\","
+        "\"lastName\":\"Smith\","
+        "\"age\":27,"
+        "\"weight\":135.17,"
+        "\"isAlive\":true,"
+        "\"spouse\":null,"
+        "\"children\":[],"
+        "\"groups\":{}"
+        "}";
     JDocument *doc2;
-    const char *json3 = "{"
-                        "\"a\":{},"
-                        "\"b\":{\"a\":\"a\"},"
-                        "\"c\":{\"a\":\"a\", \"b\":1},"
-                        "\"d\":{\"a\":\"a\", \"b\":\"b\"},"
-                        "\"e\":{\"a\":1, \"b\":\"b\", \"c\":3}"
-                        "}";
+    const char *json3 =
+        "{"
+        "\"a\":{},"
+        "\"b\":{\"a\":\"a\"},"
+        "\"c\":{\"a\":\"a\", \"b\":1},"
+        "\"d\":{\"a\":\"a\", \"b\":\"b\"},"
+        "\"e\":{\"a\":1, \"b\":\"b\", \"c\":3}"
+        "}";
     JDocument *doc3;
     const char *json4 = "{\"a\":[], \"b\":[1], \"c\":[1,2], \"d\":[1,2,3], \"e\":[1,2,3,4,5]}";
     JDocument *doc4;
     const char *json5 = "{\"a\":{\"b\":{\"c\":{\"d\":{\"e\":{\"f\":{\"g\":{\"h:\":1}}}}}}}}";
     JDocument *doc5;
-    const char *json6 = "{"
-                        "\"a\":["
-                        "[[1,2],[3,4],[5,6]],"
-                        "[[7,8],[9,10],[11,12]]"
-                        "]"
-                        "}";
+    const char *json6 =
+        "{"
+        "\"a\":["
+        "[[1,2],[3,4],[5,6]],"
+        "[[7,8],[9,10],[11,12]]"
+        "]"
+        "}";
     JDocument *doc6;
 
     void SetUp() override {
@@ -271,21 +274,20 @@ TEST_F(DomTest, testSerialize_DefaultFormat) {
 TEST_F(DomTest, testSerialize_CustomFormatArray) {
     PrintFormat format;
     format.newline = "\n";
-    format.indent  = "\t";
+    format.indent = "\t";
     format.space = ".";
     jsn::vector<std::pair<jsn::string, jsn::string>> tests{
-            {"[]", "[]"},
-            {"[0]", "[\n\t0\n]"},
-            {"[0,1]", "[\n\t0,\n\t1\n]"},
-            {"[[]]",  "[\n\t[]\n]"},
-            {"[[0]]", "[\n\t[\n\t\t0\n\t]\n]"},
-            {"[[0,1]]", "[\n\t[\n\t\t0,\n\t\t1\n\t]\n]"},
-            {"{}", "{}"},
-            {"{\"a\":0}", "{\n\t\"a\":.0\n}"},
-            {"{\"a\":0,\"b\":1}", "{\n\t\"a\":.0,\n\t\"b\":.1\n}"},
-            {"{\"a\":{\"b\":1}}", "{\n\t\"a\":.{\n\t\t\"b\":.1\n\t}\n}"}
-    };
-    for (auto p : tests) {
+        {"[]", "[]"},
+        {"[0]", "[\n\t0\n]"},
+        {"[0,1]", "[\n\t0,\n\t1\n]"},
+        {"[[]]", "[\n\t[]\n]"},
+        {"[[0]]", "[\n\t[\n\t\t0\n\t]\n]"},
+        {"[[0,1]]", "[\n\t[\n\t\t0,\n\t\t1\n\t]\n]"},
+        {"{}", "{}"},
+        {"{\"a\":0}", "{\n\t\"a\":.0\n}"},
+        {"{\"a\":0,\"b\":1}", "{\n\t\"a\":.0,\n\t\"b\":.1\n}"},
+        {"{\"a\":{\"b\":1}}", "{\n\t\"a\":.{\n\t\t\"b\":.1\n\t}\n}"}};
+    for (const auto &p : tests) {
         JDocument *doc;
         JsonUtilCode rc = dom_parse(nullptr, p.first.c_str(), p.first.length(), &doc);
         EXPECT_EQ(rc, JSONUTIL_SUCCESS);
@@ -303,9 +305,10 @@ TEST_F(DomTest, testSerialize_CustomFormat) {
     format.indent = "\t";
     format.newline = "\n";
     format.space = " ";
-    const char* exp_json = "{\n\t\"firstName\": \"John\",\n\t\"lastName\": \"Smith\",\n\t\"age\": 27,"
-                           "\n\t\"weight\": 135.17,\n\t\"isAlive\": true,\n\t\"spouse\": null,"
-                           "\n\t\"children\": [],\n\t\"groups\": {}\n}";
+    const char *exp_json =
+        "{\n\t\"firstName\": \"John\",\n\t\"lastName\": \"Smith\",\n\t\"age\": 27,"
+        "\n\t\"weight\": 135.17,\n\t\"isAlive\": true,\n\t\"spouse\": null,"
+        "\n\t\"children\": [],\n\t\"groups\": {}\n}";
     rapidjson::StringBuffer oss;
     dom_serialize(doc2, &format, oss);
     EXPECT_STREQ(oss.GetString(), exp_json);
@@ -313,9 +316,10 @@ TEST_F(DomTest, testSerialize_CustomFormat) {
     format.indent = "**";
     format.newline = "\n";
     format.space = "--";
-    exp_json = "{\n**\"firstName\":--\"John\",\n**\"lastName\":--\"Smith\",\n**\"age\":--27,"
-               "\n**\"weight\":--135.17,\n**\"isAlive\":--true,\n**\"spouse\":--null,"
-               "\n**\"children\":--[],\n**\"groups\":--{}\n}";
+    exp_json =
+        "{\n**\"firstName\":--\"John\",\n**\"lastName\":--\"Smith\",\n**\"age\":--27,"
+        "\n**\"weight\":--135.17,\n**\"isAlive\":--true,\n**\"spouse\":--null,"
+        "\n**\"children\":--[],\n**\"groups\":--{}\n}";
     Clear(&oss);
     dom_serialize(doc2, &format, oss);
     EXPECT_STREQ(oss.GetString(), exp_json);
@@ -442,16 +446,18 @@ TEST_F(DomTest, testGetObject) {
     ReplyBuffer oss;
     JsonUtilCode rc = dom_get_value_as_str(doc1, ".address", nullptr, oss, false);
     EXPECT_EQ(rc, JSONUTIL_SUCCESS);
-    EXPECT_STREQ(GetString(&oss), "{\"street\":\"21 2nd Street\",\"city\":\"New York\",\"state\":\"NY\","
-    "\"zipcode\":\"10021-3100\"}");
+    EXPECT_STREQ(GetString(&oss),
+                 "{\"street\":\"21 2nd Street\",\"city\":\"New York\",\"state\":\"NY\","
+                 "\"zipcode\":\"10021-3100\"}");
 }
 
 TEST_F(DomTest, testGetArray) {
     ReplyBuffer oss;
     JsonUtilCode rc = dom_get_value_as_str(doc1, ".phoneNumbers", nullptr, oss, false);
     EXPECT_EQ(rc, JSONUTIL_SUCCESS);
-    EXPECT_STREQ(GetString(&oss), "[{\"type\":\"home\",\"number\":\"212 555-1234\"},{\"type\":\"office\","
-    "\"number\":\"646 555-4567\"}]");
+    EXPECT_STREQ(GetString(&oss),
+                 "[{\"type\":\"home\",\"number\":\"212 555-1234\"},{\"type\":\"office\","
+                 "\"number\":\"646 555-4567\"}]");
 
     Clear(&oss);
     rc = dom_get_value_as_str(doc1, ".children", nullptr, oss, false);
@@ -460,7 +466,7 @@ TEST_F(DomTest, testGetArray) {
 }
 
 TEST_F(DomTest, testGet_multiPaths) {
-    const char *paths[] = { ".firstName", ".lastName" };
+    const char *paths[] = {".firstName", ".lastName"};
     ReplyBuffer oss;
     JsonUtilCode rc = dom_get_values_as_str(doc1, paths, 2, nullptr, oss, false);
     EXPECT_EQ(rc, JSONUTIL_SUCCESS);
@@ -471,7 +477,7 @@ TEST_F(DomTest, testGet_multiPaths) {
     format.indent = "\t";
     format.newline = "\n";
     format.space = " ";
-    const char* exp_json = "{\n\t\".firstName\": \"John\",\n\t\".lastName\": \"Smith\"\n}";
+    const char *exp_json = "{\n\t\".firstName\": \"John\",\n\t\".lastName\": \"Smith\"\n}";
     Clear(&oss);
     rc = dom_get_values_as_str(doc1, paths, 2, &format, oss, false);
     EXPECT_EQ(rc, JSONUTIL_SUCCESS);
@@ -1036,7 +1042,7 @@ TEST_F(DomTest, testStrLen_v2path_wildcard) {
     EXPECT_EQ(rc, JSONUTIL_SUCCESS);
     EXPECT_TRUE(is_v2_path);
     EXPECT_EQ(vec.size(), 4);
-    for (size_t i=0; i < vec.size(); i++) {
+    for (size_t i = 0; i < vec.size(); i++) {
         EXPECT_EQ(vec[i], i);
     }
 
@@ -1102,8 +1108,8 @@ TEST_F(DomTest, testStrAppend_v2path_wildcard) {
     EXPECT_EQ(rc, JSONUTIL_SUCCESS);
     EXPECT_TRUE(is_v2_path);
     EXPECT_EQ(vec.size(), 4);
-    for (size_t i=0; i < vec.size(); i++) {
-        EXPECT_EQ(vec[i], i+1);
+    for (size_t i = 0; i < vec.size(); i++) {
+        EXPECT_EQ(vec[i], i + 1);
     }
 
     dom_free_doc(doc);
@@ -1131,7 +1137,7 @@ TEST_F(DomTest, testObjLen_v2path_wildcard) {
     EXPECT_EQ(rc, JSONUTIL_SUCCESS);
     EXPECT_TRUE(is_v2_path);
     EXPECT_EQ(vec.size(), 3);
-    for (size_t i=0; i < vec.size(); i++) {
+    for (size_t i = 0; i < vec.size(); i++) {
         EXPECT_EQ(vec[i], i);
     }
 
@@ -1197,8 +1203,9 @@ TEST_F(DomTest, testArrLen) {
 }
 
 TEST_F(DomTest, testArrLen_v2path) {
-    const char *input = "[ [\"Marry\", \"Bob\", \"Tom\"], [\"Peter\", \"Marry\", \"Carol\"],"
-                        "[\"Peter\", \"Jane\"], [] ]";
+    const char *input =
+        "[ [\"Marry\", \"Bob\", \"Tom\"], [\"Peter\", \"Marry\", \"Carol\"],"
+        "[\"Peter\", \"Jane\"], [] ]";
     JDocument *doc;
     JsonUtilCode rc = dom_parse(nullptr, input, strlen(input), &doc);
     EXPECT_EQ(rc, JSONUTIL_SUCCESS);
@@ -1218,8 +1225,8 @@ TEST_F(DomTest, testArrLen_v2path) {
 }
 
 TEST_F(DomTest, testArrAppend) {
-    const char *jsons[] = { "\"John\"" };
-    size_t json_lens[] = { 6 };
+    const char *jsons[] = {"\"John\""};
+    size_t json_lens[] = {6};
     jsn::vector<size_t> vec;
     bool is_v2_path;
 
@@ -1243,8 +1250,8 @@ TEST_F(DomTest, testArrAppend) {
 }
 
 TEST_F(DomTest, testArrAppend_multiValues) {
-    const char *jsons[] = { "\"John\"", "\"Mary\"", "\"Tom\"" };
-    size_t json_lens[] = { 6, 6, 5 };
+    const char *jsons[] = {"\"John\"", "\"Mary\"", "\"Tom\""};
+    size_t json_lens[] = {6, 6, 5};
     jsn::vector<size_t> vec;
     bool is_v2_path;
     JsonUtilCode rc = dom_array_append(nullptr, doc1, ".children", jsons, json_lens, 3, vec, is_v2_path);
@@ -1266,8 +1273,8 @@ TEST_F(DomTest, testArrAppend_v2path) {
 
     jsn::vector<size_t> vec;
     bool is_v2_path;
-    const char *jsons[] = { "\"John\"", "\"Tom\"" };
-    size_t json_lens[] = { 6, 5 };
+    const char *jsons[] = {"\"John\"", "\"Tom\""};
+    size_t json_lens[] = {6, 5};
     rc = dom_array_append(nullptr, doc, "$[*]", jsons, json_lens, 2, vec, is_v2_path);
     EXPECT_EQ(rc, JSONUTIL_SUCCESS);
     EXPECT_TRUE(is_v2_path);
@@ -1279,15 +1286,16 @@ TEST_F(DomTest, testArrAppend_v2path) {
     ReplyBuffer oss;
     rc = dom_get_value_as_str(doc, "$[*]", nullptr, oss, false);
     EXPECT_EQ(rc, JSONUTIL_SUCCESS);
-    EXPECT_STREQ(GetString(&oss), "[[\"Marry\",\"Bob\",\"John\",\"Tom\"],[\"Peter\",\"John\",\"Tom\"],"
-                                    "[\"John\",\"Tom\"]]");
+    EXPECT_STREQ(GetString(&oss),
+                 "[[\"Marry\",\"Bob\",\"John\",\"Tom\"],[\"Peter\",\"John\",\"Tom\"],"
+                 "[\"John\",\"Tom\"]]");
 
     dom_free_doc(doc);
 }
 
 TEST_F(DomTest, testArrPop) {
-    const char *jsons[] = { "\"John\"", "\"Mary\"", "\"Tom\"" };
-    size_t json_lens[] = { 6, 6, 5 };
+    const char *jsons[] = {"\"John\"", "\"Mary\"", "\"Tom\""};
+    size_t json_lens[] = {6, 6, 5};
     jsn::vector<size_t> vec;
     bool is_v2_path;
     JsonUtilCode rc = dom_array_append(nullptr, doc1, ".children", jsons, json_lens, 3, vec, is_v2_path);
@@ -1346,7 +1354,7 @@ TEST_F(DomTest, testArrPop_v2path) {
 
 TEST_F(DomTest, testArrInsert) {
     const char *vals[1] = {"\"john\""};
-    size_t val_lens[1] = { 6 };
+    size_t val_lens[1] = {6};
     jsn::vector<size_t> vec;
     bool is_v2_path;
     JsonUtilCode rc = dom_array_insert(nullptr, doc1, ".children", 0, vals, val_lens, 1, vec, is_v2_path);
@@ -1369,8 +1377,8 @@ TEST_F(DomTest, testArrInsert_v2path) {
 
     jsn::vector<size_t> vec;
     bool is_v2_path;
-    const char *jsons[] = { "\"John\"", "\"Tom\"" };
-    size_t json_lens[] = { 6, 5 };
+    const char *jsons[] = {"\"John\"", "\"Tom\""};
+    size_t json_lens[] = {6, 5};
     rc = dom_array_insert(nullptr, doc, "$[*]", 0, jsons, json_lens, 2, vec, is_v2_path);
     EXPECT_EQ(rc, JSONUTIL_SUCCESS);
     EXPECT_TRUE(is_v2_path);
@@ -1382,15 +1390,16 @@ TEST_F(DomTest, testArrInsert_v2path) {
     ReplyBuffer oss;
     rc = dom_get_value_as_str(doc, "$[*]", nullptr, oss, false);
     EXPECT_EQ(rc, JSONUTIL_SUCCESS);
-    EXPECT_STREQ(GetString(&oss), "[[\"John\",\"Tom\",\"Marry\",\"Bob\"],"
-                                    "[\"John\",\"Tom\",\"Peter\"],[\"John\",\"Tom\"]]");
+    EXPECT_STREQ(GetString(&oss),
+                 "[[\"John\",\"Tom\",\"Marry\",\"Bob\"],"
+                 "[\"John\",\"Tom\",\"Peter\"],[\"John\",\"Tom\"]]");
 
     dom_free_doc(doc);
 }
 
 TEST_F(DomTest, testClear) {
-    const char *jsons[] = { "\"John\"", "\"Mary\"", "\"Tom\"" };
-    size_t json_lens[] = { 6, 6, 5 };
+    const char *jsons[] = {"\"John\"", "\"Mary\"", "\"Tom\""};
+    size_t json_lens[] = {6, 6, 5};
     jsn::vector<size_t> vec;
     bool is_v2_path;
     JsonUtilCode rc = dom_array_append(nullptr, doc1, ".children", jsons, json_lens, 3, vec, is_v2_path);
@@ -1440,8 +1449,9 @@ TEST_F(DomTest, testClear) {
 }
 
 TEST_F(DomTest, testClear_v2path) {
-    const char *input1 = "{\"a\":{}, \"b\":{\"a\": 1, \"b\": null, \"c\": true}, "
-                         "\"c\":1, \"d\":true, \"e\":null, \"f\":\"d\", \"g\": 4, \"h\": 4.5}";
+    const char *input1 =
+        "{\"a\":{}, \"b\":{\"a\": 1, \"b\": null, \"c\": true}, "
+        "\"c\":1, \"d\":true, \"e\":null, \"f\":\"d\", \"g\": 4, \"h\": 4.5}";
     JDocument *d1;
     JsonUtilCode rc = dom_parse(nullptr, input1, strlen(input1), &d1);
     EXPECT_EQ(rc, JSONUTIL_SUCCESS);
@@ -1475,8 +1485,8 @@ TEST_F(DomTest, testClear_v2path) {
 }
 
 TEST_F(DomTest, testArrTrim) {
-    const char *jsons[] = { "\"John\"", "\"Mary\"", "\"Tom\"" };
-    size_t json_lens[] = { 6, 6, 5 };
+    const char *jsons[] = {"\"John\"", "\"Mary\"", "\"Tom\""};
+    size_t json_lens[] = {6, 6, 5};
     jsn::vector<size_t> vec;
     bool is_v2_path;
     JsonUtilCode rc = dom_array_append(nullptr, doc1, ".children", jsons, json_lens, 3, vec, is_v2_path);
@@ -1551,8 +1561,8 @@ TEST_F(DomTest, testArrTrim_v2path) {
 }
 
 TEST_F(DomTest, testArrIndex) {
-    const char *jsons[] = { "\"John\"", "\"Marry\"", "\"Tom\"" };
-    size_t json_lens[] = { 6, 7, 5 };
+    const char *jsons[] = {"\"John\"", "\"Marry\"", "\"Tom\""};
+    size_t json_lens[] = {6, 7, 5};
     jsn::vector<size_t> vec;
     bool is_v2_path;
     JsonUtilCode rc = dom_array_append(nullptr, doc1, ".children", jsons, json_lens, 3, vec, is_v2_path);
@@ -1575,8 +1585,9 @@ TEST_F(DomTest, testArrIndex) {
 }
 
 TEST_F(DomTest, testArrIndex_v2path) {
-    const char *input = "[ [\"Marry\", \"Bob\", \"Tom\"], [\"Peter\", \"Marry\", \"Carol\"], "
-                        "[\"Peter\", \"Jane\"], [] ]";
+    const char *input =
+        "[ [\"Marry\", \"Bob\", \"Tom\"], [\"Peter\", \"Marry\", \"Carol\"], "
+        "[\"Peter\", \"Jane\"], [] ]";
     JDocument *doc;
     JsonUtilCode rc = dom_parse(nullptr, input, strlen(input), &doc);
     EXPECT_EQ(rc, JSONUTIL_SUCCESS);
@@ -2261,7 +2272,7 @@ class HTTest : public ::testing::Test {
 };
 
 TEST_F(HTTest, hashfunc) {
-    enum {key_count = 1 << 18, max_dups = 7};
+    enum { key_count = 1 << 18, max_dups = 7 };
     std::unordered_map<size_t, size_t> hashes;
     for (size_t i = 0; i < key_count; ++i) {
         std::string s = std::to_string(i);
@@ -2277,7 +2288,7 @@ TEST_F(HTTest, hashfunc) {
 }
 
 TEST_F(HTTest, HTIngestTest) {
-    for (auto num_keys : { 1<<18 }) {
+    for (auto num_keys : {1 << 18}) {
         rapidjson::hashTableStats.reset();
         std::ostringstream os;
         os << '{';
@@ -2303,7 +2314,7 @@ TEST_F(HTTest, HTIngestTest) {
         EXPECT_EQ(JSONUTIL_SUCCESS, dom_parse(nullptr, os.str().c_str(), os.str().size(), &doc2));
         s = keyTable->getStats();
         EXPECT_EQ(s.rehashes, 0);
-        EXPECT_EQ(s.handles, 2*num_keys);
+        EXPECT_EQ(s.handles, 2 * num_keys);
         EXPECT_EQ(rapidjson::hashTableStats.rehashUp, 0);
         EXPECT_EQ(rapidjson::hashTableStats.rehashDown, 0);
         EXPECT_EQ(rapidjson::hashTableStats.convertToHT, 0);

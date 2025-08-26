@@ -1,119 +1,122 @@
-#include <cstdlib>
-#include <cstddef>
-#include <cstring>
-#include <cstdio>
-#include <cstdint>
-#include <cmath>
-#include <memory>
-#include <vector>
-#include <string>
-#include <sstream>
-#include <gtest/gtest.h>
-#include "json/dom.h"
 #include "json/selector.h"
+
+#include <gtest/gtest.h>
+
+#include <cmath>
+#include <cstddef>
+#include <cstdint>
+#include <cstdio>
+#include <cstdlib>
+#include <cstring>
+#include <memory>
+#include <sstream>
+#include <string>
+#include <vector>
+
+#include "json/dom.h"
 
 extern size_t dummy_malloc_size(void *);
 extern void SetupAllocFuncs(size_t numShards);
-extern std::string& getReplyString();
+extern std::string &getReplyString();
 extern const char *GetString(ReplyBuffer *b);
 
 class SelectorTest : public ::testing::Test {
- protected:
-    const char *store = "{\n"
-                        "  \"budget\": 10.00,\n"
-                        "  \"favorite\": \"Sword of Honour\",\n"
-                        "  \"store\": {\n"
-                        "    \"books\": [\n"
-                        "      {\n"
-                        "        \"category\": \"reference\",\n"
-                        "        \"author\": \"Nigel Rees\",\n"
-                        "        \"title\": \"Sayings of the Century\",\n"
-                        "        \"price\": 8.95\n"
-                        "      },\n"
-                        "      {\n"
-                        "        \"category\": \"fiction\",\n"
-                        "        \"author\": \"Evelyn Waugh\",\n"
-                        "        \"title\": \"Sword of Honour\",\n"
-                        "        \"price\": 12.99,\n"
-                        "        \"movies\": [\n"
-                        "          {\n"
-                        "            \"title\": \"Sword of Honour\",\n"
-                        "            \"realisator\": {\n"
-                        "              \"first_name\": \"Bill\",\n"
-                        "              \"last_name\": \"Anderson\"\n"
-                        "            }\n"
-                        "          }\n"
-                        "        ]\n"
-                        "      },\n"
-                        "      {\n"
-                        "        \"category\": \"fiction\",\n"
-                        "        \"author\": \"Herman Melville\",\n"
-                        "        \"title\": \"Moby Dick\",\n"
-                        "        \"isbn\": \"0-553-21311-3\",\n"
-                        "        \"price\": 9\n"
-                        "      },\n"
-                        "      {\n"
-                        "        \"category\": \"fiction\",\n"
-                        "        \"author\": \"J. R. R. Tolkien\",\n"
-                        "        \"title\": \"The Lord of the Rings\",\n"
-                        "        \"isbn\": \"0-395-19395-8\",\n"
-                        "        \"price\": 22.99\n"
-                        "      }\n"
-                        "    ],\n"
-                        "    \"bicycle\": {\n"
-                        "      \"color\": \"red\",\n"
-                        "      \"price\": 19.95\n"
-                        "    }\n"
-                        "  }\n"
-                        "}";
+   protected:
+    const char *store =
+        "{\n"
+        "  \"budget\": 10.00,\n"
+        "  \"favorite\": \"Sword of Honour\",\n"
+        "  \"store\": {\n"
+        "    \"books\": [\n"
+        "      {\n"
+        "        \"category\": \"reference\",\n"
+        "        \"author\": \"Nigel Rees\",\n"
+        "        \"title\": \"Sayings of the Century\",\n"
+        "        \"price\": 8.95\n"
+        "      },\n"
+        "      {\n"
+        "        \"category\": \"fiction\",\n"
+        "        \"author\": \"Evelyn Waugh\",\n"
+        "        \"title\": \"Sword of Honour\",\n"
+        "        \"price\": 12.99,\n"
+        "        \"movies\": [\n"
+        "          {\n"
+        "            \"title\": \"Sword of Honour\",\n"
+        "            \"realisator\": {\n"
+        "              \"first_name\": \"Bill\",\n"
+        "              \"last_name\": \"Anderson\"\n"
+        "            }\n"
+        "          }\n"
+        "        ]\n"
+        "      },\n"
+        "      {\n"
+        "        \"category\": \"fiction\",\n"
+        "        \"author\": \"Herman Melville\",\n"
+        "        \"title\": \"Moby Dick\",\n"
+        "        \"isbn\": \"0-553-21311-3\",\n"
+        "        \"price\": 9\n"
+        "      },\n"
+        "      {\n"
+        "        \"category\": \"fiction\",\n"
+        "        \"author\": \"J. R. R. Tolkien\",\n"
+        "        \"title\": \"The Lord of the Rings\",\n"
+        "        \"isbn\": \"0-395-19395-8\",\n"
+        "        \"price\": 22.99\n"
+        "      }\n"
+        "    ],\n"
+        "    \"bicycle\": {\n"
+        "      \"color\": \"red\",\n"
+        "      \"price\": 19.95\n"
+        "    }\n"
+        "  }\n"
+        "}";
 
-    const char *node_accounts = "{\n"
-                                "  \"clientName\": \"jim\",\n"
-                                "  \"nameSpace\": \"BobSpace\",\n"
-                                "  \"codeName\": \"codeName\",\n"
-                                "  \"codeId\": 5555,\n"
-                                "  \"codeData\": {\n"
-                                "    \"uTaskQueue_CodeData\": [\n"
-                                "      {\n"
-                                "        \"stuff\": 99\n"
-                                "      }\n"
-                                "    ]\n"
-                                "  },\n"
-                                "  \"nodeData\": [\n"
-                                "    {\n"
-                                "      \"selfNodeId\": 1,\n"
-                                "      \"selfAndChildNodeIds\": [\n"
-                                "        1,\n"
-                                "        2,\n"
-                                "        3\n"
-                                "      ],\n"
-                                "      \"uTaskQueue_NodeData\": [\n"
-                                "        {\n"
-                                "          \"hidden\": \"1+2+3\",\n"
-                                "          \"usercreate\": -1000\n"
-                                "        }\n"
-                                "      ]\n"
-                                "    },\n"
-                                "    {\n"
-                                "      \"selfNodeId\": 10,\n"
-                                "      \"selfAndChildNodeIds\": [\n"
-                                "        10,\n"
-                                "        11,\n"
-                                "        12\n"
-                                "      ],\n"
-                                "      \"uTaskQueue_NodeData\": [\n"
-                                "        {\n"
-                                "         \"hidden\": \"10+11+12\",\n"
-                                "         \"other_stuff\": 1000\n"
-                                "        }\n"
-                                "      ]\n"
-                                "    }\n"
-                                "  ]\n"
-                                "}";
+    const char *node_accounts =
+        "{\n"
+        "  \"clientName\": \"jim\",\n"
+        "  \"nameSpace\": \"BobSpace\",\n"
+        "  \"codeName\": \"codeName\",\n"
+        "  \"codeId\": 5555,\n"
+        "  \"codeData\": {\n"
+        "    \"uTaskQueue_CodeData\": [\n"
+        "      {\n"
+        "        \"stuff\": 99\n"
+        "      }\n"
+        "    ]\n"
+        "  },\n"
+        "  \"nodeData\": [\n"
+        "    {\n"
+        "      \"selfNodeId\": 1,\n"
+        "      \"selfAndChildNodeIds\": [\n"
+        "        1,\n"
+        "        2,\n"
+        "        3\n"
+        "      ],\n"
+        "      \"uTaskQueue_NodeData\": [\n"
+        "        {\n"
+        "          \"hidden\": \"1+2+3\",\n"
+        "          \"usercreate\": -1000\n"
+        "        }\n"
+        "      ]\n"
+        "    },\n"
+        "    {\n"
+        "      \"selfNodeId\": 10,\n"
+        "      \"selfAndChildNodeIds\": [\n"
+        "        10,\n"
+        "        11,\n"
+        "        12\n"
+        "      ],\n"
+        "      \"uTaskQueue_NodeData\": [\n"
+        "        {\n"
+        "         \"hidden\": \"10+11+12\",\n"
+        "         \"other_stuff\": 1000\n"
+        "        }\n"
+        "      ]\n"
+        "    }\n"
+        "  ]\n"
+        "}";
 
-    void SetUp() override {
-        SetupAllocFuncs(16);
-    }
+    void SetUp() override { SetupAllocFuncs(16); }
 
     void TearDown() override {
         delete keyTable;
@@ -298,21 +301,21 @@ TEST_F(SelectorTest, test_filterExpr_expression_part4) {
 
     rc = selector.getValues(*d1, "$.store.books[?(9>@.price || 10<@.price && @.isbn)].price");
     EXPECT_EQ(rc, JSONUTIL_SUCCESS);
-    auto& rs = selector.getResultSet();
+    auto &rs = selector.getResultSet();
     EXPECT_EQ(rs.size(), 2);
     EXPECT_EQ(rs[0].first->GetDouble(), 8.95);
     EXPECT_EQ(rs[1].first->GetDouble(), 22.99);
 
     rc = selector.getValues(*d1, "$.store.books[?(9>@.price||10<@.price&&@.isbn)].price");
     EXPECT_EQ(rc, JSONUTIL_SUCCESS);
-    auto& rs2 = selector.getResultSet();
+    auto &rs2 = selector.getResultSet();
     EXPECT_EQ(rs2.size(), 2);
     EXPECT_EQ(rs2[0].first->GetDouble(), 8.95);
     EXPECT_EQ(rs2[1].first->GetDouble(), 22.99);
 
     rc = selector.getValues(*d1, "$.store.books[?((9>@.price||10<@.price)&&@.isbn)].price");
     EXPECT_EQ(rc, JSONUTIL_SUCCESS);
-    auto& rs3 = selector.getResultSet();
+    auto &rs3 = selector.getResultSet();
     EXPECT_EQ(rs3.size(), 1);
     EXPECT_EQ(rs3[0].first->GetDouble(), 22.99);
 
@@ -347,7 +350,7 @@ TEST_F(SelectorTest, test_filterExpr_expression_part5) {
     Selector selector;
     rc = selector.getValues(*d1, "$.*.[?(@>2)]");
     EXPECT_EQ(rc, JSONUTIL_SUCCESS);
-    auto& rs = selector.getResultSet();
+    auto &rs = selector.getResultSet();
     EXPECT_EQ(rs.size(), 3);
     EXPECT_EQ(rs[0].first->GetInt(), 3);
     EXPECT_EQ(rs[1].first->GetInt(), 4);
@@ -355,7 +358,7 @@ TEST_F(SelectorTest, test_filterExpr_expression_part5) {
 
     rc = selector.getValues(*d1, "$.*.[?(2<@)]");
     EXPECT_EQ(rc, JSONUTIL_SUCCESS);
-    auto& rs2 = selector.getResultSet();
+    auto &rs2 = selector.getResultSet();
     EXPECT_EQ(rs2.size(), 3);
     EXPECT_EQ(rs2[0].first->GetInt(), 3);
     EXPECT_EQ(rs2[1].first->GetInt(), 4);
@@ -363,7 +366,7 @@ TEST_F(SelectorTest, test_filterExpr_expression_part5) {
 
     rc = selector.getValues(*d1, "$.*.[?(2<@&&@<5)]");
     EXPECT_EQ(rc, JSONUTIL_SUCCESS);
-    auto& rs3 = selector.getResultSet();
+    auto &rs3 = selector.getResultSet();
     EXPECT_EQ(rs3.size(), 2);
     EXPECT_EQ(rs3[0].first->GetInt(), 3);
     EXPECT_EQ(rs3[1].first->GetInt(), 4);
@@ -375,40 +378,40 @@ TEST_F(SelectorTest, test_filterExpr_expression_part5) {
 
     rc = selector.getValues(*d2, "$..[?(@==true)]");
     EXPECT_EQ(rc, JSONUTIL_SUCCESS);
-    auto& rs4 = selector.getResultSet();
+    auto &rs4 = selector.getResultSet();
     EXPECT_EQ(rs4.size(), 2);
     EXPECT_EQ(rs4[0].first->GetBool(), true);
     EXPECT_EQ(rs4[1].first->GetBool(), true);
 
     rc = selector.getValues(*d2, "$..[?(@==false)]");
     EXPECT_EQ(rc, JSONUTIL_SUCCESS);
-    auto& rs5 = selector.getResultSet();
+    auto &rs5 = selector.getResultSet();
     EXPECT_EQ(rs5.size(), 1);
     EXPECT_EQ(rs5[0].first->GetBool(), false);
 
     rc = selector.getValues(*d2, "$..[?(@!=false)]");
     EXPECT_EQ(rc, JSONUTIL_SUCCESS);
-    auto& rs6 = selector.getResultSet();
+    auto &rs6 = selector.getResultSet();
     EXPECT_EQ(rs6.size(), 2);
     EXPECT_EQ(rs6[0].first->GetBool(), true);
     EXPECT_EQ(rs6[1].first->GetBool(), true);
 
     rc = selector.getValues(*d2, "$.*.[?(@!=true)]");
     EXPECT_EQ(rc, JSONUTIL_SUCCESS);
-    auto& rs7 = selector.getResultSet();
+    auto &rs7 = selector.getResultSet();
     EXPECT_EQ(rs7.size(), 1);
     EXPECT_EQ(rs7[0].first->GetBool(), false);
 
     rc = selector.getValues(*d2, "$..[?(@>=true)]");
     EXPECT_EQ(rc, JSONUTIL_SUCCESS);
-    auto& rs8 = selector.getResultSet();
+    auto &rs8 = selector.getResultSet();
     EXPECT_EQ(rs8.size(), 2);
     EXPECT_EQ(rs8[0].first->GetBool(), true);
     EXPECT_EQ(rs8[1].first->GetBool(), true);
 
     rc = selector.getValues(*d2, "$..[?(@ <= true)]");
     EXPECT_EQ(rc, JSONUTIL_SUCCESS);
-    auto& rs9 = selector.getResultSet();
+    auto &rs9 = selector.getResultSet();
     EXPECT_EQ(rs9.size(), 3);
     EXPECT_EQ(rs9[0].first->GetBool(), true);
     EXPECT_EQ(rs9[1].first->GetBool(), false);
@@ -416,14 +419,14 @@ TEST_F(SelectorTest, test_filterExpr_expression_part5) {
 
     rc = selector.getValues(*d2, "$..[?(@>false)]");
     EXPECT_EQ(rc, JSONUTIL_SUCCESS);
-    auto& rs10 = selector.getResultSet();
+    auto &rs10 = selector.getResultSet();
     EXPECT_EQ(rs10.size(), 2);
     EXPECT_EQ(rs10[0].first->GetBool(), true);
     EXPECT_EQ(rs10[1].first->GetBool(), true);
 
     rc = selector.getValues(*d2, "$..[?(@<true)]");
     EXPECT_EQ(rc, JSONUTIL_SUCCESS);
-    auto& rs11 = selector.getResultSet();
+    auto &rs11 = selector.getResultSet();
     EXPECT_EQ(rs11.size(), 1);
     EXPECT_EQ(rs11[0].first->GetBool(), false);
 
@@ -432,8 +435,9 @@ TEST_F(SelectorTest, test_filterExpr_expression_part5) {
 }
 
 TEST_F(SelectorTest, test_filterExpr_expression_part6) {
-    const char *input = "[{\"NumEntry\":1},{\"NumEntry\":2},{\"NumEntry\":3},"
-                         "{\"NumEntry\":4},{\"NumEntry\":5},{\"NumEntry\":6}]";
+    const char *input =
+        "[{\"NumEntry\":1},{\"NumEntry\":2},{\"NumEntry\":3},"
+        "{\"NumEntry\":4},{\"NumEntry\":5},{\"NumEntry\":6}]";
     JDocument *d1;
     JsonUtilCode rc = dom_parse(nullptr, input, strlen(input), &d1);
     EXPECT_EQ(rc, JSONUTIL_SUCCESS);
@@ -476,24 +480,25 @@ TEST_F(SelectorTest, test_filterExpr_expression_part6) {
 }
 
 TEST_F(SelectorTest, test_filterExpr_expression_part7) {
-    const char *input = "{"
-                        "  \"key for key\"     : \"key inside here\","
-                        "  \"key$for$key\"     : \"key inside here\","
-                        "  \"key'for'key\"     : \"key inside here\","
-                        "  \"key\\\"for\\\"key\"     : \"key inside here\","
-                        "  \"an object\"       : {"
-                        "    \"weight\"   : 300,"
-                        "    \"a value\"  : 300,"
-                        "    \"poquo value\"  : \"\\\"\","
-                        "    \"my key\"   : \"key inside here\""
-                        "  },"
-                        "  \"anonther object\" : {"
-                        "    \"weight\"   : 400,"
-                        "    \"a value\"  : 400,"
-                        "    \"poquo value\"  : \"'\","
-                        "    \"my key\"   : \"key inside there\""
-                        "  }"
-                        "}";
+    const char *input =
+        "{"
+        "  \"key for key\"     : \"key inside here\","
+        "  \"key$for$key\"     : \"key inside here\","
+        "  \"key'for'key\"     : \"key inside here\","
+        "  \"key\\\"for\\\"key\"     : \"key inside here\","
+        "  \"an object\"       : {"
+        "    \"weight\"   : 300,"
+        "    \"a value\"  : 300,"
+        "    \"poquo value\"  : \"\\\"\","
+        "    \"my key\"   : \"key inside here\""
+        "  },"
+        "  \"anonther object\" : {"
+        "    \"weight\"   : 400,"
+        "    \"a value\"  : 400,"
+        "    \"poquo value\"  : \"'\","
+        "    \"my key\"   : \"key inside there\""
+        "  }"
+        "}";
 
     JDocument *d1;
     JsonUtilCode rc = dom_parse(nullptr, input, strlen(input), &d1);
@@ -514,49 +519,49 @@ TEST_F(SelectorTest, test_filterExpr_expression_part7) {
 
     rc = selector.getValues(*d1, "$..[?(@[\"my key\"]==$[\"key$for$key\"])].weight");
     EXPECT_EQ(rc, JSONUTIL_SUCCESS);
-    auto& rs = selector.getResultSet();
+    auto &rs = selector.getResultSet();
     EXPECT_EQ(rs.size(), 1);
     EXPECT_EQ(rs[0].first->GetInt(), 300);
 
     rc = selector.getValues(*d1, "$..[?(@[\"my key\"]==$[\"key'for'key\"])].weight");
     EXPECT_EQ(rc, JSONUTIL_SUCCESS);
-    auto& rs2 = selector.getResultSet();
+    auto &rs2 = selector.getResultSet();
     EXPECT_EQ(rs2.size(), 1);
     EXPECT_EQ(rs2[0].first->GetInt(), 300);
 
     rc = selector.getValues(*d1, "$..[?(@[\"my key\"]==$[\"key\\\"for\\\"key\"])].weight");
     EXPECT_EQ(rc, JSONUTIL_SUCCESS);
-    auto& rs3 = selector.getResultSet();
+    auto &rs3 = selector.getResultSet();
     EXPECT_EQ(rs3.size(), 1);
     EXPECT_EQ(rs3[0].first->GetInt(), 300);
 
     rc = selector.getValues(*d1, "$..[?(@[\"my key\"]==$[\"key for key\"])].weight");
     EXPECT_EQ(rc, JSONUTIL_SUCCESS);
-    auto& rs4 = selector.getResultSet();
+    auto &rs4 = selector.getResultSet();
     EXPECT_EQ(rs4.size(), 1);
     EXPECT_EQ(rs4[0].first->GetInt(), 300);
 
     rc = selector.getValues(*d1, "$..[?($[\"key for key\"]==@[\"my key\"])].weight");
     EXPECT_EQ(rc, JSONUTIL_SUCCESS);
-    auto& rs5 = selector.getResultSet();
+    auto &rs5 = selector.getResultSet();
     EXPECT_EQ(rs5.size(), 1);
     EXPECT_EQ(rs5[0].first->GetInt(), 300);
 
     rc = selector.getValues(*d1, "$..[?(@[\"poquo value\"]=='\"')].weight");
     EXPECT_EQ(rc, JSONUTIL_SUCCESS);
-    auto& rs6 = selector.getResultSet();
+    auto &rs6 = selector.getResultSet();
     EXPECT_EQ(rs6.size(), 1);
     EXPECT_EQ(rs6[0].first->GetInt(), 300);
 
     rc = selector.getValues(*d1, "$..[?(@[\"poquo value\"]==\"'\")].weight");
     EXPECT_EQ(rc, JSONUTIL_SUCCESS);
-    auto& rs7 = selector.getResultSet();
+    auto &rs7 = selector.getResultSet();
     EXPECT_EQ(rs7.size(), 1);
     EXPECT_EQ(rs7[0].first->GetInt(), 400);
 
     rc = selector.getValues(*d1, "$..[?(@[\"poquo value\"]=='\\\'')].weight");
     EXPECT_EQ(rc, JSONUTIL_SUCCESS);
-    auto& rs8 = selector.getResultSet();
+    auto &rs8 = selector.getResultSet();
     EXPECT_EQ(rs8.size(), 1);
     EXPECT_EQ(rs8[0].first->GetInt(), 400);
 
@@ -1071,11 +1076,12 @@ TEST_F(SelectorTest, test_deep_recursive_update4) {
 }
 
 TEST_F(SelectorTest, test_filter_on_object) {
-    const char *input = "{\"an object\" : {\n"
-                        "  \"weight\"  : 300,\n"
-                        "  \"a value\" : 300,\n"
-                        "  \"my key\"  : \"key inside here\"\n"
-                        "}}";
+    const char *input =
+        "{\"an object\" : {\n"
+        "  \"weight\"  : 300,\n"
+        "  \"a value\" : 300,\n"
+        "  \"my key\"  : \"key inside here\"\n"
+        "}}";
     JDocument *d1;
     JsonUtilCode rc = dom_parse(nullptr, input, strlen(input), &d1);
     EXPECT_EQ(rc, JSONUTIL_SUCCESS);
@@ -1094,28 +1100,29 @@ TEST_F(SelectorTest, test_filter_on_object) {
 }
 
 TEST_F(SelectorTest, test_filter_string_comparison) {
-    const char *input = "{\"objects\": ["
-                        "    {"
-                        "       \"weight\"  : 100,"
-                        "       \"a value\" : 100,"
-                        "       \"my key\"  : \"key inside here\""
-                        "    },"
-                        "    {"
-                        "       \"weight\"  : 200,"
-                        "       \"a value\" : 200,"
-                        "       \"my key\"  : \"key inside there\""
-                        "    },"
-                        "    {"
-                        "       \"weight\"  : 300,"
-                        "       \"a value\" : 300,"
-                        "       \"my key\"  : \"key inside here\""
-                        "    },"
-                        "    {"
-                        "       \"weight\"  : 400,"
-                        "       \"a value\" : 400,"
-                        "       \"my key\"  : \"key inside there\""
-                        "    }"
-                        "]}";
+    const char *input =
+        "{\"objects\": ["
+        "    {"
+        "       \"weight\"  : 100,"
+        "       \"a value\" : 100,"
+        "       \"my key\"  : \"key inside here\""
+        "    },"
+        "    {"
+        "       \"weight\"  : 200,"
+        "       \"a value\" : 200,"
+        "       \"my key\"  : \"key inside there\""
+        "    },"
+        "    {"
+        "       \"weight\"  : 300,"
+        "       \"a value\" : 300,"
+        "       \"my key\"  : \"key inside here\""
+        "    },"
+        "    {"
+        "       \"weight\"  : 400,"
+        "       \"a value\" : 400,"
+        "       \"my key\"  : \"key inside there\""
+        "    }"
+        "]}";
     JDocument *d1;
     JsonUtilCode rc = dom_parse(nullptr, input, strlen(input), &d1);
     EXPECT_EQ(rc, JSONUTIL_SUCCESS);
@@ -1179,14 +1186,16 @@ TEST_F(SelectorTest, test_malformed_jsonpath) {
 
 TEST_F(SelectorTest, test_escaped_controlCharacters) {
     // escaped backslashes, quotes and control characters
-    const char *input = "{\"a\\\\a\":1, \"b\\tb\":2, \"c\\nc\":3, \"d\\rd\":4, \"e\\be\":5,"
-                        " \"f\\\"f\": 6, \"g g\": 7, \"\": 8, \"\'\":9}";
+    const char *input =
+        "{\"a\\\\a\":1, \"b\\tb\":2, \"c\\nc\":3, \"d\\rd\":4, \"e\\be\":5,"
+        " \"f\\\"f\": 6, \"g g\": 7, \"\": 8, \"\'\":9}";
     JDocument *d1;
     JsonUtilCode rc = dom_parse(nullptr, input, strlen(input), &d1);
     EXPECT_EQ(rc, JSONUTIL_SUCCESS);
 
     Selector selector;
-    rc = selector.getValues(*d1, "$.[\"a\\\\a\",\"b\\tb\",\"c\\nc\",\"d\\rd\","
+    rc = selector.getValues(*d1,
+                            "$.[\"a\\\\a\",\"b\\tb\",\"c\\nc\",\"d\\rd\","
                             "\"e\\be\",\"f\\\"f\",\"g g\",\"\",\"\'\"]");
     EXPECT_EQ(rc, JSONUTIL_SUCCESS);
     auto &rs = selector.getResultSet();
@@ -1201,8 +1210,9 @@ TEST_F(SelectorTest, test_escaped_controlCharacters) {
     EXPECT_EQ(rs[7].first->GetInt(), 8);
     EXPECT_EQ(rs[8].first->GetInt(), 9);
 
-    input = "{\"value_1\": {\"value\" : 10, \"key\": \"linebreak\\n\"}, \"value_2\" : "
-            "{\"value\" : 20, \"key\" : \"nolinebreak\"}}";
+    input =
+        "{\"value_1\": {\"value\" : 10, \"key\": \"linebreak\\n\"}, \"value_2\" : "
+        "{\"value\" : 20, \"key\" : \"nolinebreak\"}}";
     JDocument *d2;
     rc = dom_parse(nullptr, input, strlen(input), &d2);
     EXPECT_EQ(rc, JSONUTIL_SUCCESS);
@@ -1309,7 +1319,7 @@ TEST_F(SelectorTest, test_delete_insert) {
     Selector selector;
     rc = selector.getValues(*d1, "$.a.b.*");
     EXPECT_EQ(rc, JSONUTIL_SUCCESS);
-    auto& rs1 = selector.getResultSet();
+    auto &rs1 = selector.getResultSet();
     EXPECT_EQ(rs1.size(), 3);
 
     // delete
@@ -1317,7 +1327,7 @@ TEST_F(SelectorTest, test_delete_insert) {
     EXPECT_EQ(rc, JSONUTIL_SUCCESS);
     EXPECT_EQ(num_vals_deleted, 3);
 
-    for (int i=0; i < 10; i++) {
+    for (int i = 0; i < 10; i++) {
         // insert
         rc = dom_set_value(nullptr, d1, "$[\"a\"][\"b\"][\"c\"]", "\"good afternoon\"");
         EXPECT_EQ(rc, JSONUTIL_SUCCESS);
@@ -1331,7 +1341,7 @@ TEST_F(SelectorTest, test_delete_insert) {
     // get
     rc = selector.getValues(*d1, "$.a.b");
     EXPECT_EQ(rc, JSONUTIL_SUCCESS);
-    auto& rs = selector.getResultSet();
+    auto &rs = selector.getResultSet();
     EXPECT_EQ(rs.size(), 1);
     EXPECT_EQ(rs[0].first->MemberCount(), 0);
 

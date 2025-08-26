@@ -1,7 +1,7 @@
 #ifndef VALKEYJSONMODULE_JSON_H_
 #define VALKEYJSONMODULE_JSON_H_
 
-#include <stddef.h>
+#include <cstddef>
 
 size_t json_get_max_document_size();
 size_t json_get_defrag_threshold();

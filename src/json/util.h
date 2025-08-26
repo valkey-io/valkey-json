@@ -17,7 +17,7 @@ extern "C" {
 #include <./include/valkeymodule.h>
 }
 
-typedef enum {
+enum JsonUtilCode {
     JSONUTIL_SUCCESS = 0,
     JSONUTIL_WRONG_NUM_ARGS,
     JSONUTIL_JSON_PARSE_ERROR,
@@ -65,16 +65,16 @@ typedef enum {
     JSONUTIL_ALLOCATION_FAILURE,
     JSONUTIL_KEY_OPEN_ERROR,
     JSONUTIL_LAST
-} JsonUtilCode;
+};
 
-typedef struct {
+struct PrintFormat  {
     const char *newline;
     const char *space;
     const char *indent;
-} PrintFormat;
+};
 
 /* Enums for buffer sizes used in conversion of double to json or double to rapidjson */
-enum { BUF_SIZE_DOUBLE_JSON = 32, BUF_SIZE_DOUBLE_RAPID_JSON = 25};
+enum { BUF_SIZE_DOUBLE_JSON = 32, BUF_SIZE_DOUBLE_RAPID_JSON = 25 };
 
 /* Get message for a given code. */
 const char *jsonutil_code_to_message(JsonUtilCode code);
@@ -87,7 +87,7 @@ size_t jsonutil_double_to_string(const double val, char *double_to_string_buf, s
 /**
  * Convert double to string using the same format as RapidJSON's Writer::WriteDouble does.
  */
-size_t jsonutil_double_to_string_rapidjson(const double val, char* double_to_string_buf_rapidjson, size_t len);
+size_t jsonutil_double_to_string_rapidjson(const double val, char *double_to_string_buf_rapidjson, size_t len);
 
 /* Check if a double value is int64.
  * If the given double does not equal an integer (int64), return false.
