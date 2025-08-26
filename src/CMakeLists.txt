@@ -36,6 +36,7 @@ target_sources(${OBJECT_TARGET}
 	json/keytable.cc
 	json/memory.cc
 	json/json_api.cc
+	json/shared_api.cc
 )
 
 add_library(${JSON_MODULE_LIB} SHARED $<TARGET_OBJECTS:${OBJECT_TARGET}>)

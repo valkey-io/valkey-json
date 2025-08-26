@@ -1,6 +1,9 @@
 #ifndef VALKEYJSONMODULE_JSON_H_
 #define VALKEYJSONMODULE_JSON_H_
 
+#include "./include/valkeymodule.h"
+#include "json/util.h"
+
 #include <stddef.h>
 
 size_t json_get_max_document_size();
@@ -16,6 +19,8 @@ bool json_is_instrument_enabled_delete();
 bool json_is_instrument_enabled_dump_doc_before();
 bool json_is_instrument_enabled_dump_doc_after();
 bool json_is_instrument_enabled_dump_value_before_delete();
+
+JsonUtilCode verify_open_doc_key(ValkeyModuleKey *key);
 
 #define DOUBLE_CHARS_CUTOFF 24
 
