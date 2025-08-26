@@ -4213,7 +4213,7 @@ class TestJsonBasic(JsonTestCase):
         cmd_arity = [('MEMORY', -3), ('FIELDS', -3), ('DEPTH', 3), ('HELP', 2),
                      ('MAX-DEPTH-KEY', 2), ('MAX-SIZE-KEY',
                                             2), ('KEYTABLE-CHECK', 2), ('KEYTABLE-CORRUPT', 3),
-                     ('KEYTABLE-DISTRIBUTION', 3)]
+                     ('KEYTABLE-DISTRIBUTION', 3), ('TEST-SHARED-API', 3)]
         subcmd_dict = {f'JSON.DEBUG|{cmd}': arity for cmd, arity in cmd_arity}
 
         output = client.execute_command(
