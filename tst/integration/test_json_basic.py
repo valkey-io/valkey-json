@@ -4349,6 +4349,7 @@ class TestJsonBasic(JsonTestCase):
         '''
         client = self.server.get_new_client()
         client.execute_command("json.set", "k1", ".", DATA)
+        print(client.execute_command("json.debug","help"))
         for path in ["$.0", "$.1", "$.2", "$.3", "$.4", "$.5", "$5.0", "$5.1"]:
             g = client.execute_command("json.get", "k1", path)
             s = client.execute_command("json.debug", "test-shared-api", "k1", path)
