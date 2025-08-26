@@ -17,7 +17,7 @@
 //
 // Errors:
 //
-//   If the key isn't JSON, then you'll get REDISMODULE_ERR for the return.
+//   If the key isn't JSON, then you'll get VALKEYMODULE_ERR for the return.
 //   If the key is JSON, but the path doesn't identify anything, then you'll get a nullptr for the result.
 //   Otherwise you get the JSON text that matches the path.
 //

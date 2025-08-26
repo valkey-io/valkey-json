@@ -2051,6 +2051,35 @@ STATIC int reply_debug_memory_fields(jsn::vector<size_t> &vec, const bool is_v2_
     }
 }
 
+//
+// Provide testing for the SharedAPI interface.
+//
+// JSON.DEBUG TEST-SHARED-API <key> <path>
+//
+// Returns the fetched string
+// 
+STATIC int TestSharedApi(ValkeyModuleCtx *ctx, ValkeyModuleString **argv, int argc) {
+    if (argc != 4) {
+        ValkeyModule_WrongArity(ctx);
+        return VALKEYMODULE_OK;
+    }
+    auto key = ValkeyModule_OpenKey(ctx, argv[2], VALKEYMODULE_READ);
+    if (!key) {
+        ValkeyModule_ReplyWithError(ctx, "Unknown key");
+        return VALKEYMODULE_OK;
+    }
+    ValkeyModuleString *result;
+    SharedJSON_Get(key, ValkeyModule_StringPtrLen(argv[3], nullptr), &result);
+    if (result) {
+        ValkeyModule_ReplyWithString(ctx, result);
+        ValkeyModule_FreeString(ctx, result);
+    } else {
+        ValkeyModule_ReplyWithError(ctx, "Invalid Path");
+    }
+    ValkeyModule_CloseKey(key);
+    return VALKEYMODULE_OK;
+}
+
 int Command_JsonDebug(ValkeyModuleCtx *ctx, ValkeyModuleString **argv, int argc) {
     ValkeyModule_AutoMemory(ctx);
 
@@ -2221,6 +2250,17 @@ int Command_JsonDebug(ValkeyModuleCtx *ctx, ValkeyModuleString **argv, int argc)
             ValkeyModule_ReplyWithLongLong(ctx, it->second);
         }
         return VALKEYMODULE_OK;
+    } else if (!strcasecmp(subcmd, "TEST-SHARED-API")) {
+        // Testing for SharedAPI Interface
+        if (ValkeyModule_IsKeysPositionRequest(ctx)) {
+            if (argc < 3) {
+                return VALKEYMODULE_ERR;
+            } else {
+                ValkeyModule_KeyAtPos(ctx, 2);
+                return VALKEYMODULE_OK;
+            }
+        }
+        return TestSharedApi(ctx, argv, argc);
     } else if (!strcasecmp(subcmd, "HELP")) {
         if (ValkeyModule_IsKeysPositionRequest(ctx)) {
             return VALKEYMODULE_ERR;
@@ -2243,6 +2283,7 @@ int Command_JsonDebug(ValkeyModuleCtx *ctx, ValkeyModuleString **argv, int argc)
         cmds.push_back("JSON.DEBUG KEYTABLE-CHECK - Extended KeyTable integrity check");
         cmds.push_back("JSON.DEBUG KEYTABLE-CORRUPT <name> - Intentionally corrupt KeyTable handle counts");
         cmds.push_back("JSON.DEBUG KEYTABLE-DISTRIBUTION <topN> - Find and count topN longest runs in KeyTable");
+        cmds.push_back("JSON.DEBUG TEST-SHARED-API <key> <path> - Provide testing for Shared api interface for search");
 
         ValkeyModule_ReplyWithArray(ctx, cmds.size());
         for (auto& s : cmds) ValkeyModule_ReplyWithSimpleString(ctx, s.c_str());
