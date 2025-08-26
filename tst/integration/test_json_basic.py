@@ -4351,6 +4351,6 @@ class TestJsonBasic(JsonTestCase):
         client.execute_command("json.set", "k1", ".", DATA)
         for path in ["$.0", "$.1", "$.2", "$.3", "$.4", "$.5", "$5.0", "$5.1"]:
             g = client.execute_command("json.get","k1",path)
-            s = client.execute_command("ft.debug test-shared-api k1 ", path)
+            s = client.execute_command("json.debug test-shared-api k1 ", path)
             print("For Path:", path, " json.get:", g, " shared-api:", s)
             assert (g == s)
