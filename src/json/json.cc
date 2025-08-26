@@ -2068,7 +2068,7 @@ STATIC int TestSharedApi(ValkeyModuleCtx *ctx, ValkeyModuleString **argv, int ar
         ValkeyModule_ReplyWithError(ctx, "Unknown key");
         return VALKEYMODULE_OK;
     }
-    ValkeyModuleString *result;
+    ValkeyModuleString *result = nullptr;
     SharedJSON_Get(key, ValkeyModule_StringPtrLen(argv[3], nullptr), &result);
     if (result) {
         ValkeyModule_ReplyWithString(ctx, result);
@@ -2960,6 +2960,10 @@ extern "C" int ValkeyModule_OnLoad(ValkeyModuleCtx *ctx) {
     if (ValkeyModule_CreateSubcommand(parent, "KEYTABLE-DISTRIBUTION", Command_JsonDebug, "", 0, 0, 0)
         == VALKEYMODULE_ERR) {
         ValkeyModule_Log(ctx, "warning", "Failed to create subcommand KEYTABLE-DISTRIBUTION for command JSON.DEBUG.");
+        return VALKEYMODULE_ERR;
+    }
+    if (ValkeyModule_CreateSubcommand(parent, "TEST-SHARED-API", Command_JsonDebug, "", 2, 2, 1) == VALKEYMODULE_ERR) {
+        ValkeyModule_Log(ctx, "warning", "Failed to create subcommand TEST_SHARED-API for command JSON.DEBUG.");
         return VALKEYMODULE_ERR;
     }
 
