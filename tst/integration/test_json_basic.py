@@ -4336,7 +4336,7 @@ class TestJsonBasic(JsonTestCase):
         exp = "{\"a\":4.5,\"b/c\":9}"
         assert exp.encode() == client.execute_command("json.get", "k1")
 
-    def json_test_shared_api(self):
+    def test_json_shared_api(self):
         DATA = '''
         {
             "0": 0,
