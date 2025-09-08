@@ -10,7 +10,7 @@
  * Design Considerations:
  * 1. All JSON CRUD operations should be delegated to the DOM module.
  * 2. Shared utility/helper code should reside in the UTIL module.
- * 3. When invoking a DOM or UTIL method tha returns a heap-allocated object, the caller must release the memory
+ * 3. When invoking a DOM or UTIL method the returns a heap-allocated object, the caller must release the memory
  *    after consuming it.
  * 4. The first line of every command handler should be: "ValkeyModule_AutoMemory(ctx);". This is for enabling
  *    auto memory management for the command.
@@ -27,18 +27,16 @@
  *    helper structs named as XXXCmdsArgs, and helper methods named as parseXXXCmdArgs, where XXX is command name.
  */
 
-#include "json/json.h"
 #include "json/dom.h"
-#include "json/rapidjson_includes.h"
-#include "json/alloc.h"
 #include "json/stats.h"
 #include "json/memory.h"
+#include "json/shared_api.h"
 #include "./include/valkeymodule.h"
+
 #include <string>
-#include <memory>
 #include <cmath>
 
-#define MODULE_VERSION 10010
+#define MODULE_VERSION 10002 /* version 1.0.2 */
 #define MODULE_NAME "json"
 /* The release stage is used in order to provide release status information.
  * In unstable branch the status is always "dev".
@@ -170,6 +168,17 @@ bool json_is_instrument_enabled_dump_value_before_delete() {
 
 /* ============================== Helper Methods ============================== */
 
+/* Verify that an open Key is a JSON document 
+    * @param key - ValkeyModuleKey pointer.
+    * @return JSONUTIL_SUCCESS if the key is a valid document key, otherwise an error code.
+    */
+JsonUtilCode verify_open_doc_key(ValkeyModuleKey *key) {
+    if (ValkeyModule_KeyType(key) == VALKEYMODULE_KEYTYPE_EMPTY) return JSONUTIL_DOCUMENT_KEY_NOT_FOUND;
+    if (ValkeyModule_ModuleTypeGetType(key) != DocumentType) return JSONUTIL_NOT_A_DOCUMENT_KEY;
+    return JSONUTIL_SUCCESS;
+}
+
+
 /* Verify that the document key exists and is a document key.
  * @param key - OUTPUT parameter, pointer to ValkeyModuleKey pointer.
  */
@@ -177,9 +186,7 @@ STATIC JsonUtilCode verify_doc_key(ValkeyModuleCtx *ctx, ValkeyModuleString *rmK
                                                                                      bool readOnly = false) {
     *key = static_cast<ValkeyModuleKey*>(ValkeyModule_OpenKey(ctx, rmKey,
                                         readOnly?  VALKEYMODULE_READ : VALKEYMODULE_READ | VALKEYMODULE_WRITE));
-    if (ValkeyModule_KeyType(*key) == VALKEYMODULE_KEYTYPE_EMPTY) return JSONUTIL_DOCUMENT_KEY_NOT_FOUND;
-    if (ValkeyModule_ModuleTypeGetType(*key) != DocumentType) return JSONUTIL_NOT_A_DOCUMENT_KEY;
-    return JSONUTIL_SUCCESS;
+    return verify_open_doc_key(*key);                                        
 }
 
 /* Fetch JSON at a single path.
@@ -1508,7 +1515,7 @@ STATIC void reply_arrpop(jsn::vector<rapidjson::StringBuffer> &vec, const bool i
     if (!is_v2_path) {
         // Legacy path: return a single value, which is the first value.
         for (auto it = vec.begin(); it != vec.end(); it++) {
-            if (it->GetLength() != 0) {  // emtpy indicates empty array or wrong type
+            if (it->GetLength() != 0) {  // empty indicates empty array or wrong type
                 ValkeyModule_ReplyWithStringBuffer(ctx, it->GetString(), it->GetLength());
                 return;
             }
@@ -1518,7 +1525,7 @@ STATIC void reply_arrpop(jsn::vector<rapidjson::StringBuffer> &vec, const bool i
         // JSONPath: return an array of lengths.
         ValkeyModule_ReplyWithArray(ctx, vec.size());
         for (auto it = vec.begin(); it != vec.end(); it++) {
-            if (it->GetLength() == 0) {  // emtpy indicates empty array or wrong type
+            if (it->GetLength() == 0) {  // empty indicates empty array or wrong type
                 ValkeyModule_ReplyWithNull(ctx);
             } else {
                 ValkeyModule_ReplyWithStringBuffer(ctx, it->GetString(), it->GetLength());
@@ -2043,6 +2050,35 @@ STATIC int reply_debug_memory_fields(jsn::vector<size_t> &vec, const bool is_v2_
     }
 }
 
+//
+// Provide testing for the SharedAPI interface.
+//
+// JSON.DEBUG TEST-SHARED-API <key> <path>
+//
+// Returns the fetched string
+// 
+STATIC int TestSharedApi(ValkeyModuleCtx *ctx, ValkeyModuleString **argv, int argc) {
+    if (argc != 4) {
+        ValkeyModule_WrongArity(ctx);
+        return VALKEYMODULE_OK;
+    }
+    auto key = ValkeyModule_OpenKey(ctx, argv[2], VALKEYMODULE_READ);
+    if (!key) {
+        ValkeyModule_ReplyWithError(ctx, "Unknown key");
+        return VALKEYMODULE_OK;
+    }
+    ValkeyModuleString *result = nullptr;
+    SharedJSON_Get(key, ValkeyModule_StringPtrLen(argv[3], nullptr), &result);
+    if (result) {
+        ValkeyModule_ReplyWithString(ctx, result);
+        ValkeyModule_FreeString(ctx, result);
+    } else {
+        ValkeyModule_ReplyWithError(ctx, "Invalid Path");
+    }
+    ValkeyModule_CloseKey(key);
+    return VALKEYMODULE_OK;
+}
+
 int Command_JsonDebug(ValkeyModuleCtx *ctx, ValkeyModuleString **argv, int argc) {
     ValkeyModule_AutoMemory(ctx);
 
@@ -2213,6 +2249,17 @@ int Command_JsonDebug(ValkeyModuleCtx *ctx, ValkeyModuleString **argv, int argc)
             ValkeyModule_ReplyWithLongLong(ctx, it->second);
         }
         return VALKEYMODULE_OK;
+    } else if (!strcasecmp(subcmd, "TEST-SHARED-API")) {
+        // Testing for SharedAPI Interface
+        if (ValkeyModule_IsKeysPositionRequest(ctx)) {
+            if (argc < 3) {
+                return VALKEYMODULE_ERR;
+            } else {
+                ValkeyModule_KeyAtPos(ctx, 2);
+                return VALKEYMODULE_OK;
+            }
+        }
+        return TestSharedApi(ctx, argv, argc);
     } else if (!strcasecmp(subcmd, "HELP")) {
         if (ValkeyModule_IsKeysPositionRequest(ctx)) {
             return VALKEYMODULE_ERR;
@@ -2235,6 +2282,7 @@ int Command_JsonDebug(ValkeyModuleCtx *ctx, ValkeyModuleString **argv, int argc)
         cmds.push_back("JSON.DEBUG KEYTABLE-CHECK - Extended KeyTable integrity check");
         cmds.push_back("JSON.DEBUG KEYTABLE-CORRUPT <name> - Intentionally corrupt KeyTable handle counts");
         cmds.push_back("JSON.DEBUG KEYTABLE-DISTRIBUTION <topN> - Find and count topN longest runs in KeyTable");
+        cmds.push_back("JSON.DEBUG TEST-SHARED-API <key> <path> - Provide testing for Shared api interface for search");
 
         ValkeyModule_ReplyWithArray(ctx, cmds.size());
         for (auto& s : cmds) ValkeyModule_ReplyWithSimpleString(ctx, s.c_str());
@@ -2913,6 +2961,10 @@ extern "C" int ValkeyModule_OnLoad(ValkeyModuleCtx *ctx) {
         ValkeyModule_Log(ctx, "warning", "Failed to create subcommand KEYTABLE-DISTRIBUTION for command JSON.DEBUG.");
         return VALKEYMODULE_ERR;
     }
+    if (ValkeyModule_CreateSubcommand(parent, "TEST-SHARED-API", Command_JsonDebug, "", 2, 2, 1) == VALKEYMODULE_ERR) {
+        ValkeyModule_Log(ctx, "warning", "Failed to create subcommand TEST_SHARED-API for command JSON.DEBUG.");
+        return VALKEYMODULE_ERR;
+    }
 
     // key-spec flags categories
     const uint64_t ks_read_write_update = VALKEYMODULE_CMD_KEY_RW | VALKEYMODULE_CMD_KEY_UPDATE;
@@ -3034,6 +3086,8 @@ extern "C" int ValkeyModule_OnLoad(ValkeyModuleCtx *ctx) {
 
     // Register module configs
     if (registerModuleConfigs(ctx) == VALKEYMODULE_ERR) return VALKEYMODULE_ERR;
+
+    SharedAPI_Register(ctx);
 
     return VALKEYMODULE_OK;
 }

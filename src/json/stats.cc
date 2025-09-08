@@ -21,7 +21,7 @@ static pthread_key_t thread_local_mem_counter_key;
  * Use atomic integers due to possible multi-threading execution of rdb_load and
  * also the overhead of atomic operations are negligible.
  */
-typedef struct {
+typedef struct _JsonStats {
     std::atomic_ullong used_mem;  // global used memory counter
     std::atomic_ullong num_doc_keys;
     std::atomic_ullong max_depth_ever_seen;

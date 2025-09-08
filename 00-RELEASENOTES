@@ -1,6 +1,14 @@
 Valkey JSON 1.0 release notes
 ========================
 ================================================================================
+Valkey JSON 1.0.2 - Released Mon 8 September 2025
+================================================================================
+* Support building valkey-json on Clang/Apple (#69)
+* Workdflow to automatically trigger valkey-bundle release (#64)
+* Allow testing on external container server (#70)
+* Implement SharedAPI interface that mimics JSON.GET (#71)
+
+================================================================================
 Valkey JSON 1.0.1 - Released Thu 19 June 2025
 ================================================================================
 Improvements in the build script

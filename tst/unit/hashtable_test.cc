@@ -73,7 +73,7 @@ static JValue makeArray(size_t sz, size_t offset = 0) {
     JValue j;
     j.SetArray();
     for (size_t i = 0; i < sz; ++i) {
-        j.PushBack(JValue(i + offset), allocator);
+        j.PushBack(JValue(static_cast<uint64_t>(i + offset)), allocator);
     }
     return j;
 }
