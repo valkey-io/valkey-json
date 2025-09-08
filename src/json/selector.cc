@@ -588,7 +588,7 @@ void Lexer::unescape(const std::string_view &input, jsn::stringstream &ss) {
                         // output the internal representation of the control character
                         ss << ctrlChars[ptr - ctrlChar_2ndPart];
                     } else {
-                        // This blackslash does not represent an escaped control character.
+                        // This backslash does not represent an escaped control character.
                         ss << input[i];
                     }
                 }

@@ -916,7 +916,7 @@ public:
     /*!
         \param a An array obtained by \c GetArray().
         \note \c Array is always pass-by-value.
-        \note the source array is moved into this value and the sourec array becomes empty.
+        \note the source array is moved into this value and the source array becomes empty.
     */
     GenericValue(Array a) RAPIDJSON_NOEXCEPT : data_(a.value_.data_) {
         a.value_.data_ = Data();
@@ -1749,7 +1749,7 @@ public:
     /*! This function do not deallocate memory in the array, i.e. the capacity is unchanged.
         \note Linear time complexity.
     */
-    void Clear(Allocator &allocator) {
+    void Clear([[maybe_unused]] Allocator &allocator) {
         GenericValue* e = GetElementsPointer();
         for (GenericValue* v = e; v != e + data_.a.size; ++v)
             v->~GenericValue();
@@ -1859,7 +1859,7 @@ public:
     /*!
         \note Constant time complexity.
     */
-    GenericValue& PopBack(Allocator& allocator) {
+    GenericValue& PopBack([[maybe_unused]] Allocator& allocator) {
         RAPIDJSON_ASSERT(!Empty());
         GetElementsPointer()[--data_.a.size].~GenericValue();
         return *this;
@@ -2614,7 +2614,7 @@ private:
         //
         // Move the members from the copy into the new hashtable
         //
-        size_t object_member_count = 0;
+        [[maybe_unused]] size_t object_member_count = 0;
         size_t object_num_member_chars = 0;
         for (MemberIterator i = me.MemberBegin(); i != me.MemberEnd(); ++i) {
             object_member_count += 1;

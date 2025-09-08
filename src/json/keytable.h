@@ -161,7 +161,7 @@ struct KeyTable_Layout {
 
  protected:
     KeyTable_Layout();               // Nobody gets to create one.
-    friend class KeyTable_Shard;     // Only class allowed to manipulate reference count
+    friend struct KeyTable_Shard;    // Only class allowed to manipulate reference count
     bool incrRefCount() const;       // true => saturated
     size_t decrRefCount() const;     // returns current count
     size_t original_hash;            // Remember original hash
@@ -233,7 +233,7 @@ struct KeyTable_Handle {
     }
 
  private:
-    friend class KeyTable;
+    friend struct KeyTable;
     friend struct KeyTable_Shard;
 
     KeyTable_Handle(KeyTable_Layout *ptr, size_t hashCode) : theHandle(ptr, hashCode) {}
@@ -369,7 +369,7 @@ struct KeyTable {
     size_t getNumShards() const { return numShards; }
 
  private:
-    friend class KeyTable_Shard;
+    friend struct KeyTable_Shard;
     size_t shardNumberFromHash(size_t hash);
     size_t hashcodeFromHash(size_t hash);
     KeyTable_Shard* shards;

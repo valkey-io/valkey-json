@@ -3,6 +3,8 @@ cmake_minimum_required(VERSION 3.17)
 include(FetchContent)
 include(ExternalProject)
 
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+
 # Detect the system architecture
 EXECUTE_PROCESS(
     COMMAND uname -m
@@ -10,14 +12,43 @@ EXECUTE_PROCESS(
     OUTPUT_VARIABLE ARCHITECTURE
 )
 
-if("${ARCHITECTURE}" STREQUAL "x86_64" OR "${ARCHITECTURE}" STREQUAL "aarch64")
+if("${ARCHITECTURE}" STREQUAL "x86_64"
+   OR "${ARCHITECTURE}" STREQUAL "aarch64"
+   OR "${ARCHITECTURE}" STREQUAL "arm64")
     message("Building valkey-json for ${ARCHITECTURE}")
 else()
-    message(FATAL_ERROR "Unsupported architecture: ${ARCHITECTURE}. valkey-json is only supported on x86_64 and aarch64.")
+    message(
+        FATAL_ERROR
+            "Unsupported architecture: ${ARCHITECTURE}. valkey-json is only supported on x86_64, aarch64 and arm64"
+    )
 endif()
 
 # Project definition
 project(ValkeyJSONModule VERSION 1.0.1 LANGUAGES C CXX)
+
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-mismatched-tags -Wno-format")
+
+# Clang related adjustments
+set(COMPILER_IS_CLANG OFF)
+if (${CMAKE_C_COMPILER_ID} STREQUAL "Clang" OR ${CMAKE_C_COMPILER_ID} STREQUAL "AppleClang")
+    set(COMPILER_IS_CLANG ON)
+endif()
+
+if (COMPILER_IS_CLANG)
+    message(STATUS "Defining VALKEYMODULE_ATTR_COMMON => __attribute__((weak))")
+    add_definitions(-DVALKEYMODULE_ATTR_COMMON=__attribute__\(\(weak\)\))
+endif()
+
+if(APPLE AND NOT COMPILER_IS_CLANG)
+    # Force clang compiler on macOS
+    find_program(CLANGPP "clang++")
+    find_program(CLANG "clang")
+    if(CLANG AND CLANGPP)
+          message(STATUS "Found ${CLANGPP}, ${CLANG}")
+          set(CMAKE_CXX_COMPILER ${CLANGPP})
+          set(CMAKE_C_COMPILER ${CLANG})
+    endif()
+endif()
 
 # ASAN build option
 option(ENABLE_ASAN "Enable Address Sanitizer" OFF)

@@ -1,0 +1,21 @@
+# See https://github.com/crate-ci/typos/blob/master/docs/reference.md to configure typos
+
+[files]
+extend-exclude = [
+    ".git/",
+    "deps/",
+    "tst/",
+    "build/",
+    "cmake-build-debug/",
+    "rapidjson/",
+    "CMakeLists.txt"
+]
+
+[default.extend-words]
+Valkey = "Valkey"
+valkey = "valkey"
+threadsave = "threadsave"
+
+[default.extend-identifiers]
+ctrlChar_2ndPart = "ctrlChar_2ndPart"
+INSERTs = "INSERTs"
