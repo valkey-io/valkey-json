@@ -36,7 +36,7 @@
 #include <string>
 #include <cmath>
 
-#define MODULE_VERSION 10010
+#define MODULE_VERSION 10002 /* version 1.0.2 */
 #define MODULE_NAME "json"
 /* The release stage is used in order to provide release status information.
  * In unstable branch the status is always "dev".

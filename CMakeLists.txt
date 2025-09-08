@@ -24,7 +24,7 @@ else()
 endif()
 
 # Project definition
-project(ValkeyJSONModule VERSION 1.0.1 LANGUAGES C CXX)
+project(ValkeyJSONModule VERSION 1.0.2 LANGUAGES C CXX)
 
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-mismatched-tags -Wno-format")
 
