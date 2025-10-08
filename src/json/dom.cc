@@ -1513,7 +1513,7 @@ JValue rdbLoadJValue(load_params *params) {
             return array;
         }
         default:
-            ValkeyModule_LogIOError(params->rdb, "error", "Invalid metadata code %llx", code);
+            ValkeyModule_LogIOError(params->rdb, "error", "Invalid metadata code %lx", code);
             params->status = JSONUTIL_INVALID_RDB_FORMAT;
             return JValue();
     }
