@@ -302,7 +302,7 @@ struct KeyTable_Shard {
         if (duration == 0) duration = 1;
         uint64_t keys_per_second = (size / duration) * 1000;
         ValkeyModule_Log(nullptr, "notice",
-                        "Keytable Resize to %zu completed in %llu ms (%llu / sec)",
+                        "Keytable Resize to %zu completed in %lu ms (%lu / sec)",
                         capacity, duration, keys_per_second);
     }
 
