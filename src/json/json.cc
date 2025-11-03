@@ -2669,8 +2669,9 @@ extern "C" int ValkeyModule_OnLoad(ValkeyModuleCtx *ctx) {
         return VALKEYMODULE_ERR;
     }
 
-    // Indicate that we can handle I/O errors ourself.
-    ValkeyModule_SetModuleOptions(ctx, VALKEYMODULE_OPTIONS_HANDLE_IO_ERRORS);
+    // Indicate that we can handle I/O errors ourself and repl async load.
+    // https://valkey.io/topics/modules-api-ref/#ValkeyModule_SetModuleOptions
+    ValkeyModule_SetModuleOptions(ctx, VALKEYMODULE_OPTIONS_HANDLE_IO_ERRORS | VALKEYMODULE_OPTIONS_HANDLE_REPL_ASYNC_LOAD);
 
     // Initialize metrics
     JsonUtilCode rc = jsonstats_init();
