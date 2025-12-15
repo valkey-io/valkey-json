@@ -6,5 +6,5 @@ This directory contains integration tests that verify the interaction between vl
 
 ```text
 python 3.9
-pytest 4
+pytest 7.4.3
 ```

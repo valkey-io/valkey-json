@@ -1,3 +1,4 @@
 valkey
-pytest==6
+pytest==7.4.3
 pytest-html
+setuptools
