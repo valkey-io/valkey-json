@@ -10,7 +10,19 @@ jobs:
       matrix:
         server_version: ['unstable', '8.0', '8.1']
     steps:
-      - uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # v4.1.1
+      - name: Checkout valkey
+        uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # v4.1.1
+        with:
+          repository: valkey/valkey
+          ref: ${{ matrix.server_version }}
+          path: valkey
+      - name: Set VALKEY_INCLUDE_DIR
+        run: echo "VALKEY_INCLUDE_DIR=$(pwd)/valkey/src" >> $GITHUB_ENV
+      - name: Checkout valkey-json
+        uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # v4.1.1
+        with:
+          repository: valkey/valkey-json
+          path: valkey-json
       - name: Set the server version
         run: echo "SERVER_VERSION=${{ matrix.server_version }}" >> $GITHUB_ENV
       - name: Build release
