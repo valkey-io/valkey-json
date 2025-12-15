@@ -13,19 +13,24 @@ jobs:
       - name: Checkout valkey
         uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # v4.1.1
         with:
-          repository: valkey/valkey
+          repository: valkey-io/valkey
           ref: ${{ matrix.server_version }}
           path: valkey
+
       - name: Set VALKEY_INCLUDE_DIR
+        working-directory: valkey
         run: echo "VALKEY_INCLUDE_DIR=$(pwd)/valkey/src" >> $GITHUB_ENV
+
       - name: Checkout valkey-json
         uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # v4.1.1
         with:
-          repository: valkey/valkey-json
           path: valkey-json
+
       - name: Set the server version
         run: echo "SERVER_VERSION=${{ matrix.server_version }}" >> $GITHUB_ENV
+
       - name: Build release
+        working-directory: valkey-json
         run: ./build.sh
 
   unit-tests:
