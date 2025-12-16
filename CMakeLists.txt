@@ -100,39 +100,31 @@ else()
     endif()
 endif()
 
-if(VALKEY_INCLUDE_DIR)
-    if(ENABLE_UNIT_TESTS OR ENABLE_INTEGRATION_TESTS)
-        message(FATAL_ERROR "Incompatible option VALKEY_INCLUDE_DIR with ENABLE_UNIT_TESTS or ENABLE_INTEGRATION_TESTS")
-    endif()
-    file(MAKE_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/src/include")
-    file(COPY_FILE "${VALKEY_INCLUDE_DIR}/valkeymodule.h" "${CMAKE_CURRENT_SOURCE_DIR}/src/include/valkeymodule.h")
-else()
-    ExternalProject_Add(
-        valkey
-        GIT_REPOSITORY https://github.com/valkey-io/valkey.git
-        GIT_TAG ${VALKEY_VERSION}
-        PREFIX ${VALKEY_DOWNLOAD_DIR}
-        CONFIGURE_COMMAND ""
-        BUILD_COMMAND ${VALKEY_BUILD_CMD}
-        INSTALL_COMMAND ""
-        BUILD_IN_SOURCE 1
-    )
+ExternalProject_Add(
+    valkey
+    GIT_REPOSITORY https://github.com/valkey-io/valkey.git
+    GIT_TAG ${VALKEY_VERSION}
+    PREFIX ${VALKEY_DOWNLOAD_DIR}
+    CONFIGURE_COMMAND ""
+    BUILD_COMMAND ${VALKEY_BUILD_CMD}
+    INSTALL_COMMAND ""
+    BUILD_IN_SOURCE 1
+)
 
-    # Define the paths for the copied files
-    set(VALKEY_INCLUDE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/src/include")
-    set(VALKEY_BINARY_DEST "${CMAKE_CURRENT_SOURCE_DIR}/tst/integration/.build/binaries/${VALKEY_VERSION}")
+# Define the paths for the copied files
+set(VALKEY_INCLUDE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/src/include")
+set(VALKEY_BINARY_DEST "${CMAKE_CURRENT_SOURCE_DIR}/tst/integration/.build/binaries/${VALKEY_VERSION}")
 
-    ExternalProject_Add_Step(
-        valkey
-        copy_header_files
-        COMMENT "Copying header files to include/ directory"
-        DEPENDEES download
-        DEPENDERS configure
-        COMMAND ${CMAKE_COMMAND} -E make_directory ${VALKEY_INCLUDE_DIR}
-        COMMAND ${CMAKE_COMMAND} -E copy ${VALKEY_DOWNLOAD_DIR}/src/valkey/src/valkeymodule.h ${VALKEY_INCLUDE_DIR}/valkeymodule.h
-        ALWAYS 1
-    )
-endif()
+ExternalProject_Add_Step(
+    valkey
+    copy_header_files
+    COMMENT "Copying header files to include/ directory"
+    DEPENDEES download
+    DEPENDERS configure
+    COMMAND ${CMAKE_COMMAND} -E make_directory ${VALKEY_INCLUDE_DIR}
+    COMMAND ${CMAKE_COMMAND} -E copy ${VALKEY_DOWNLOAD_DIR}/src/valkey/src/valkeymodule.h ${VALKEY_INCLUDE_DIR}/valkeymodule.h
+    ALWAYS 1
+)
 
 # Integration tests require the valkey-test-framework which is only needed when
 # building Valkey from source.
@@ -210,18 +202,11 @@ message("CMAKE_C_FLAGS: ${CMAKE_C_FLAGS}")
 message("CMAKE_CXX_FLAGS: ${CMAKE_CXX_FLAGS}")
 
 # Fetch RapidJSON
-if(RAPIDJSON_SOURCE_DIR)
-    FetchContent_Declare(
-        rapidjson
-        SOURCE_DIR "${RAPIDJSON_SOURCE_DIR}"
-    )
-else()
-    FetchContent_Declare(
-        rapidjson
-        GIT_REPOSITORY https://github.com/Tencent/rapidjson.git
-        GIT_TAG ebd87cb468fb4cb060b37e579718c4a4125416c1
-    )
-endif()
+FetchContent_Declare(
+    rapidjson
+    GIT_REPOSITORY https://github.com/Tencent/rapidjson.git
+    GIT_TAG ebd87cb468fb4cb060b37e579718c4a4125416c1
+)
 
 # Disable RapidJSON tests and examples
 set(RAPIDJSON_BUILD_TESTS OFF CACHE BOOL "Build rapidjson tests" FORCE)
