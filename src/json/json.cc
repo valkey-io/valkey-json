@@ -787,34 +787,16 @@ int Command_JsonMerge(ValkeyModuleCtx *ctx, ValkeyModuleString **argv, int argc)
         if (doc == nullptr) return ValkeyModule_ReplyWithError(ctx, ERRMSG_JSON_DOCUMENT_NOT_FOUND);
         size_t orig_doc_size = dom_get_doc_size(doc);
 
-        if (is_root_path) {
-            // For root path merge, use dom_merge_value which handles merging correctly
-            // This reuses the existing tested merge logic
-            JsonUtilCode rc = dom_merge_value(ctx, doc, ".", json, json_len);
-            if (rc != JSONUTIL_SUCCESS) {
-                return ValkeyModule_ReplyWithError(ctx, jsonutil_code_to_message(rc));
-            }
-            
-            // dom_merge_value modifies the document in place
-            // end tracking memory
-            END_TRACKING_MEMORY(ctx, "JSON.MERGE", doc, orig_doc_size, begin_val)
-
-            // update stats
-            size_t new_doc_size = dom_get_doc_size(doc);
-            jsonstats_update_stats_on_update(doc, orig_doc_size, new_doc_size, json_len);
-        } else {
-            JsonUtilCode rc = dom_merge_value(ctx, doc, path, json, json_len);
-            if (rc != JSONUTIL_SUCCESS) {
-                return ValkeyModule_ReplyWithError(ctx, jsonutil_code_to_message(rc));
-            }
-
-            // end tracking memory
-            END_TRACKING_MEMORY(ctx, "JSON.MERGE", doc, orig_doc_size, begin_val)
-
-            // update stats
-            size_t new_doc_size = dom_get_doc_size(doc);
-            jsonstats_update_stats_on_update(doc, orig_doc_size, new_doc_size, json_len);
+        const char *merge_path = is_root_path ? "." : path;
+        JsonUtilCode rc = dom_merge_value(ctx, doc, merge_path, json, json_len);
+        if (rc != JSONUTIL_SUCCESS) {
+            return ValkeyModule_ReplyWithError(ctx, jsonutil_code_to_message(rc));
         }
+
+        END_TRACKING_MEMORY(ctx, "JSON.MERGE", doc, orig_doc_size, begin_val)
+
+        size_t new_doc_size = dom_get_doc_size(doc);
+        jsonstats_update_stats_on_update(doc, orig_doc_size, new_doc_size, json_len);
     }
 
     // replicate the command

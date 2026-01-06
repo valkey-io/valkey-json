@@ -712,92 +712,49 @@ TEST_F(DomTest, testDomMergeValue_NullNewKeyNotAdded) {
 }
 
 TEST_F(DomTest, testMergeValues_DepthLimit) {
-    size_t max_depth = json_get_max_path_limit();
-    
-    std::string existing_json = "{";
-    std::string new_json = "{";
-    
-    for (size_t i = 0; i < max_depth - 1; ++i) {
-        std::string key = "level" + std::to_string(i);
-        existing_json += "\"" + key + "\":{";
-        new_json += "\"" + key + "\":{";
-    }
-    
-    existing_json += "\"value\":1";
-    new_json += "\"value\":2";
-    
-    for (size_t i = 0; i < max_depth - 1; ++i) {
-        existing_json += "}";
-        new_json += "}";
-    }
-    existing_json += "}";
-    new_json += "}";
+    const char *existing_json = "{\"a\":{\"b\":{\"c\":{\"d\":{\"e\":1}}}}}";
+    const char *new_json = "{\"a\":{\"b\":{\"c\":{\"d\":{\"e\":2}}}}}";
     
     JDocument *existing_doc;
-    JsonUtilCode rc = dom_parse(nullptr, existing_json.c_str(), existing_json.length(), &existing_doc);
+    JsonUtilCode rc = dom_parse(nullptr, existing_json, strlen(existing_json), &existing_doc);
     EXPECT_EQ(rc, JSONUTIL_SUCCESS);
     
     JParser new_parser;
-    new_parser.Parse(new_json.c_str(), new_json.length());
+    new_parser.Parse(new_json, strlen(new_json));
     EXPECT_FALSE(new_parser.HasParseError());
     
-    JValue merged = merge_values(existing_doc->GetJValue(), new_parser.GetJValue(), allocator);
+    JValue merged = merge_values(existing_doc->GetJValue(), new_parser.GetJValue(), allocator, 0);
     EXPECT_TRUE(merged.IsObject());
-    
-    JValue *current = &merged;
-    for (size_t i = 0; i < max_depth - 1; ++i) {
-        std::string key = "level" + std::to_string(i);
-        EXPECT_TRUE(current->HasMember(key.c_str()));
-        current = &(*current)[key.c_str()];
-        EXPECT_TRUE(current->IsObject());
-    }
-    EXPECT_TRUE(current->HasMember("value"));
-    EXPECT_EQ(current->GetInt(), 2);
+    EXPECT_TRUE(merged.HasMember("a"));
+    EXPECT_TRUE(merged["a"].HasMember("b"));
+    EXPECT_TRUE(merged["a"]["b"].HasMember("c"));
+    EXPECT_TRUE(merged["a"]["b"]["c"].HasMember("d"));
+    EXPECT_TRUE(merged["a"]["b"]["c"]["d"].HasMember("e"));
+    EXPECT_EQ(merged["a"]["b"]["c"]["d"]["e"].GetInt(), 2);
     
     dom_free_doc(existing_doc);
 }
 
 TEST_F(DomTest, testMergeValues_DepthLimitExceeded) {
-    size_t max_depth = json_get_max_path_limit();
-    
-    std::string existing_json = "{";
-    std::string new_json = "{";
-    
-    for (size_t i = 0; i < max_depth + 1; ++i) {
-        std::string key = "level" + std::to_string(i);
-        existing_json += "\"" + key + "\":{";
-        new_json += "\"" + key + "\":{";
-    }
-    
-    existing_json += "\"value\":1";
-    new_json += "\"value\":2";
-    
-    for (size_t i = 0; i < max_depth + 1; ++i) {
-        existing_json += "}";
-        new_json += "}";
-    }
-    existing_json += "}";
-    new_json += "}";
+    const char *existing_json = "{\"a\":{\"b\":{\"c\":1}}}";
+    const char *new_json = "{\"a\":{\"b\":{\"c\":2}}}";
     
     JDocument *existing_doc;
-    JsonUtilCode rc = dom_parse(nullptr, existing_json.c_str(), existing_json.length(), &existing_doc);
+    JsonUtilCode rc = dom_parse(nullptr, existing_json, strlen(existing_json), &existing_doc);
     EXPECT_EQ(rc, JSONUTIL_SUCCESS);
     
     JParser new_parser;
-    new_parser.Parse(new_json.c_str(), new_json.length());
+    new_parser.Parse(new_json, strlen(new_json));
     EXPECT_FALSE(new_parser.HasParseError());
     
-    JValue merged = merge_values(existing_doc->GetJValue(), new_parser.GetJValue(), allocator);
+    size_t max_depth = json_get_max_path_limit();
+    JValue merged = merge_values(existing_doc->GetJValue(), new_parser.GetJValue(), allocator, max_depth + 1);
     
-    JValue *current = &merged;
-    for (size_t i = 0; i < max_depth + 1; ++i) {
-        std::string key = "level" + std::to_string(i);
-        EXPECT_TRUE(current->HasMember(key.c_str()));
-        current = &(*current)[key.c_str()];
-        EXPECT_TRUE(current->IsObject());
-    }
-    EXPECT_TRUE(current->HasMember("value"));
-    EXPECT_EQ(current->GetInt(), 2);
+    EXPECT_TRUE(merged.IsObject());
+    EXPECT_TRUE(merged.HasMember("a"));
+    EXPECT_TRUE(merged["a"].HasMember("b"));
+    EXPECT_TRUE(merged["a"]["b"].HasMember("c"));
+    EXPECT_EQ(merged["a"]["b"]["c"].GetInt(), 2);
     
     dom_free_doc(existing_doc);
 }
