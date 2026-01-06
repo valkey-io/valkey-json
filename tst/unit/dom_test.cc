@@ -871,6 +871,95 @@ TEST_F(DomTest, testMergeValues_ArrayReplacement) {
     dom_free_doc(existing_doc);
 }
 
+TEST_F(DomTest, testMergeValues_ArrayReplacedWithScalar) {
+    const char *existing_json = "{\"a\":[1,2,3],\"b\":[4,5,6],\"c\":[7,8,9]}";
+    const char *new_json = "{\"a\":42,\"b\":\"string\",\"c\":true}";
+    
+    JDocument *existing_doc;
+    JsonUtilCode rc = dom_parse(nullptr, existing_json, strlen(existing_json), &existing_doc);
+    EXPECT_EQ(rc, JSONUTIL_SUCCESS);
+    
+    JParser new_parser;
+    new_parser.Parse(new_json, strlen(new_json));
+    EXPECT_FALSE(new_parser.HasParseError());
+    
+    JValue merged = merge_values(existing_doc->GetJValue(), new_parser.GetJValue(), allocator);
+    EXPECT_TRUE(merged.IsObject());
+    EXPECT_TRUE(merged.HasMember("a"));
+    EXPECT_TRUE(merged["a"].IsInt());
+    EXPECT_EQ(merged["a"].GetInt(), 42);
+    EXPECT_TRUE(merged.HasMember("b"));
+    EXPECT_TRUE(merged["b"].IsString());
+    EXPECT_STREQ(merged["b"].GetString(), "string");
+    EXPECT_TRUE(merged.HasMember("c"));
+    EXPECT_TRUE(merged["c"].IsBool());
+    EXPECT_TRUE(merged["c"].GetBool());
+    
+    dom_free_doc(existing_doc);
+}
+
+TEST_F(DomTest, testMergeValues_ArrayReplacedWithObject) {
+    const char *existing_json = "{\"a\":[1,2,3],\"b\":{\"x\":1}}";
+    const char *new_json = "{\"a\":{\"nested\":{\"key\":\"value\"},\"other\":123}}";
+    
+    JDocument *existing_doc;
+    JsonUtilCode rc = dom_parse(nullptr, existing_json, strlen(existing_json), &existing_doc);
+    EXPECT_EQ(rc, JSONUTIL_SUCCESS);
+    
+    JParser new_parser;
+    new_parser.Parse(new_json, strlen(new_json));
+    EXPECT_FALSE(new_parser.HasParseError());
+    
+    JValue merged = merge_values(existing_doc->GetJValue(), new_parser.GetJValue(), allocator);
+    EXPECT_TRUE(merged.IsObject());
+    EXPECT_TRUE(merged.HasMember("a"));
+    EXPECT_TRUE(merged["a"].IsObject());
+    EXPECT_TRUE(merged["a"].HasMember("nested"));
+    EXPECT_TRUE(merged["a"]["nested"].IsObject());
+    EXPECT_TRUE(merged["a"]["nested"].HasMember("key"));
+    EXPECT_STREQ(merged["a"]["nested"]["key"].GetString(), "value");
+    EXPECT_TRUE(merged["a"].HasMember("other"));
+    EXPECT_EQ(merged["a"]["other"].GetInt(), 123);
+    EXPECT_TRUE(merged.HasMember("b"));
+    EXPECT_TRUE(merged["b"].IsObject());
+    EXPECT_TRUE(merged["b"].HasMember("x"));
+    EXPECT_EQ(merged["b"]["x"].GetInt(), 1);
+    
+    dom_free_doc(existing_doc);
+}
+
+TEST_F(DomTest, testMergeValues_EmptyObjectNoOp) {
+    const char *existing_json = "{\"a\":1,\"b\":{\"x\":2,\"y\":3},\"c\":[4,5,6]}";
+    const char *new_json = "{}";
+    
+    JDocument *existing_doc;
+    JsonUtilCode rc = dom_parse(nullptr, existing_json, strlen(existing_json), &existing_doc);
+    EXPECT_EQ(rc, JSONUTIL_SUCCESS);
+    
+    JParser new_parser;
+    new_parser.Parse(new_json, strlen(new_json));
+    EXPECT_FALSE(new_parser.HasParseError());
+    
+    JValue merged = merge_values(existing_doc->GetJValue(), new_parser.GetJValue(), allocator);
+    EXPECT_TRUE(merged.IsObject());
+    EXPECT_TRUE(merged.HasMember("a"));
+    EXPECT_EQ(merged["a"].GetInt(), 1);
+    EXPECT_TRUE(merged.HasMember("b"));
+    EXPECT_TRUE(merged["b"].IsObject());
+    EXPECT_TRUE(merged["b"].HasMember("x"));
+    EXPECT_EQ(merged["b"]["x"].GetInt(), 2);
+    EXPECT_TRUE(merged["b"].HasMember("y"));
+    EXPECT_EQ(merged["b"]["y"].GetInt(), 3);
+    EXPECT_TRUE(merged.HasMember("c"));
+    EXPECT_TRUE(merged["c"].IsArray());
+    EXPECT_EQ(merged["c"].Size(), 3);
+    EXPECT_EQ(merged["c"][0].GetInt(), 4);
+    EXPECT_EQ(merged["c"][1].GetInt(), 5);
+    EXPECT_EQ(merged["c"][2].GetInt(), 6);
+    
+    dom_free_doc(existing_doc);
+}
+
 TEST_F(DomTest, testMergeValues_NullDeletesKey) {
     const char *existing_json = "{\"a\":1,\"b\":2,\"c\":3}";
     const char *new_json = "{\"b\":null,\"c\":4}";
