@@ -228,7 +228,7 @@ JsonUtilCode dom_set_value(ValkeyModuleCtx *ctx, JDocument *doc, const char *jso
  * - Null values delete keys (existing) or prevent addition (new)
  */
 JValue merge_values(const JValue &existing, const JValue &new_val, RapidJsonAllocator &alloc, int depth) {
-    if (existing.ObjectEmpty()) {
+    if (existing.IsObject() && existing.ObjectEmpty()) {
         // Nothing to merge into – just return a deep copy of new_val
         return JValue(new_val, alloc);
     }
