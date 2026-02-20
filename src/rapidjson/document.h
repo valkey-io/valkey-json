@@ -2615,7 +2615,7 @@ private:
         // Move the members from the copy into the new hashtable
         //
         [[maybe_unused]] size_t object_member_count = 0;
-        size_t object_num_member_chars = 0;
+        [[maybe_unused]] size_t object_num_member_chars = 0;
         for (MemberIterator i = me.MemberBegin(); i != me.MemberEnd(); ++i) {
             object_member_count += 1;
             object_num_member_chars += i->name.GetStringLength();
