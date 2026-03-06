@@ -239,41 +239,32 @@ JValue merge_values(const JValue &existing, const JValue &new_val, RapidJsonAllo
         return JValue(existing, alloc);
     }
     
-    // Build merged object from scratch
     JValue merged(rapidjson::kObjectType);
     
     // First pass: process existing members
     for (auto it = existing.MemberBegin(); it != existing.MemberEnd(); ++it) {
-        // Get key string and store in a std::string to ensure it persists
-        std::string key(it->name.GetString(), it->name.GetStringLength());
-        
-        // Check if this key exists in new_val
-        auto new_it = new_val.FindMember(key.c_str());
-        
+        std::string_view key(it->name.GetString(), it->name.GetStringLength());
+        auto new_it = new_val.FindMember(key);
+
         if (new_it != new_val.MemberEnd()) {
-            // Key exists in both
             if (new_it->value.IsNull()) {
-                // Rule 1: Merging with null value deletes the key
-                // Don't add this key to merged object
                 continue;
-            } else if (it->value.IsObject() && new_it->value.IsObject()) {
-                // Both are objects - merge recursively
+            }
+            if (it->value.IsObject() && new_it->value.IsObject()) {
                 JValue val_result = merge_values(it->value, new_it->value, alloc, depth + 1);
                 JValue key_copy;
-                key_copy.SetString(key.c_str(), static_cast<rapidjson::SizeType>(key.length()), alloc);
+                key_copy.SetString(key, alloc);
                 merged.AddMember(key_copy, val_result, alloc);
             } else {
-                // Rule 2 & 4: Not both objects - use new value (updates value or replaces array)
                 JValue val_result = JValue(new_it->value, alloc);
                 JValue key_copy;
-                key_copy.SetString(key.c_str(), static_cast<rapidjson::SizeType>(key.length()), alloc);
+                key_copy.SetString(key, alloc);
                 merged.AddMember(key_copy, val_result, alloc);
             }
         } else {
-            // Key only in existing - copy it
             JValue val_result = JValue(it->value, alloc);
             JValue key_copy;
-            key_copy.SetString(key.c_str(), static_cast<rapidjson::SizeType>(key.length()), alloc);
+            key_copy.SetString(key, alloc);
             merged.AddMember(key_copy, val_result, alloc);
         }
     }
