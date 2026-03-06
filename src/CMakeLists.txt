@@ -40,6 +40,4 @@ target_sources(${OBJECT_TARGET}
 )
 
 add_library(${JSON_MODULE_LIB} SHARED $<TARGET_OBJECTS:${OBJECT_TARGET}>)
-if(ENABLE_UNIT_TESTS OR ENABLE_INTEGRATION_TESTS)
-	add_dependencies(${OBJECT_TARGET} valkey)
-endif()
+add_dependencies(${OBJECT_TARGET} valkey)

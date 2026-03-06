@@ -369,6 +369,7 @@ STATIC void PutEscapedString(OutputBuffer& oss, const char *str) {
     serialize_value(tmp, 0, nullptr, oss);
 }
 
+// Build stringified JSON array directly from a vector of values.
 template<typename T>
 STATIC void build_json_array(const jsn::vector<JValue*> &values, const PrintFormat *format, T &oss) {
     bool has_format = has_custom_format(format);
@@ -394,29 +395,36 @@ JsonUtilCode dom_get_value_as_str(JDocument *doc, const char *json_path, const P
     JsonUtilCode rc = selector.getValues(*doc, json_path);
     if (rc != JSONUTIL_SUCCESS) {
         if (selector.isLegacyJsonPathSyntax()) return rc;
+        // For v2 path, return error code only if it's a syntax error.
         if (selector.isSyntaxError(rc)) return rc;
     }
 
     jsn::vector<JValue*> values;
     selector.getSelectedValues(values);
 
+    // If legacy path, return either the first value, or NONEXISTENT error if no value is found.
     if (selector.isLegacyJsonPathSyntax()) {
         if (values.empty()) {
             return JSONUTIL_JSON_PATH_NOT_EXIST;
         } else {
             serialize_value(*values[0], 0, format, oss);
+            // update stats
             if (update_stats) jsonstats_update_stats_on_read(oss.GetLength());
             return JSONUTIL_SUCCESS;
         }
     }
 
+    // v2 path: return an array of values.
     if (values.empty()) {
+        // return an empty array
         oss.Put('[');
         oss.Put(']');
     } else {
+        // Multiple values are returned to the client as a JSON array.
         build_json_array(values, format, oss);
     }
 
+    // update stats
     if (update_stats) jsonstats_update_stats_on_read(oss.GetLength());
     return JSONUTIL_SUCCESS;
 }
