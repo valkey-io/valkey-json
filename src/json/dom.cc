@@ -281,14 +281,13 @@ JValue merge_values(const JValue &existing, const JValue &new_val, RapidJsonAllo
     // Second pass: add keys that only exist in new_val (Target[Name] = MergePatch(undefined, Value))
     JValue empty_obj(rapidjson::kObjectType);
     for (auto it = new_val.MemberBegin(); it != new_val.MemberEnd(); ++it) {
-        std::string key(it->name.GetString(), it->name.GetStringLength());
-        
-        if (!merged.HasMember(key.c_str())) {
+        std::string_view key(it->name.GetString(), it->name.GetStringLength());
+        if (!merged.HasMember(key)) {
             if (it->value.IsNull()) {
                 continue;
             }
             JValue key_copy;
-            key_copy.SetString(key.c_str(), static_cast<rapidjson::SizeType>(key.length()), alloc);
+            key_copy.SetString(key, alloc);
             JValue val_result = merge_values(empty_obj, it->value, alloc, depth + 1);
             merged.AddMember(key_copy, val_result, alloc);
         }
