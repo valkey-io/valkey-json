@@ -35,6 +35,7 @@
 
 #include <string>
 #include <cmath>
+#include <vector>
 
 /* In unstable branch the module version is always "999999". */
 #define MODULE_VERSION 999999
@@ -74,11 +75,15 @@ static size_t config_max_recursive_descent_tokens = DEFAULT_MAX_RECURSIVE_DESCEN
 #define DEFAULT_MAX_QUERY_STRING_SIZE (128 * 1024)  // 128KB
 static size_t config_max_query_string_size = DEFAULT_MAX_QUERY_STRING_SIZE;
 
+static int config_debug_mode = 0;
+
 #define DEFAULT_KEY_TABLE_SHARDS 32768
 #define DEFAULT_HASH_TABLE_MIN_SIZE 64
 KeyTable *keyTable = nullptr;
 rapidjson::HashTableFactors rapidjson::hashTableFactors;
 rapidjson::HashTableStats   rapidjson::hashTableStats;
+
+static std::vector<KeyTable_Handle> debug_corrupt_handles;
 
 extern size_t hash_function(const char *text, size_t length);
 
@@ -2080,6 +2085,10 @@ STATIC int TestSharedApi(ValkeyModuleCtx *ctx, ValkeyModuleString **argv, int ar
     return VALKEYMODULE_OK;
 }
 
+static bool isDebugModeEnabled() {
+    return config_debug_mode != 0;
+}
+
 int Command_JsonDebug(ValkeyModuleCtx *ctx, ValkeyModuleString **argv, int argc) {
     ValkeyModule_AutoMemory(ctx);
 
@@ -2210,6 +2219,10 @@ int Command_JsonDebug(ValkeyModuleCtx *ctx, ValkeyModuleString **argv, int argc)
             return VALKEYMODULE_ERR;
         }
 
+        if (!isDebugModeEnabled()) {
+            return ValkeyModule_ReplyWithError(ctx, "ERR unknown subcommand 'KEYTABLE-CORRUPT'. Try JSON.DEBUG HELP.");
+        }
+
         // ATTENTION:
         // THIS IS AN UNDOCUMENTED SUBCOMMAND, TO BE USED FOR DEV TEST ONLY. DON'T RUN IT ON A PRODUCTION SYSTEM.
         //
@@ -2223,13 +2236,38 @@ int Command_JsonDebug(ValkeyModuleCtx *ctx, ValkeyModuleString **argv, int argc)
         const char *str = ValkeyModule_StringPtrLen(argv[2], &len);
 
         KeyTable_Handle h = keyTable->makeHandle(str, len);
-        ValkeyModule_Log(ctx, "warning", "*** Handle %s count is now %zd", str, h->getRefCount());
+        ValkeyModule_Log(ctx, "warning",
+                         "KEYTABLE-CORRUPT: injected handle for input of %zu bytes, refcount=%zd",
+                         len, h->getRefCount());
+        debug_corrupt_handles.push_back(std::move(h));
         return ValkeyModule_ReplyWithSimpleString(ctx, "OK");
+    } else if (!strcasecmp(subcmd, "KEYTABLE-CLEAR")) {
+        if (ValkeyModule_IsKeysPositionRequest(ctx)) {
+            return VALKEYMODULE_ERR;
+        }
+
+        if (!isDebugModeEnabled()) {
+            return ValkeyModule_ReplyWithError(ctx, "ERR unknown subcommand 'KEYTABLE-CLEAR'. Try JSON.DEBUG HELP.");
+        }
+
+        if (argc != 2) return ValkeyModule_WrongArity(ctx);
+
+        size_t count = debug_corrupt_handles.size();
+        for (auto &h : debug_corrupt_handles) {
+            keyTable->destroyHandle(h);
+        }
+        debug_corrupt_handles.clear();
+        ValkeyModule_Log(ctx, "warning", "KEYTABLE-CLEAR: released %zu injected handles", count);
+        return ValkeyModule_ReplyWithLongLong(ctx, count);
     } else if (!strcasecmp(subcmd, "KEYTABLE-DISTRIBUTION")) {
         // compute longest runs of non-empty hashtable entries, a direct measure of key distribution and
         // worst-case run-time for lookup/insert/delete
         if (ValkeyModule_IsKeysPositionRequest(ctx)) {
             return VALKEYMODULE_ERR;
+        }
+
+        if (!isDebugModeEnabled()) {
+            return ValkeyModule_ReplyWithError(ctx, "ERR unknown subcommand 'KEYTABLE-DISTRIBUTION'. Try JSON.DEBUG HELP.");
         }
 
         // ATTENTION:
@@ -2282,6 +2320,7 @@ int Command_JsonDebug(ValkeyModuleCtx *ctx, ValkeyModuleString **argv, int argc)
         cmds.push_back("JSON.DEBUG MAX-SIZE-KEY  - Find JSON key with largest memory size");
         cmds.push_back("JSON.DEBUG KEYTABLE-CHECK - Extended KeyTable integrity check");
         cmds.push_back("JSON.DEBUG KEYTABLE-CORRUPT <name> - Intentionally corrupt KeyTable handle counts");
+        cmds.push_back("JSON.DEBUG KEYTABLE-CLEAR - Release all handles injected by KEYTABLE-CORRUPT");
         cmds.push_back("JSON.DEBUG KEYTABLE-DISTRIBUTION <topN> - Find and count topN longest runs in KeyTable");
         cmds.push_back("JSON.DEBUG TEST-SHARED-API <key> <path> - Provide testing for Shared api interface for search");
 
@@ -2552,12 +2591,31 @@ int Config_SetSizeConfig(const char *name, long long val, void *privdata, Valkey
     return VALKEYMODULE_OK;
 }
 
+int Config_GetBoolConfig(const char *name, void *privdata) {
+    VALKEYMODULE_NOT_USED(name);
+    return *static_cast<int*>(privdata);
+}
+
+int Config_SetBoolConfig(const char *name, int val, void *privdata, ValkeyModuleString **err) {
+    VALKEYMODULE_NOT_USED(name);
+    VALKEYMODULE_NOT_USED(err);
+    *static_cast<int*>(privdata) = val;
+    return VALKEYMODULE_OK;
+}
+
 int registerModuleConfigs(ValkeyModuleCtx *ctx) {
     REGISTER_NUMERIC_CONFIG(ctx, "max-document-size", DEFAULT_MAX_DOCUMENT_SIZE, VALKEYMODULE_CONFIG_MEMORY,
                             0, LLONG_MAX, &config_max_document_size, Config_GetSizeConfig, Config_SetSizeConfig)
 
     REGISTER_NUMERIC_CONFIG(ctx, "max-path-limit", DEFAULT_MAX_PATH_LIMIT, VALKEYMODULE_CONFIG_DEFAULT,
                             0, INT_MAX, &config_max_path_limit, Config_GetSizeConfig, Config_SetSizeConfig)
+
+    if (ValkeyModule_RegisterBoolConfig(ctx, "debug-mode", 0,
+            VALKEYMODULE_CONFIG_HIDDEN | VALKEYMODULE_CONFIG_IMMUTABLE,
+            Config_GetBoolConfig, Config_SetBoolConfig, nullptr, &config_debug_mode) == VALKEYMODULE_ERR) {
+        ValkeyModule_Log(ctx, "warning", "Failed to register module config \"debug-mode\".");
+        return VALKEYMODULE_ERR;
+    }
 
     ValkeyModule_LoadConfigs(ctx);
     return VALKEYMODULE_OK;
@@ -2954,11 +3012,15 @@ extern "C" int ValkeyModule_OnLoad(ValkeyModuleCtx *ctx) {
         ValkeyModule_Log(ctx, "warning", "Failed to create subcommand KEYTABLE-CHECK for command JSON.DEBUG.");
         return VALKEYMODULE_ERR;
     }
-    if (ValkeyModule_CreateSubcommand(parent, "KEYTABLE-CORRUPT", Command_JsonDebug, "", 2, 2, 1) == VALKEYMODULE_ERR) {
+    if (ValkeyModule_CreateSubcommand(parent, "KEYTABLE-CORRUPT", Command_JsonDebug, "admin", 2, 2, 1) == VALKEYMODULE_ERR) {
         ValkeyModule_Log(ctx, "warning", "Failed to create subcommand KEYTABLE-CORRUPT for command JSON.DEBUG.");
         return VALKEYMODULE_ERR;
     }
-    if (ValkeyModule_CreateSubcommand(parent, "KEYTABLE-DISTRIBUTION", Command_JsonDebug, "", 0, 0, 0)
+    if (ValkeyModule_CreateSubcommand(parent, "KEYTABLE-CLEAR", Command_JsonDebug, "admin", 0, 0, 0) == VALKEYMODULE_ERR) {
+        ValkeyModule_Log(ctx, "warning", "Failed to create subcommand KEYTABLE-CLEAR for command JSON.DEBUG.");
+        return VALKEYMODULE_ERR;
+    }
+    if (ValkeyModule_CreateSubcommand(parent, "KEYTABLE-DISTRIBUTION", Command_JsonDebug, "admin", 0, 0, 0)
         == VALKEYMODULE_ERR) {
         ValkeyModule_Log(ctx, "warning", "Failed to create subcommand KEYTABLE-DISTRIBUTION for command JSON.DEBUG.");
         return VALKEYMODULE_ERR;
@@ -3072,6 +3134,7 @@ extern "C" int ValkeyModule_OnLoad(ValkeyModuleCtx *ctx) {
     if (!set_command_info(ctx, "JSON.DEBUG|MAX-SIZE-KEY", 2)) return VALKEYMODULE_ERR;
     if (!set_command_info(ctx, "JSON.DEBUG|KEYTABLE-CHECK", 2)) return VALKEYMODULE_ERR;
     if (!set_command_info(ctx, "JSON.DEBUG|KEYTABLE-CORRUPT", 3)) return VALKEYMODULE_ERR;
+    if (!set_command_info(ctx, "JSON.DEBUG|KEYTABLE-CLEAR", 2)) return VALKEYMODULE_ERR;
     if (!set_command_info(ctx, "JSON.DEBUG|KEYTABLE-DISTRIBUTION", 3)) return VALKEYMODULE_ERR;
 
     if (!memory_traps_control(false)) {

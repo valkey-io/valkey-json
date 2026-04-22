@@ -182,7 +182,7 @@ class TestJsonBasic(JsonTestCase):
         else:
             # Original local server setup
             server_path = f"{os.path.dirname(os.path.realpath(__file__))}/.build/binaries/{os.environ['SERVER_VERSION']}/valkey-server"
-            args = {'loadmodule': os.getenv('MODULE_PATH'), "enable-debug-command": "local", 'enable-protected-configs': 'yes'}
+            args = {'loadmodule': os.getenv('MODULE_PATH'), 'json.debug-mode': 'yes', "enable-debug-command": "local", 'enable-protected-configs': 'yes'}
             self.server, self.client = self.create_server(testdir=self.testdir, server_path=server_path, args=args)
 
         self.error_class = ErrorStringTester
@@ -2747,6 +2747,33 @@ class TestJsonBasic(JsonTestCase):
         exp_val = client.execute_command('JSON.DEBUG','MEMORY',wikipedia,'.')
         assert exp_val == metadate_val
 
+    def test_keytable_corrupt_injects_handle(self):
+        """JSON.DEBUG KEYTABLE-CORRUPT should inject a handle that KEYTABLE-CHECK detects as a mismatch."""
+        client = self.server.get_new_client()
+        # Baseline: KEYTABLE-CHECK should succeed
+        client.execute_command('JSON.DEBUG', 'KEYTABLE-CHECK')
+        # Inject a handle
+        client.execute_command('JSON.DEBUG', 'KEYTABLE-CORRUPT', 'unique_test_corrupt_string_abc123')
+        # KEYTABLE-CHECK now detects the mismatch
+        with pytest.raises(ResponseError, match="Mismatch"):
+            client.execute_command('JSON.DEBUG', 'KEYTABLE-CHECK')
+        # Clean up so teardown doesn't trip the assertion
+        client.execute_command('JSON.DEBUG', 'KEYTABLE-CLEAR')
+
+    def test_keytable_clear_releases_handles(self):
+        """JSON.DEBUG KEYTABLE-CLEAR should release all injected handles and restore integrity."""
+        client = self.server.get_new_client()
+        # Inject 3 handles
+        client.execute_command('JSON.DEBUG', 'KEYTABLE-CORRUPT', 'clear_test_string_1')
+        client.execute_command('JSON.DEBUG', 'KEYTABLE-CORRUPT', 'clear_test_string_2')
+        client.execute_command('JSON.DEBUG', 'KEYTABLE-CORRUPT', 'clear_test_string_3')
+        # Clear them
+        cleared = client.execute_command('JSON.DEBUG', 'KEYTABLE-CLEAR')
+        assert cleared == 3, f"Expected 3 cleared handles, got {cleared}"
+        # KEYTABLE-CHECK succeeds again after cleanup
+        client.execute_command('JSON.DEBUG', 'KEYTABLE-CHECK')
+
+
     def test_json_duplicate_keys(self):
         client = self.server.get_new_client()
         '''Test handling of object with duplicate keys'''
@@ -4213,7 +4240,7 @@ class TestJsonBasic(JsonTestCase):
         cmd_arity = [('MEMORY', -3), ('FIELDS', -3), ('DEPTH', 3), ('HELP', 2),
                      ('MAX-DEPTH-KEY', 2), ('MAX-SIZE-KEY',
                                             2), ('KEYTABLE-CHECK', 2), ('KEYTABLE-CORRUPT', 3),
-                     ('KEYTABLE-DISTRIBUTION', 3), ('TEST-SHARED-API', -2)]
+                     ('KEYTABLE-CLEAR', 2), ('KEYTABLE-DISTRIBUTION', 3), ('TEST-SHARED-API', -2)]
         subcmd_dict = {f'JSON.DEBUG|{cmd}': arity for cmd, arity in cmd_arity}
 
         output = client.execute_command(
@@ -4355,3 +4382,43 @@ class TestJsonBasic(JsonTestCase):
             s = client.execute_command("json.debug", "test-shared-api", "k1", path)
             print("For Path:", path, " json.get:", g, " shared-api:", s)
             assert (g == s)
+
+
+class TestJsonDebugGating(JsonTestCase):
+    """Test that debug commands are gated behind json.debug-mode module config."""
+
+    @pytest.fixture(autouse=True)
+    def setup_test(self, setup):
+        use_external = os.environ.get("VALKEY_EXTERNAL_SERVER", "false").lower() == "true"
+
+        if use_external:
+            external_host = os.environ.get("VALKEY_HOST", "localhost")
+            external_port = int(os.environ.get("VALKEY_PORT", "6379"))
+            self.server, self.client = self.create_server(
+                testdir=self.testdir,
+                bind_ip=external_host,
+                port=external_port,
+                external_server=True
+            )
+        else:
+            server_path = f"{os.path.dirname(os.path.realpath(__file__))}/.build/binaries/{os.environ['SERVER_VERSION']}/valkey-server"
+            # Load module WITHOUT debug-mode — commands should be gated
+            args = {'loadmodule': os.getenv('MODULE_PATH'), "enable-debug-command": "local", 'enable-protected-configs': 'yes'}
+            self.server, self.client = self.create_server(testdir=self.testdir, server_path=server_path, args=args)
+
+        self.error_class = ErrorStringTester
+
+    def test_keytable_corrupt_requires_debug_mode(self):
+        """KEYTABLE-CORRUPT should be rejected without debug-mode."""
+        with pytest.raises(ResponseError, match="unknown subcommand"):
+            self.client.execute_command('JSON.DEBUG', 'KEYTABLE-CORRUPT', 'test_string')
+
+    def test_keytable_clear_requires_debug_mode(self):
+        """KEYTABLE-CLEAR should be rejected without debug-mode."""
+        with pytest.raises(ResponseError, match="unknown subcommand"):
+            self.client.execute_command('JSON.DEBUG', 'KEYTABLE-CLEAR')
+
+    def test_keytable_distribution_requires_debug_mode(self):
+        """KEYTABLE-DISTRIBUTION should be rejected without debug-mode."""
+        with pytest.raises(ResponseError, match="unknown subcommand"):
+            self.client.execute_command('JSON.DEBUG', 'KEYTABLE-DISTRIBUTION', '10')
