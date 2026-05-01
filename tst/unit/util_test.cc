@@ -58,8 +58,8 @@ TEST_F(UtilTest, testIsInt64) {
     EXPECT_TRUE(jsonutil_is_int64(INT16_MIN));
     EXPECT_TRUE(jsonutil_is_int64(INT32_MAX));
     EXPECT_TRUE(jsonutil_is_int64(INT32_MIN));
-    EXPECT_TRUE(jsonutil_is_int64(INT64_MAX >> 1));
-    EXPECT_TRUE(jsonutil_is_int64(8223372036854775807LL));
+    EXPECT_TRUE(jsonutil_is_int64(static_cast<double>(INT64_MAX >> 1)));
+    EXPECT_TRUE(jsonutil_is_int64(static_cast<double>(8223372036854775807LL)));
     EXPECT_TRUE(jsonutil_is_int64(INT64_MIN));
     EXPECT_FALSE(jsonutil_is_int64(1e28));      // out of range of int64
     EXPECT_FALSE(jsonutil_is_int64(1.7e308));   // out of range of int64
