@@ -1,0 +1,35 @@
+name: Linter
+
+on:
+  push:
+  pull_request:
+
+concurrency:
+  group: linter-${{ github.head_ref || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  cpplint:
+    name: C++ Lint
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # v4.1.1
+
+      - name: Set up Python
+        uses: actions/setup-python@3542bca2639a428e1796aaa6a2ffef0c0f575566 # v3.1.4
+        with:
+          python-version: '3.9'
+
+      - name: Install cpplint
+        run: pip install cpplint
+
+      - name: Run cpplint on src/json
+        run: cpplint --recursive src/json/
+
+      - name: Run cpplint on tst/unit
+        run: cpplint --recursive tst/unit/
