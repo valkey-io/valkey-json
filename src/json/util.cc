@@ -43,7 +43,7 @@ const char *jsonutil_code_to_message(JsonUtilCode code) {
         case JSONUTIL_ADDITION_OVERFLOW: return "OVERFLOW Addition would overflow";
         case JSONUTIL_EMPTY_JSON_OBJECT: return "EMPTYVAL Empty JSON object";
         case JSONUTIL_EMPTY_JSON_ARRAY: return "EMPTYVAL Empty JSON array";
-        case JSONUTIL_INDEX_OUT_OF_ARRAY_BOUNDARIES: return "OUTOFBOUNDARIES Array index is out of bounds";
+        case JSONUTIL_INDEX_OUT_OF_ARRAY_BOUNDS: return "OUTOFBOUNDS Array index is out of bounds";
         case JSONUTIL_UNKNOWN_SUBCOMMAND: return "SYNTAXERR Unknown subcommand";
         case JSONUTIL_FAILED_TO_CREATE_THREAD_SPECIFIC_DATA_KEY:
             return "PTHREADERR Failed to create thread-specific data key";

@@ -78,7 +78,7 @@ valkey-server --loadmodule /path/to/libjson.so
 2. Execute Valkey command:
     MODULE LOAD /path/to/libjson.so
 ```
-## Supported  Module Commands
+## Supported Module Commands
 ```text
 JSON.ARRAPPEND
 JSON.ARRINDEX

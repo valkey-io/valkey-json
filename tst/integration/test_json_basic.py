@@ -394,7 +394,7 @@ class TestJsonBasic(JsonTestCase):
         with pytest.raises(ResponseError) as e:
             client.execute_command(
                 'JSON.SET', wikipedia, 'phoneNumbers[9]', '"123"')
-        assert self.error_class.is_outofboundaries_error(str(e.value))
+        assert self.error_class.is_outofbounds_error(str(e.value))
 
     def test_json_set_insert_value(self):
         client = self.server.get_new_client()
@@ -514,8 +514,8 @@ class TestJsonBasic(JsonTestCase):
         for (path, value) in [('.firstName', '"John"'),         # string
                               ('.address.city', '"New York"'),  # string
                               ('.spouse', 'null'),              # null
-                              ('.children', '[]'),              # empy array
-                              ('.groups', '{}'),                # empy object
+                              ('.children', '[]'),              # empty array
+                              ('.groups', '{}'),                # empty object
                               ('.isAlive', 'true'),             # boolean
                               ('.age', '27')]:           # float number
             assert value.encode() == client.execute_command(
@@ -525,7 +525,7 @@ class TestJsonBasic(JsonTestCase):
             assert value == client.execute_command(
                 'JSON.GET', wikipedia, path).decode()
 
-    def test_json_path_syntax_objectkeys(self):
+    def test_json_path_syntax_object_keys(self):
         client = self.server.get_new_client()
         for (path, value) in [('["firstName"]', '"John"'),
                               ('address[\'city\']', '"New York"'),
@@ -832,7 +832,7 @@ class TestJsonBasic(JsonTestCase):
             assert exp == client.execute_command(
                 'JSON.GET', key, path)
 
-        # Legacy path returns non-existent error if no value is selected.
+        # Legacy path returns nonexistent error if no value is selected.
         for (key, path, exp) in [
             (k1, '.a[*]', None),
             (k2, '.a.*', None)
@@ -876,7 +876,7 @@ class TestJsonBasic(JsonTestCase):
             with pytest.raises(ResponseError) as e:
                 client.execute_command(
                     'JSON.GET', wikipedia, path)
-            assert self.error_class.is_outofboundaries_error(str(e.value))
+            assert self.error_class.is_outofbounds_error(str(e.value))
 
         # test using negative index on a non-array value
         for path in [
@@ -1013,7 +1013,7 @@ class TestJsonBasic(JsonTestCase):
         ]:
             assert exp.encode() == client.execute_command('JSON.GET', k2, path)
 
-        # we do not support mixing of  unions and slices, nor do we support extraneous commas
+        # we do not support mixing of unions and slices, nor do we support extraneous commas
         for path in [
             '$[0,1,2:4]',
             '$[0:2,3,4]',
@@ -1541,7 +1541,7 @@ class TestJsonBasic(JsonTestCase):
         '''
         Test that double values remain consistent when going through JSON Engine.
             This tests a tolerance of 2^-50 for a decent number of iterations,
-            but is not enough to guarantee that level of presicion to our customers.
+            but is not enough to guarantee that level of precision to our customers.
         Also verify that regular and pretty print double values have the same output.
         '''
         client = self.server.get_new_client()
@@ -1902,7 +1902,7 @@ class TestJsonBasic(JsonTestCase):
             assert exp_new_str == client.execute_command(
                 'JSON.GET', key, path).decode()
 
-    def test_json_objectlen_command(self):
+    def test_json_object_len_command(self):
         client = self.server.get_new_client()
         assert 4 == client.execute_command(
             'JSON.OBJLEN', wikipedia, '.address')
@@ -1973,7 +1973,7 @@ class TestJsonBasic(JsonTestCase):
                     'JSON.OBJLEN', key, path)
             assert self.error_class.is_wrongtype_error(str(e.value))
 
-    def test_json_objectkeys_command(self):
+    def test_json_object_keys_command(self):
         client = self.server.get_new_client()
         obj_keys = [b'street', b'city', b'state', b'zipcode']
         assert obj_keys == client.execute_command(
@@ -2274,13 +2274,13 @@ class TestJsonBasic(JsonTestCase):
         with pytest.raises(ResponseError) as e:
             client.execute_command(
                 'JSON.ARRINSERT', wikipedia, ".children", 3000000000, '"a"')
-        assert self.error_class.is_outofboundaries_error(str(e.value))
+        assert self.error_class.is_outofbounds_error(str(e.value))
 
         # error condition: index arg is out of array boundaries
         with pytest.raises(ResponseError) as e:
             client.execute_command(
                 'JSON.ARRINSERT', wikipedia, ".children", 31, '"a"')
-        assert self.error_class.is_outofboundaries_error(str(e.value))
+        assert self.error_class.is_outofbounds_error(str(e.value))
 
     def test_json_arrinsert_command_jsonpath(self):
         client = self.server.get_new_client()
@@ -2311,7 +2311,7 @@ class TestJsonBasic(JsonTestCase):
         with pytest.raises(ResponseError) as e:
             client.execute_command(
                 'JSON.ARRINSERT', k2, "$.[*]", 1, '3')
-        assert self.error_class.is_outofboundaries_error(str(e.value))
+        assert self.error_class.is_outofbounds_error(str(e.value))
 
     def test_json_clear_command(self):
         client = self.server.get_new_client()
@@ -2709,13 +2709,13 @@ class TestJsonBasic(JsonTestCase):
                           [b'number', b'646 555-4567']]
 
     def test_json_debug_memory(self):
-        # non-existent key
+        # nonexistent key
         client = self.server.get_new_client()
 
         assert None == client.execute_command(
             'JSON.DEBUG MEMORY', nonexistentkey)
 
-        # non-existent path
+        # nonexistent path
         with pytest.raises(ResponseError) as e:
             client.execute_command(
                 'JSON.DEBUG MEMORY', wikipedia, nonexistentpath)
@@ -2743,9 +2743,9 @@ class TestJsonBasic(JsonTestCase):
 
         # Verify the document size calculated by the "per document memory tracking" machinery matches the size
         # calculated by the method of walking the JSON tree.
-        metadate_val = client.execute_command('JSON.DEBUG','MEMORY',wikipedia)
+        metadata_val = client.execute_command('JSON.DEBUG','MEMORY',wikipedia)
         exp_val = client.execute_command('JSON.DEBUG','MEMORY',wikipedia,'.')
-        assert exp_val == metadate_val
+        assert exp_val == metadata_val
 
     def test_json_duplicate_keys(self):
         client = self.server.get_new_client()

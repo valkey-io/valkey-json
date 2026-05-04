@@ -1341,7 +1341,7 @@ JsonUtilCode Selector::evalArrayMember(int64_t idx) {
         TRACE("DEBUG", "evalArrayMember Current node is not array. Cannot eval array index " << idx)
         return JSONUTIL_JSON_ELEMENT_NOT_ARRAY;
     }
-    if (idx < 0 || idx >= static_cast<long long>(node->Size())) return JSONUTIL_INDEX_OUT_OF_ARRAY_BOUNDARIES;
+    if (idx < 0 || idx >= static_cast<long long>(node->Size())) return JSONUTIL_INDEX_OUT_OF_ARRAY_BOUNDS;
 
     State state;
     snapshotState(state);
@@ -1436,7 +1436,7 @@ JsonUtilCode Selector::traverseToArrayIndex(int64_t idx) {
 
     // check index bounds
     if (idx >= static_cast<long long>(node->Size()) || idx < 0) {
-        return JSONUTIL_INDEX_OUT_OF_ARRAY_BOUNDARIES;
+        return JSONUTIL_INDEX_OUT_OF_ARRAY_BOUNDS;
     }
 
     nodePath.append("/").append(std::to_string(idx));

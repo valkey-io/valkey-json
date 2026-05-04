@@ -404,7 +404,7 @@ struct GenericStringRef {
     //! Explicitly create string reference from \c const character pointer
 #ifndef __clang__ // -Wdocumentation
     /*!
-        This constructor can be used to \b explicitly  create a reference to
+        This constructor can be used to \b explicitly create a reference to
         a constant string pointer.
 
         \see StringRef(const CharType*)
@@ -1039,9 +1039,9 @@ public:
     */
     GenericValue& operator=(GenericValue& rhs) RAPIDJSON_NOEXCEPT {
         if (RAPIDJSON_LIKELY(this != &rhs)) {
-            // Can't destroy "this" before assigning "rhs", otherwise "rhs"
-            // could be used after free if it's an sub-Value of "this",
-            // hence the temporary danse.
+            // Can't destroy "this" before assigning "rhs"; otherwise, "rhs"
+            // could be used after free if it's a sub-Value of "this",
+            // hence the temporary dance.
             GenericValue temp;
             temp.RawAssign(rhs, false); // valid
             this->~GenericValue();
@@ -1914,7 +1914,7 @@ public:
     uint64_t GetUint64() const  { RAPIDJSON_ASSERT(data_.f.flags & kUint64Flag); return data_.n.u64; }
 
     //! Get the value as double type.
-    /*! \note If the value is 64-bit integer type, it may lose precision. Use \c IsLosslessDouble() to check whether the converison is lossless.
+    /*! \note If the value is 64-bit integer type, it may lose precision. Use \c IsLosslessDouble() to check whether the conversion is lossless.
     */
     double GetDouble() const {
         RAPIDJSON_ASSERT(IsNumber());
@@ -2790,7 +2790,7 @@ private:
         for (size_t count = 0; count <= data_.o.capacity; ++count) {
             MemberHT& thisEntry = m[ix];
             if (!thisEntry.name) {
-                trace("Removemember, scan complete");
+                trace("RemoveMember, scan complete");
                 if (loadFactor() < hashTableFactors.minLoad) {
                     //
                     // See DoConstructHT

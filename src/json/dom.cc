@@ -826,7 +826,7 @@ STATIC JsonUtilCode internal_array_insert(JValue &arrVal, jsn::vector<JParser> &
     // Return error if the index is out of bounds.
     // If index is size-1, we are inserting before the last element.
     // If index is size, we are appending to the array.
-    if (index < 0 || index > static_cast<int64_t>(size)) return JSONUTIL_INDEX_OUT_OF_ARRAY_BOUNDARIES;
+    if (index < 0 || index > static_cast<int64_t>(size)) return JSONUTIL_INDEX_OUT_OF_ARRAY_BOUNDS;
 
     // append num_values empty values
     for (size_t i=0; i < num_values; i++) {

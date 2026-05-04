@@ -50,7 +50,7 @@
 
 #define ERRMSG_JSON_DOCUMENT_NOT_FOUND "NONEXISTENT JSON document is not found"
 #define ERRMSG_NEW_VALKEY_KEY_PATH_NOT_ROOT "SYNTAXERR A new Valkey key's path must be root"
-#define ERRMSG_CANNOT_DISABLE_MODULE_DUE_TO_OUTSTADING_DATA \
+#define ERRMSG_CANNOT_DISABLE_MODULE_DUE_TO_OUTSTANDING_DATA \
     "Cannot disable the module because there are outstanding document keys"
 
 #define STATIC /* decorator for static functions, remove so that backtrace symbols include these */
@@ -942,7 +942,7 @@ int Command_JsonDel(ValkeyModuleCtx *ctx, ValkeyModuleString **argv, int argc) {
 
     if (rc != JSONUTIL_SUCCESS) {
         if (rc == JSONUTIL_INVALID_JSON_PATH || rc == JSONUTIL_JSON_PATH_NOT_EXIST) {
-            // ignore invalid or non-existent path
+            // ignore invalid or nonexistent path
             return ValkeyModule_ReplyWithLongLong(ctx, 0);
         } else {
             return ValkeyModule_ReplyWithError(ctx, jsonutil_code_to_message(rc));
@@ -2234,7 +2234,7 @@ int Command_JsonDebug(ValkeyModuleCtx *ctx, ValkeyModuleString **argv, int argc)
 
         // ATTENTION:
         // THIS IS AN UNDOCUMENTED SUBCOMMAND, DON'T RUN IT ON A PRODUCTION SYSTEM
-        // UNLESS YOU KNOW WHAT YOU'RE DOING -- IT CAN LOCK THE MAINTHREAD FOR SEVERAL SECONDS
+        // UNLESS YOU KNOW WHAT YOU'RE DOING -- IT CAN LOCK THE MAIN THREAD FOR SEVERAL SECONDS
         //
 
 
@@ -2470,7 +2470,7 @@ int handleHashTableFactor(T rapidjson::HashTableFactors::*f, const void *v, T sc
 //
 // Resize the number of shards in the keyTable. this isn't multi-thread safe. But the current AppConfig architecture
 // doesn't provide a good way to solve this problem. Also, we only do it when the table is empty. As long as there
-// are no background operations in progress (slot migration, threadsave) we're good. Sadly there's no easy way for
+// are no background operations in progress we're good. Sadly there's no easy way for
 // a module to detect that. Once we have RM_ApplyConfig, we'll restrict this to only happen at initialization time.
 // and close this small timing hole.
 //
@@ -3080,7 +3080,7 @@ extern "C" int ValkeyModule_OnLoad(ValkeyModuleCtx *ctx) {
     }
 
     //
-    // Setup the global string table
+    // Set up the global string table
     //
     initKeyTable(KeyTable::MAX_SHARDS, KeyTable::Factors());
     if (configKeyTable() == VALKEYMODULE_ERR) return VALKEYMODULE_ERR;
