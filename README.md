@@ -78,6 +78,44 @@ valkey-server --loadmodule /path/to/libjson.so
 2. Execute Valkey command:
     MODULE LOAD /path/to/libjson.so
 ```
+
+## Configuration
+
+### Document path limit (`json.max-path-limit`)
+
+JSON documents are subject to a **maximum nesting depth** (path limit). This limit caps how deeply objects and arrays can be nested (e.g. `a.b.c.d...`). It is used to avoid unbounded recursion and stack overflow when parsing, merging, or traversing documents.
+
+- **Config key:** `json.max-path-limit`
+- **Default:** 128
+- **Range:** 0 to INT_MAX
+
+If an operation would create or load a document whose nesting depth exceeds this limit, the module returns an error: *"Document path nesting limit is exceeded"*. The same limit is enforced when merging values (e.g. with `JSON.MERGE` or merge semantics in `JSON.SET`): once the recursion depth reaches the limit, merging stops and the new value is used as-is for the remainder of the path.
+
+To change the limit (e.g. to 256):
+
+```text
+CONFIG SET json.max-path-limit 256
+```
+
+### Debug commands (`json.debug-mode`)
+
+The `JSON.DEBUG KEYTABLE-CORRUPT`, `JSON.DEBUG KEYTABLE-CLEAR`, and `JSON.DEBUG KEYTABLE-DISTRIBUTION` subcommands are intended for development and debugging only. They are gated behind the `json.debug-mode` hidden module config, which is **immutable** — it can only be set at module load time.
+
+To enable debug commands, load the module and set the config via Valkey's CLI or config file:
+
+```text
+valkey-server --loadmodule /path/to/libjson.so --json.debug-mode yes
+```
+
+Or in `valkey.conf`:
+
+```text
+loadmodule /path/to/libjson.so
+json.debug-mode yes
+```
+
+When `debug-mode` is not enabled (the default), these subcommands return an error.
+
 ## Supported  Module Commands
 ```text
 JSON.ARRAPPEND
