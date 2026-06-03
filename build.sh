@@ -109,6 +109,15 @@ fi
 
 CMAKE_FLAGS="$CMAKE_FLAGS -DENABLE_UNIT_TESTS=${ENABLE_UNIT_TESTS} -DENABLE_INTEGRATION_TESTS=${ENABLE_INTEGRATION_TESTS} -DBUILD_RELEASE=${ENABLE_BUILD_RELEASE}"
 
+if [ -n "$VALKEY_SERVER_PATH" ]; then
+    if [ ! -f "$VALKEY_SERVER_PATH" ]; then
+        echo "Error: VALKEY_SERVER_PATH is set but file does not exist: $VALKEY_SERVER_PATH"
+        exit 1
+    fi
+    echo "Using external valkey-server binary: $VALKEY_SERVER_PATH"
+    CMAKE_FLAGS="$CMAKE_FLAGS -DVALKEY_SERVER_PATH=$VALKEY_SERVER_PATH"
+fi
+
 if [ -z "${CFLAGS}" ]; then
     cmake .. -DVALKEY_VERSION=${SERVER_VERSION} ${CMAKE_FLAGS}
 else

@@ -89,9 +89,24 @@ if(ENABLE_ASAN)
     set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} ${ASAN_FLAGS}")
 endif()
 
+# Optional: path to an externally built valkey-server binary. When set,
+# we skip building Valkey from source and copy the provided binary into
+# the integration test directory instead. The Valkey source is still
+# downloaded (without being built) so that valkeymodule.h can be copied.
+set(VALKEY_SERVER_PATH "" CACHE STRING "Path to an externally built valkey-server binary; if set, skip building Valkey from source")
+
+if(VALKEY_SERVER_PATH)
+    if(NOT EXISTS "${VALKEY_SERVER_PATH}")
+        message(FATAL_ERROR "VALKEY_SERVER_PATH is set but file does not exist: ${VALKEY_SERVER_PATH}")
+    endif()
+    message(STATUS "Using external valkey-server binary: ${VALKEY_SERVER_PATH}")
+endif()
+
 # Determine Valkey build command depending on build type
 if((BUILD_RELEASE OR ENABLE_UNIT_TESTS) AND NOT ENABLE_INTEGRATION_TESTS)
     set(VALKEY_BUILD_CMD ${CMAKE_COMMAND} -E echo "Skipping build step for release build")
+elseif(VALKEY_SERVER_PATH)
+    set(VALKEY_BUILD_CMD ${CMAKE_COMMAND} -E echo "Skipping Valkey build (using external valkey-server: ${VALKEY_SERVER_PATH})")
 else()
     if(ENABLE_ASAN)
         set(VALKEY_BUILD_CMD make distclean && make -j SANITIZER=address)
@@ -129,12 +144,18 @@ ExternalProject_Add_Step(
 # Integration tests require the valkey-test-framework which is only needed when
 # building Valkey from source.
 if(ENABLE_INTEGRATION_TESTS)
-    # Copy the valkey-server binary after building
+    if(VALKEY_SERVER_PATH)
+        set(VALKEY_SERVER_SRC "${VALKEY_SERVER_PATH}")
+    else()
+        set(VALKEY_SERVER_SRC "${VALKEY_BIN_DIR}/valkey-server")
+    endif()
+    # Copy the valkey-server binary after building (or after the no-op
+    # build step when VALKEY_SERVER_PATH is provided)
     add_custom_command(TARGET valkey
             POST_BUILD
             COMMAND ${CMAKE_COMMAND} -E make_directory ${VALKEY_BINARY_DEST}
-            COMMAND ${CMAKE_COMMAND} -E copy ${VALKEY_BIN_DIR}/valkey-server ${VALKEY_BINARY_DEST}/valkey-server
-            COMMENT "Copied valkey-server to destination directory"
+            COMMAND ${CMAKE_COMMAND} -E copy ${VALKEY_SERVER_SRC} ${VALKEY_BINARY_DEST}/valkey-server
+            COMMENT "Copied valkey-server (${VALKEY_SERVER_SRC}) to destination directory"
         )
     # Define valkey-test-framework commit id
     set(VALKEY_TEST_FRAMEWORK_COMMIT "9fb28b74efd122324db00498a2fde6e5d281c90f" CACHE STRING "Valkey-test-framework commit to use")

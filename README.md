@@ -49,6 +49,11 @@ To build the module with ASAN and run tests
 export ASAN_BUILD=true
 ./build.sh --integration
 ```
+To skip building Valkey from source and reuse an externally built `valkey-server` binary, set `VALKEY_SERVER_PATH` to its absolute path.
+The binary will be copied into the integration test directory; `valkeymodule.h` is still fetched from the Valkey repo for compiling the module:
+```text
+SERVER_VERSION=unstable VALKEY_SERVER_PATH=/path/to/valkey-server ./build.sh --integration
+```
 
 ## Cleaning
 ```text
