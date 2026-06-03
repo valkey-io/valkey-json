@@ -137,7 +137,7 @@ if(ENABLE_INTEGRATION_TESTS)
             COMMENT "Copied valkey-server to destination directory"
         )
     # Define valkey-test-framework commit id
-    set(VALKEY_TEST_FRAMEWORK_COMMIT "9fb28b74efd122324db00498a2fde6e5d281c90f" CACHE STRING "Valkey-test-framework commit to use")
+    set(VALKEY_TEST_FRAMEWORK_COMMIT "unstable" CACHE STRING "Valkey-test-framework commit to use")
 
     # Set the download directory for Valkey-test-framework
     set(VALKEY_TEST_FRAMEWORK_DOWNLOAD_DIR "${CMAKE_CURRENT_BINARY_DIR}/_deps/valkey-test-framework-src")
