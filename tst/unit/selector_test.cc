@@ -1289,6 +1289,25 @@ TEST_F(SelectorTest, test_delete) {
     dom_free_doc(d1);
 }
 
+TEST_F(SelectorTest, test_filterExpr_overflow_literal) {
+    JDocument *d1;
+    const char *input = "{\"n\":5}";
+    JsonUtilCode rc = dom_parse(nullptr, input, strlen(input), &d1);
+    EXPECT_EQ(rc, JSONUTIL_SUCCESS);
+
+    // Build the plain-digit literal 10^309, which is > DBL_MAX.
+    std::string big_literal = "1" + std::string(309, '0');
+    std::string path = "$[?(@.n > " + big_literal + ")]";
+
+    Selector selector;
+    rc = selector.getValues(*d1, path.c_str());
+    // 5 is not greater than 10^309, so no values match and it doesnt crash.
+    EXPECT_EQ(rc, JSONUTIL_SUCCESS);
+    EXPECT_EQ(selector.getResultSet().size(), 0);
+
+    dom_free_doc(d1);
+}
+
 TEST_F(SelectorTest, test_delete_insert) {
     JDocument *d1;
     const char *json = "{\"a\": { \"b\": { \"c1\": \"abc\", \"c2\": \"foo bar\", \"c3\": \"just a test\" }}}";
