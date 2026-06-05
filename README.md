@@ -52,12 +52,15 @@ export ASAN_BUILD=true
 To skip building Valkey from source and reuse an externally built `valkey-server` binary, set `VALKEY_SERVER_PATH` to its absolute path.
 The binary will be copied into the integration test directory; `valkeymodule.h` is still fetched from the Valkey repo for compiling the module:
 ```text
-SERVER_VERSION=unstable VALKEY_SERVER_PATH=/path/to/valkey-server ./build.sh --integration
+SERVER_VERSION=unstable \
+VALKEY_SERVER_PATH=/path/to/valkey-server \
+./build.sh --integration
 ```
 
 To use a local `valkeymodule.h` (e.g. to match the exact version of the binary above, or to build offline), set `VALKEY_MODULE_H_PATH` to its absolute path.
 When both `VALKEY_SERVER_PATH` and `VALKEY_MODULE_H_PATH` are set, the Valkey repo is no longer cloned, enabling a fully offline build:
 ```text
+SERVER_VERSION=unstable \
 VALKEY_SERVER_PATH=/path/to/valkey-server \
 VALKEY_MODULE_H_PATH=/path/to/valkeymodule.h \
 ./build.sh --integration
