@@ -118,6 +118,15 @@ if [ -n "$VALKEY_SERVER_PATH" ]; then
     CMAKE_FLAGS="$CMAKE_FLAGS -DVALKEY_SERVER_PATH=$VALKEY_SERVER_PATH"
 fi
 
+if [ -n "$VALKEY_MODULE_H_PATH" ]; then
+    if [ ! -f "$VALKEY_MODULE_H_PATH" ]; then
+        echo "Error: VALKEY_MODULE_H_PATH is set but file does not exist: $VALKEY_MODULE_H_PATH"
+        exit 1
+    fi
+    echo "Using external valkeymodule.h: $VALKEY_MODULE_H_PATH"
+    CMAKE_FLAGS="$CMAKE_FLAGS -DVALKEY_MODULE_H_PATH=$VALKEY_MODULE_H_PATH"
+fi
+
 if [ -z "${CFLAGS}" ]; then
     cmake .. -DVALKEY_VERSION=${SERVER_VERSION} ${CMAKE_FLAGS}
 else

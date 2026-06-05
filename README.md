@@ -55,6 +55,14 @@ The binary will be copied into the integration test directory; `valkeymodule.h` 
 SERVER_VERSION=unstable VALKEY_SERVER_PATH=/path/to/valkey-server ./build.sh --integration
 ```
 
+To use a local `valkeymodule.h` (e.g. to match the exact version of the binary above, or to build offline), set `VALKEY_MODULE_H_PATH` to its absolute path.
+When both `VALKEY_SERVER_PATH` and `VALKEY_MODULE_H_PATH` are set, the Valkey repo is no longer cloned, enabling a fully offline build:
+```text
+VALKEY_SERVER_PATH=/path/to/valkey-server \
+VALKEY_MODULE_H_PATH=/path/to/valkeymodule.h \
+./build.sh --integration
+```
+
 ## Cleaning
 ```text
 # Clean build artifacts
