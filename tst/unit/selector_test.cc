@@ -1342,3 +1342,34 @@ TEST_F(SelectorTest, test_delete_insert) {
 
     dom_free_doc(d1);
 }
+
+// Deleting multiple object members whose keys contain a tilde via a multi-match path.
+TEST_F(SelectorTest, test_delete_tilde_keys) {
+    JDocument *d1;
+    const char *json = "{\"~\":1,\"~~\":2}";
+    JsonUtilCode rc = dom_parse(nullptr, json, strlen(json), &d1);
+    EXPECT_EQ(rc, JSONUTIL_SUCCESS);
+
+    size_t num_vals_deleted;
+    rc = dom_delete_value(d1, "$.*", num_vals_deleted);
+    EXPECT_EQ(rc, JSONUTIL_SUCCESS);
+    EXPECT_EQ(num_vals_deleted, 2);
+
+    dom_free_doc(d1);
+}
+
+// Recursive descent ($..*) over nested objects with tilde keys.
+TEST_F(SelectorTest, test_delete_tilde_keys_recursive) {
+    JDocument *d1;
+    const char *json = "{\"o\":{\"~\":1,\"~a\":2}}";
+    JsonUtilCode rc = dom_parse(nullptr, json, strlen(json), &d1);
+    EXPECT_EQ(rc, JSONUTIL_SUCCESS);
+
+    size_t num_vals_deleted;
+    rc = dom_delete_value(d1, "$..*", num_vals_deleted);
+    EXPECT_EQ(rc, JSONUTIL_SUCCESS);
+    EXPECT_EQ(num_vals_deleted, 3);
+
+    dom_free_doc(d1);
+}
+
