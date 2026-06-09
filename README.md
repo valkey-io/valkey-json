@@ -50,6 +50,13 @@ export ASAN_BUILD=true
 ./build.sh --integration
 ```
 
+By default, integration tests launch a local Valkey server.
+To run them against an external Valkey server instead (with the JSON module already loaded), set `VALKEY_EXTERNAL_SERVER=true`.
+The host and port can be customized via `VALKEY_HOST` (default `localhost`) and `VALKEY_PORT` (default `6379`):
+```text
+VALKEY_EXTERNAL_SERVER=true VALKEY_HOST=127.0.0.1 VALKEY_PORT=6379 ./build.sh --integration
+```
+
 ## Cleaning
 ```text
 # Clean build artifacts

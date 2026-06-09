@@ -1,13 +1,5 @@
 #!/usr/bin/env bash
 
-# Sometimes processes are left running when test is cancelled.
-# Therefore, before build start, we kill all running test processes left from previous test run.
-echo "Kill old running test"
-pkill -9 -x Pytest || true
-pkill -9 -f "valkey-server.*:" || true
-pkill -9 -f Valgrind || true
-pkill -9 -f "valkey-benchmark" || true
-
 # If environment variable SERVER_VERSION is not set, default to "unstable"
 if [ -z "$SERVER_VERSION" ]; then
     echo "SERVER_VERSION environment variable is not set. Defaulting to \"unstable\"."
