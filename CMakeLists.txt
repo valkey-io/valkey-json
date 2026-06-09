@@ -89,9 +89,49 @@ if(ENABLE_ASAN)
     set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} ${ASAN_FLAGS}")
 endif()
 
+# Optional: path to an externally built valkey-server binary. When set,
+# we skip building Valkey from source and copy the provided binary into
+# the integration test directory instead. The Valkey source is still
+# downloaded (without being built) so that valkeymodule.h can be copied,
+# unless VALKEY_MODULE_H_PATH is also provided (see below).
+set(VALKEY_SERVER_PATH "" CACHE STRING "Path to an externally built valkey-server binary; if set, skip building Valkey from source")
+
+# Optional: path to an external valkeymodule.h header. When set, the
+# header is copied from this path instead of from the cloned Valkey
+# source. Combined with VALKEY_SERVER_PATH (or a non-integration build),
+# this lets the build skip cloning the Valkey repo entirely, enabling
+# fully offline builds and exact header/binary version matching.
+set(VALKEY_MODULE_H_PATH "" CACHE STRING "Path to an external valkeymodule.h; combined with VALKEY_SERVER_PATH allows fully offline builds")
+
+if(VALKEY_SERVER_PATH)
+    if(NOT EXISTS "${VALKEY_SERVER_PATH}")
+        message(FATAL_ERROR "VALKEY_SERVER_PATH is set but file does not exist: ${VALKEY_SERVER_PATH}")
+    endif()
+    message(STATUS "Using external valkey-server binary: ${VALKEY_SERVER_PATH}")
+endif()
+
+if(VALKEY_MODULE_H_PATH)
+    if(NOT EXISTS "${VALKEY_MODULE_H_PATH}")
+        message(FATAL_ERROR "VALKEY_MODULE_H_PATH is set but file does not exist: ${VALKEY_MODULE_H_PATH}")
+    endif()
+    message(STATUS "Using external valkeymodule.h: ${VALKEY_MODULE_H_PATH}")
+endif()
+
+# Decide whether the Valkey source needs to be cloned. The clone serves
+# two purposes: providing valkeymodule.h, and providing the source tree
+# to build valkey-server for integration tests. If both can be satisfied
+# externally, skip the clone entirely.
+set(VALKEY_NEED_CLONE TRUE)
+if(VALKEY_MODULE_H_PATH AND (VALKEY_SERVER_PATH OR NOT ENABLE_INTEGRATION_TESTS))
+    set(VALKEY_NEED_CLONE FALSE)
+    message(STATUS "Offline build: skipping Valkey source clone")
+endif()
+
 # Determine Valkey build command depending on build type
 if((BUILD_RELEASE OR ENABLE_UNIT_TESTS) AND NOT ENABLE_INTEGRATION_TESTS)
     set(VALKEY_BUILD_CMD ${CMAKE_COMMAND} -E echo "Skipping build step for release build")
+elseif(VALKEY_SERVER_PATH)
+    set(VALKEY_BUILD_CMD ${CMAKE_COMMAND} -E echo "Skipping Valkey build (using external valkey-server: ${VALKEY_SERVER_PATH})")
 else()
     if(ENABLE_ASAN)
         set(VALKEY_BUILD_CMD make distclean && make -j SANITIZER=address)
@@ -100,41 +140,68 @@ else()
     endif()
 endif()
 
-ExternalProject_Add(
-    valkey
-    GIT_REPOSITORY https://github.com/valkey-io/valkey.git
-    GIT_TAG ${VALKEY_VERSION}
-    PREFIX ${VALKEY_DOWNLOAD_DIR}
-    CONFIGURE_COMMAND ""
-    BUILD_COMMAND ${VALKEY_BUILD_CMD}
-    INSTALL_COMMAND ""
-    BUILD_IN_SOURCE 1
-)
-
 # Define the paths for the copied files
 set(VALKEY_INCLUDE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/src/include")
 set(VALKEY_BINARY_DEST "${CMAKE_CURRENT_SOURCE_DIR}/tst/integration/.build/binaries/${VALKEY_VERSION}")
 
-ExternalProject_Add_Step(
-    valkey
-    copy_header_files
-    COMMENT "Copying header files to include/ directory"
-    DEPENDEES download
-    DEPENDERS configure
-    COMMAND ${CMAKE_COMMAND} -E make_directory ${VALKEY_INCLUDE_DIR}
-    COMMAND ${CMAKE_COMMAND} -E copy ${VALKEY_DOWNLOAD_DIR}/src/valkey/src/valkeymodule.h ${VALKEY_INCLUDE_DIR}/valkeymodule.h
-    ALWAYS 1
-)
+if(VALKEY_NEED_CLONE)
+    ExternalProject_Add(
+        valkey
+        GIT_REPOSITORY https://github.com/valkey-io/valkey.git
+        GIT_TAG ${VALKEY_VERSION}
+        PREFIX ${VALKEY_DOWNLOAD_DIR}
+        CONFIGURE_COMMAND ""
+        BUILD_COMMAND ${VALKEY_BUILD_CMD}
+        INSTALL_COMMAND ""
+        BUILD_IN_SOURCE 1
+    )
+
+    # Header source: prefer the user-provided path; otherwise use the
+    # one from the cloned Valkey repo.
+    if(VALKEY_MODULE_H_PATH)
+        set(VALKEY_MODULE_H_SRC "${VALKEY_MODULE_H_PATH}")
+    else()
+        set(VALKEY_MODULE_H_SRC "${VALKEY_DOWNLOAD_DIR}/src/valkey/src/valkeymodule.h")
+    endif()
+
+    ExternalProject_Add_Step(
+        valkey
+        copy_header_files
+        COMMENT "Copying header files to include/ directory"
+        DEPENDEES download
+        DEPENDERS configure
+        COMMAND ${CMAKE_COMMAND} -E make_directory ${VALKEY_INCLUDE_DIR}
+        COMMAND ${CMAKE_COMMAND} -E copy ${VALKEY_MODULE_H_SRC} ${VALKEY_INCLUDE_DIR}/valkeymodule.h
+        ALWAYS 1
+    )
+else()
+    # Fully offline build: both valkey-server (if needed) and
+    # valkeymodule.h are provided by the user, so we don't clone the
+    # Valkey repo at all. Provide a placeholder utility target named
+    # "valkey" so existing dependants (add_dependencies / POST_BUILD
+    # custom_command) keep working unchanged.
+    add_custom_target(valkey
+        COMMAND ${CMAKE_COMMAND} -E echo "Offline build: skipping Valkey clone/build"
+    )
+    file(MAKE_DIRECTORY ${VALKEY_INCLUDE_DIR})
+    configure_file(${VALKEY_MODULE_H_PATH} ${VALKEY_INCLUDE_DIR}/valkeymodule.h COPYONLY)
+endif()
 
 # Integration tests require the valkey-test-framework which is only needed when
 # building Valkey from source.
 if(ENABLE_INTEGRATION_TESTS)
-    # Copy the valkey-server binary after building
+    if(VALKEY_SERVER_PATH)
+        set(VALKEY_SERVER_SRC "${VALKEY_SERVER_PATH}")
+    else()
+        set(VALKEY_SERVER_SRC "${VALKEY_BIN_DIR}/valkey-server")
+    endif()
+    # Copy the valkey-server binary after building (or after the no-op
+    # build step when VALKEY_SERVER_PATH is provided)
     add_custom_command(TARGET valkey
             POST_BUILD
             COMMAND ${CMAKE_COMMAND} -E make_directory ${VALKEY_BINARY_DEST}
-            COMMAND ${CMAKE_COMMAND} -E copy ${VALKEY_BIN_DIR}/valkey-server ${VALKEY_BINARY_DEST}/valkey-server
-            COMMENT "Copied valkey-server to destination directory"
+            COMMAND ${CMAKE_COMMAND} -E copy ${VALKEY_SERVER_SRC} ${VALKEY_BINARY_DEST}/valkey-server
+            COMMENT "Copied valkey-server (${VALKEY_SERVER_SRC}) to destination directory"
         )
     # Define valkey-test-framework commit id
     set(VALKEY_TEST_FRAMEWORK_COMMIT "33cc62660ea94d49bd6ab27cb8c09b345fc5d577" CACHE STRING "Valkey-test-framework commit to use")
