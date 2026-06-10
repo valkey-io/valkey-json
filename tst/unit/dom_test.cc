@@ -777,6 +777,44 @@ TEST_F(DomTest, testNumIncrMultBy_string_value_overflow) {
     EXPECT_FALSE(isV2Path);
 }
 
+// Numbers outside the normal double range are kept in string form, and reading them via GetDouble()
+// must not crash. std::strtod instead returns a subnormal on underflow and +/-inf on overflow, so
+// underflow goes through as normal arithmetic and overflow is caught by the existing isinf check as
+// JSONUTIL_ADDITION_OVERFLOW.
+TEST_F(DomTest, testNumIncrBy_double_out_of_range) {
+    jsn::vector<double> res;
+    bool isV2Path;
+    JParser parser;
+
+    // Case 1: Stored value is normal, the increment 1e-308 is subnormal and is converted back via
+    // GetDouble() during the addition.
+    JsonUtilCode rc = dom_set_value(nullptr, doc1, ".foo", "1.5", false, false);
+    EXPECT_EQ(rc, JSONUTIL_SUCCESS);
+    rc = dom_increment_by(doc1, ".foo", &parser.Parse("1e-308", 6).GetJValue(), res, isV2Path);
+    EXPECT_EQ(rc, JSONUTIL_SUCCESS);
+    EXPECT_EQ(res.size(), 1);
+    EXPECT_EQ(res[0], 1.5 + 1e-308);
+    EXPECT_FALSE(isV2Path);
+
+    // Case 2: subnormal stored value, the stored 1e-308 is converted back via GetDouble().
+    rc = dom_set_value(nullptr, doc1, ".foo", "1e-308", false, false);
+    EXPECT_EQ(rc, JSONUTIL_SUCCESS);
+    rc = dom_increment_by(doc1, ".foo", &parser.Parse("5", 1).GetJValue(), res, isV2Path);
+    EXPECT_EQ(rc, JSONUTIL_SUCCESS);
+    EXPECT_EQ(res.size(), 1);
+    EXPECT_EQ(res[0], 1e-308 + 5);
+    EXPECT_FALSE(isV2Path);
+
+    // Case 3: overflow stored value, a plain-digit literal >= 10^309 (> DBL_MAX) is stored in
+    // string form. GetDouble() converts it to +inf, and the addition is caught as an overflow.
+    std::string big_literal = "1" + std::string(309, '0');
+    rc = dom_set_value(nullptr, doc1, ".foo", big_literal.c_str(), false, false);
+    EXPECT_EQ(rc, JSONUTIL_SUCCESS);
+    rc = dom_increment_by(doc1, ".foo", &parser.Parse("5", 1).GetJValue(), res, isV2Path);
+    EXPECT_EQ(rc, JSONUTIL_ADDITION_OVERFLOW);
+    EXPECT_FALSE(isV2Path);
+}
+
 TEST_F(DomTest, testToggle) {
     JsonUtilCode rc = dom_set_value(nullptr, doc1, ".foobool", "true", false, false);
     EXPECT_EQ(rc, JSONUTIL_SUCCESS);
