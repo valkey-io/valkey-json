@@ -32,6 +32,7 @@
 #include <new>     // placement new
 #include <limits>
 #include <atomic>
+#include <cstdlib>  // std::strtod
 #ifdef __cpp_lib_three_way_comparison
 #include <compare>
 #endif
@@ -1918,7 +1919,7 @@ public:
     */
     double GetDouble() const {
         RAPIDJSON_ASSERT(IsNumber());
-        if ((data_.f.flags & kDoubleFlag) != 0)                { return std::stod(DataString(data_)); }   // convert from string to double.
+        if ((data_.f.flags & kDoubleFlag) != 0)                { return std::strtod(DataString(data_), nullptr);}  // convert from string to double.
         if ((data_.f.flags & kIntFlag) != 0)                   return data_.n.i.i; // int -> double
         if ((data_.f.flags & kUintFlag) != 0)                  return data_.n.u.u; // unsigned -> double
         if ((data_.f.flags & kInt64Flag) != 0)                 return static_cast<double>(data_.n.i64); // int64_t -> double (may lose precision)
