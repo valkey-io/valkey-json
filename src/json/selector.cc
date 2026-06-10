@@ -616,6 +616,15 @@ struct pathCompare {
         JPointer ptr2 = JPointer(path2);
         size_t depth1 = ptr1.GetTokenCount();
         size_t depth2 = ptr2.GetTokenCount();
+
+        // Guard against invalid pointers. A malformed JSON pointer parses to zero tokens, and
+        // because depth is size_t, tokenArray[depth - 1] below would underflow to (size_t)-1 and
+        // read out of bounds. Fall back to a stable lexicographic ordering of the raw paths.
+        if (ptr1.HasError() || ptr2.HasError() || depth1 == 0 || depth2 == 0) {
+            if (depth1 != depth2) return depth1 > depth2;
+            return path1 > path2;
+        }
+
         if (depth1 != depth2) return depth1 > depth2;
 
         const JPointer::Token* tokenArray1 = ptr1.GetTokens();
@@ -2425,7 +2434,9 @@ void Selector::dedupe() {
 
 void Selector::escape_member_name_for_json_pointer(const std::string_view &member_name, std::ostringstream &oss) {
     for (char c : member_name) {
-        if (c == '/') {
+        if (c == '~') {
+            oss << "~0";
+        } else if (c == '/') {
             oss << "~1";
         } else {
             oss << c;
