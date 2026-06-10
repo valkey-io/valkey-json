@@ -1301,7 +1301,7 @@ TEST_F(SelectorTest, test_filterExpr_overflow_literal) {
 
     Selector selector;
     rc = selector.getValues(*d1, path.c_str());
-    // 5 is not greater than 10^309, so no values match and it doesnt crash.
+    // 5 is not greater than 10^309, so no values match and it doesn't crash.
     EXPECT_EQ(rc, JSONUTIL_SUCCESS);
     EXPECT_EQ(selector.getResultSet().size(), 0);
 
