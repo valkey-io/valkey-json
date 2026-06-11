@@ -283,7 +283,6 @@ STATIC JsonUtilCode parseSetCmdArgs(ValkeyModuleString **argv, const int argc, S
 
 typedef struct {
     ValkeyModuleString *key_str;    // Required
-    ValkeyModuleKey *key;
     const char *path;               // Required
     const char *json;               // Required
     size_t json_len;
@@ -312,11 +311,11 @@ STATIC JsonUtilCode parseAndValidateMSetCmdArgs(ValkeyModuleCtx *ctx, ValkeyModu
         MSetCmdArgs &current_arg = (*args_list)[i];
 
         current_arg.key_str = argv[i * 3 + 1];
-        current_arg.key = static_cast<ValkeyModuleKey*>(
+        ValkeyModuleKey *key = static_cast<ValkeyModuleKey*>(
             ValkeyModule_OpenKey(ctx, current_arg.key_str, VALKEYMODULE_READ | VALKEYMODULE_WRITE));
 
         // Handle key allocation failure
-        if (!current_arg.key) {
+        if (!key) {
             rc = JSONUTIL_KEY_OPEN_ERROR;
             return rc;
         }
@@ -325,9 +324,9 @@ STATIC JsonUtilCode parseAndValidateMSetCmdArgs(ValkeyModuleCtx *ctx, ValkeyModu
         current_arg.json = ValkeyModule_StringPtrLen(argv[i * 3 + 3], &current_arg.json_len);
 
         // Validate key type
-        int type = ValkeyModule_KeyType(current_arg.key);
+        int type = ValkeyModule_KeyType(key);
         if (type != VALKEYMODULE_KEYTYPE_EMPTY &&
-            ValkeyModule_ModuleTypeGetType(current_arg.key) != DocumentType) {
+            ValkeyModule_ModuleTypeGetType(key) != DocumentType) {
             rc = JSONUTIL_NOT_A_DOCUMENT_KEY;
             return rc;
         }
@@ -359,7 +358,7 @@ STATIC JsonUtilCode parseAndValidateMSetCmdArgs(ValkeyModuleCtx *ctx, ValkeyModu
             }
             dom_free_doc(doc);
         } else {
-            JDocument *doc = static_cast<JDocument*>(ValkeyModule_ModuleTypeGetValue(current_arg.key));
+            JDocument *doc = static_cast<JDocument*>(ValkeyModule_ModuleTypeGetValue(key));
             if (!doc) {
                 rc = JSONUTIL_DOCUMENT_KEY_NOT_FOUND;
                 return rc;
@@ -740,6 +739,11 @@ int Command_JsonSet(ValkeyModuleCtx *ctx, ValkeyModuleString **argv, int argc) {
     return ValkeyModule_ReplyWithSimpleString(ctx, "OK");
 }
 
+// JSON.MSET applies each key/path/value independently on a best-effort basis.
+// An op that no longer applies against the current document (for example because
+// an earlier op in the same command changed the document's shape) is skipped;
+// All applicable ops are applied and the command returns OK.
+// Replicate the command so replicas and the AOF apply the same best-effort result.
 int Command_JsonMSet(ValkeyModuleCtx *ctx, ValkeyModuleString **argv, int argc) {
     ValkeyModule_AutoMemory(ctx);
 
@@ -754,44 +758,51 @@ int Command_JsonMSet(ValkeyModuleCtx *ctx, ValkeyModuleString **argv, int argc) 
             return ValkeyModule_ReplyWithError(ctx, jsonutil_code_to_message(rc));
     }
 
-    // Apply changes
-    size_t i;
-    for (i = 0; i < num_keys; i++) {
-        // begin tracking memory
+    for (size_t i = 0; i < num_keys; i++) {
         int64_t begin_val = jsonstats_begin_track_mem();
 
-        if (args_list[i].is_root_path) { // Root document
-            // parse incoming JSON string
+        // Open the key fresh so each op sees the current value, even for duplicate keys
+        // where an earlier op may have replaced the document.
+        ValkeyModuleKey *key = static_cast<ValkeyModuleKey*>(
+            ValkeyModule_OpenKey(ctx, args_list[i].key_str, VALKEYMODULE_READ | VALKEYMODULE_WRITE));
+
+        if (args_list[i].is_root_path) {
             JDocument *doc;
             rc = dom_parse(ctx, args_list[i].json, args_list[i].json_len, &doc);
-            ValkeyModule_Assert(rc == JSONUTIL_SUCCESS);
+            if (rc != JSONUTIL_SUCCESS) {
+                jsonstats_end_track_mem(begin_val);
+                continue;  // skip this op
+            }
 
             int64_t delta = jsonstats_end_track_mem(begin_val);
             size_t doc_size = dom_get_doc_size(doc) + delta;
             dom_set_doc_size(doc, doc_size);
 
-            // Set Valkey key
-            ValkeyModule_ModuleTypeSetValue(args_list[i].key, DocumentType, doc);
-            // update stats
+            ValkeyModule_ModuleTypeSetValue(key, DocumentType, doc);
             jsonstats_update_stats_on_insert(doc, true, 0, doc_size, doc_size);
-        } else { // Update existing document
-            JDocument *doc = static_cast<JDocument*>(ValkeyModule_ModuleTypeGetValue(args_list[i].key));
+        } else {
+            JDocument *doc = static_cast<JDocument*>(ValkeyModule_ModuleTypeGetValue(key));
+            if (!doc) {
+                jsonstats_end_track_mem(begin_val);
+                continue;  // skip: key no longer holds a document
+            }
             size_t orig_doc_size = dom_get_doc_size(doc);
 
             rc = dom_set_value(ctx, doc, args_list[i].path, args_list[i].json, args_list[i].json_len, false, false);
-            ValkeyModule_Assert(rc == JSONUTIL_SUCCESS);
+            if (rc != JSONUTIL_SUCCESS) {
+                jsonstats_end_track_mem(begin_val);
+                continue;  // skip: path no longer valid against current document
+            }
             int64_t delta = jsonstats_end_track_mem(begin_val);
             size_t new_doc_size = dom_get_doc_size(doc) + delta;
             dom_set_doc_size(doc, new_doc_size);
 
-            // update stats
             jsonstats_update_stats_on_update(doc, orig_doc_size, new_doc_size, args_list[i].json_len);
         }
 
         ValkeyModule_NotifyKeyspaceEvent(ctx, VALKEYMODULE_NOTIFY_GENERIC, "json.mset", args_list[i].key_str);
     }
 
-    // replicate the entire command
     ValkeyModule_ReplicateVerbatim(ctx);
     ValkeyModule_Free(args_list);
     return ValkeyModule_ReplyWithSimpleString(ctx, "OK");
