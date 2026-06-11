@@ -1347,6 +1347,10 @@ enum meta_codes {
     JSON_METACODE_PAIR    = 0x80    // Codes an object Memory, a string(member name) and a JValue
 };
 
+// Cap pre-reservation for legacy RDB array loads: the declared count is untrusted
+// (RESTORE/replication), so limit upfront allocation; PushBack grows as elements arrive.
+static constexpr uint64_t JSON_RDB_ARRAY_RESERVE_CAP = 1ULL << 16;  // 65536 elements
+
 //
 // save a JValue, recurse as required for object and array
 //
@@ -1499,15 +1503,21 @@ JValue rdbLoadJValue(load_params *params) {
             uint64_t length = ValkeyModule_LoadUnsigned(params->rdb);
             JValue array;
             array.SetArray();
-            array.Reserve(length, allocator);
             if (params->nestLevel >= json_get_max_path_limit()) {
                 params->status = JSONUTIL_DOCUMENT_PATH_LIMIT_EXCEEDED;
                 ValkeyModule_LogIOError(params->rdb, "error", "document path limit exceeded");
                 return JValue();
             }
+            array.Reserve(std::min<uint64_t>(length, JSON_RDB_ARRAY_RESERVE_CAP), allocator);
             params->nestLevel++;
             while (length--) {
                 array.PushBack(rdbLoadJValue(params), allocator);
+                // Break on load failure or IO error to avoid unbounded loop.
+                if (params->status != JSONUTIL_SUCCESS || ValkeyModule_IsIOError(params->rdb)) {
+                    if (params->status == JSONUTIL_SUCCESS) params->status = JSONUTIL_INVALID_RDB_FORMAT;
+                    params->nestLevel--;
+                    return JValue();
+                }
             }
             params->nestLevel--;
             return array;
@@ -1543,6 +1553,12 @@ JsonUtilCode dom_load(JDocument **doc, ValkeyModuleIO *ctx, int encver) {
             params.nestLevel = 0;
             params.status = JSONUTIL_SUCCESS;
             JValue loadedValue = rdbLoadJValue(&params);
+            // Catch truncated-stream cases that didn't set status during recursion.
+            if (params.status == JSONUTIL_SUCCESS && ValkeyModule_IsIOError(ctx)) {
+                ValkeyModule_LogIOError(ctx, "warning",
+                    "IO error after rdbLoadJValue with success status; rejecting");
+                params.status = JSONUTIL_INVALID_RDB_FORMAT;
+            }
             if (params.status == JSONUTIL_SUCCESS) {
                 *doc = create_doc();
                 (*doc)->SetJValue(loadedValue);
