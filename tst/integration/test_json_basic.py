@@ -2975,6 +2975,67 @@ class TestJsonBasic(JsonTestCase):
             assert value.encode() == client.execute_command(
                 'JSON.GET', key, path)
 
+    def test_json_mset_duplicate_key_root_then_path(self):
+        """Best-effort: root replace then conflicting path op on same key.
+        The root op applies, the path op is skipped (path no longer valid),
+        command returns OK, server stays alive."""
+        client = self.server.get_new_client()
+        dk = 'dk'
+        client.execute_command('JSON.SET', dk, '$', '{"a":1}')
+        # Op1 replaces root with array, op2 references .a which no longer exists
+        assert b'OK' == client.execute_command('JSON.MSET', dk, '$', '[1,2,3]', dk, '.a', '99')
+        # Server alive
+        assert client.execute_command('PING')
+        # Op1 applied, op2 skipped
+        assert b'[1,2,3]' == client.execute_command('JSON.GET', dk, '.')
+
+    def test_json_mset_duplicate_key_nested_path(self):
+        """Best-effort: nested object replacement then deeper path on same key.
+        First op applies, second is skipped (path no longer valid),
+        command returns OK."""
+        client = self.server.get_new_client()
+        dk = 'dk'
+        client.execute_command('JSON.SET', dk, '$', '{"a":{"x":1}}')
+        # Op1 replaces .a with array, op2 references .a.x which no longer exists
+        assert b'OK' == client.execute_command('JSON.MSET', dk, '.a', '[9]', dk, '.a.x', '5')
+        assert client.execute_command('PING')
+        # Op1 applied, op2 skipped
+        assert b'[9]' == client.execute_command('JSON.GET', dk, '.a')
+
+    def test_json_mset_duplicate_key_3ops_best_effort(self):
+        """Best-effort continues past conflicts: op1 ok, op2 conflicts, op3 ok.
+        A conflicting op is skipped and the remaining ops are still applied."""
+        client = self.server.get_new_client()
+        dk = 'dk'
+        k = 'mset3opk'
+        client.execute_command('JSON.SET', dk, '$', '{"a":1}')
+        client.execute_command('JSON.SET', k, '$', '{"v":0}')
+        # Op1: replace dk root (ok)
+        # Op2: set dk .a (conflicts - path gone after op1, skipped)
+        # Op3: update k .v (applied - best-effort continues past op2)
+        assert b'OK' == client.execute_command('JSON.MSET',
+                                              dk, '$', '[1,2,3]',
+                                              dk, '.a', '99',
+                                              k, '.v', '42')
+        assert client.execute_command('PING')
+        # Op1 applied
+        assert b'[1,2,3]' == client.execute_command('JSON.GET', dk, '.')
+        # Op3 applied (best-effort continues past conflict)
+        assert b'{"v":42}' == client.execute_command('JSON.GET', k, '.')
+
+    def test_json_mset_duplicate_key_later_op_valid(self):
+        """Duplicate key where the later op IS valid against the earlier op's result.
+        Op1 replaces root with {"b":1}, op2 sets .b to 2 on the new doc.
+        Both ops apply because each iteration opens the key fresh."""
+        client = self.server.get_new_client()
+        dk = 'dk'
+        client.execute_command('JSON.SET', dk, '$', '{"a":1}')
+        # Op1 replaces root, op2 sets .b on the NEW root — valid composition
+        assert b'OK' == client.execute_command('JSON.MSET', dk, '$', '{"b":1}', dk, '.b', '2')
+        assert client.execute_command('PING')
+        # Both ops applied: op1 set {"b":1}, op2 updated .b to 2
+        assert b'{"b":2}' == client.execute_command('JSON.GET', dk, '.')
+
     def test_multi_exec(self):
         client = self.server.get_new_client()
         client.execute_command('MULTI')
