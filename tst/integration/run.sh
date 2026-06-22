@@ -27,28 +27,64 @@ fi
 
 if [[ $1 == "test" ]] ; then
     if [ ! -z "${ASAN_BUILD}" ]; then
-        echo "Running tests and checking for memory leaks"
+        echo "Running tests with AddressSanitizer enabled"
+
+        # Make ASAN/LSAN report reliably. Reports go to stderr detect_leaks=1 enables 
+        # leak checks at process exit. We do not abort the process so pytest can finish;
+        # any error is caught via the log scan and the pytest exit code below.
+        export ASAN_OPTIONS="detect_leaks=1:halt_on_error=0:abort_on_error=0:log_path=stderr${ASAN_OPTIONS:+:${ASAN_OPTIONS}}"
+
+        # Propagate the real pytest exit status through the pipe to tee.
+        set -o pipefail
         python -m pytest --capture=sys --html=report.html --cache-clear -v ${TEST_FLAG} ./ ${TEST_PATTERN} 2>&1 | tee test_output.tmp
-        # Check for memory leaks in the output
+        PYTEST_STATUS=${PIPESTATUS[0]}
+        set +o pipefail
+
+        RED='\033[0;31m'
+        NC='\033[0m'
+        FAILED=0
+
+        # 1) Any AddressSanitizer error: heap-buffer-overflow, heap-use-after-free,
+        #    stack/global-buffer-overflow, etc.
+        if grep -Eq "(ERROR|WARNING): AddressSanitizer:|SUMMARY: AddressSanitizer:" test_output.tmp; then
+            echo -e "${RED}AddressSanitizer reported errors:${NC}"
+            grep -nE "(ERROR|WARNING): AddressSanitizer:|SUMMARY: AddressSanitizer:" test_output.tmp | \
+            while read -r line; do
+                echo "::error::ASAN: ${line}"
+            done
+            FAILED=1
+        fi
+
+        # 2) Memory leaks reported by LeakSanitizer.
         if grep -q "LeakSanitizer: detected memory leaks" test_output.tmp; then
-            RED='\033[0;31m'
-            echo -e "${RED}Memory leaks detected in the following tests:"
+            echo -e "${RED}Memory leaks detected in the following tests:${NC}"
             LEAKING_TESTS=$(grep -B 2 "LeakSanitizer: detected memory leaks" test_output.tmp | \
                             grep -v "LeakSanitizer" | \
                             grep ".*\.py::")
-            
-            LEAK_COUNT=$(echo "$LEAKING_TESTS" | wc -l)
-            
+
+            LEAK_COUNT=$(echo "$LEAKING_TESTS" | grep -c .)
+
             # Output each leaking test
             echo "$LEAKING_TESTS" | while read -r line; do
-                echo "::error::Test with leak: $line"
+                [ -n "$line" ] && echo "::error::Test with leak: ${line}"
             done
-            
-            echo -e "\n$LEAK_COUNT python integration tests have leaks detected in them"
-            rm test_output.tmp
+
+            echo -e "\n${LEAK_COUNT} python integration tests have leaks detected in them"
+            FAILED=1
+        fi
+
+        # 3) pytest itself failed (assertion failure, or a server crash caused by a
+        #    fatal ASAN error that terminated the process mid-test).
+        if [ "${PYTEST_STATUS}" -ne 0 ]; then
+            echo -e "${RED}pytest exited with status ${PYTEST_STATUS}${NC}"
+            echo "::error::pytest exited with status ${PYTEST_STATUS}"
+            FAILED=1
+        fi
+
+        rm -f test_output.tmp
+        if [ "${FAILED}" -ne 0 ]; then
             exit 1
         fi
-        rm test_output.tmp
     else
         python -m pytest --html=report.html --cache-clear -v ${TEST_FLAG} ./ ${TEST_PATTERN}
     fi
