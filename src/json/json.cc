@@ -368,6 +368,8 @@ STATIC JsonUtilCode parseAndValidateMSetCmdArgs(ValkeyModuleCtx *ctx, ValkeyModu
                 return rc;
             }
         }
+        // Close the validation handle so no stale handle to a duplicate key survives.
+        ValkeyModule_CloseKey(key);
     }
     return JSONUTIL_SUCCESS;
 }
@@ -771,6 +773,7 @@ int Command_JsonMSet(ValkeyModuleCtx *ctx, ValkeyModuleString **argv, int argc) 
             rc = dom_parse(ctx, args_list[i].json, args_list[i].json_len, &doc);
             if (rc != JSONUTIL_SUCCESS) {
                 jsonstats_end_track_mem(begin_val);
+                ValkeyModule_CloseKey(key);
                 continue;  // skip this op
             }
 
@@ -784,6 +787,7 @@ int Command_JsonMSet(ValkeyModuleCtx *ctx, ValkeyModuleString **argv, int argc) 
             JDocument *doc = static_cast<JDocument*>(ValkeyModule_ModuleTypeGetValue(key));
             if (!doc) {
                 jsonstats_end_track_mem(begin_val);
+                ValkeyModule_CloseKey(key);
                 continue;  // skip: key no longer holds a document
             }
             size_t orig_doc_size = dom_get_doc_size(doc);
@@ -791,6 +795,7 @@ int Command_JsonMSet(ValkeyModuleCtx *ctx, ValkeyModuleString **argv, int argc) 
             rc = dom_set_value(ctx, doc, args_list[i].path, args_list[i].json, args_list[i].json_len, false, false);
             if (rc != JSONUTIL_SUCCESS) {
                 jsonstats_end_track_mem(begin_val);
+                ValkeyModule_CloseKey(key);
                 continue;  // skip: path no longer valid against current document
             }
             int64_t delta = jsonstats_end_track_mem(begin_val);
@@ -801,6 +806,9 @@ int Command_JsonMSet(ValkeyModuleCtx *ctx, ValkeyModuleString **argv, int argc) 
         }
 
         ValkeyModule_NotifyKeyspaceEvent(ctx, VALKEYMODULE_NOTIFY_GENERIC, "json.mset", args_list[i].key_str);
+        // Close before the next op reopens this key; duplicate keys free the doc/key
+        // object, and a lingering handle would dangle at teardown (heap-use-after-free).
+        ValkeyModule_CloseKey(key);
     }
 
     ValkeyModule_ReplicateVerbatim(ctx);
