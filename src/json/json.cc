@@ -767,10 +767,19 @@ int Command_JsonMerge(ValkeyModuleCtx *ctx, ValkeyModuleString **argv, int argc)
         if (!is_root_path) {
             return ValkeyModule_ReplyWithError(ctx, ERRMSG_NEW_VALKEY_KEY_PATH_NOT_ROOT);
         }
-        // For new key at root path, just parse and set (no merge needed)
+        // RFC 7396: creating a new document is MergePatch(undefined, patch). "undefined" is
+        // treated as {}, so nulls in the patch must be stripped rather than stored. Start from an
+        // empty object and reuse dom_merge_value at the root so the same RFC merge semantics
+        // (null stripping, atomic size limits) apply as for an existing document.
         JDocument *doc;
-        JsonUtilCode rc = dom_parse(ctx, json, json_len, &doc);
+        JsonUtilCode rc = dom_parse(ctx, "{}", 2, &doc);
         if (rc != JSONUTIL_SUCCESS) return ValkeyModule_ReplyWithError(ctx, jsonutil_code_to_message(rc));
+
+        rc = dom_merge_value(ctx, doc, ".", json, json_len);
+        if (rc != JSONUTIL_SUCCESS) {
+            dom_free_doc(doc);
+            return ValkeyModule_ReplyWithError(ctx, jsonutil_code_to_message(rc));
+        }
 
         // end tracking memory
         END_TRACKING_MEMORY(ctx, "JSON.MERGE", doc, 0, begin_val)

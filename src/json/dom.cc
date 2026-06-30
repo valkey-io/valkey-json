@@ -222,6 +222,10 @@ JsonUtilCode dom_set_value(ValkeyModuleCtx *ctx, JDocument *doc, const char *jso
  * Time Complexity: O(M + N). Null values in the patch delete keys.
  */
 JValue merge_values(const JValue &existing, const JValue &new_val, RapidJsonAllocator &alloc, int depth) {
+    // Safety guard against unbounded recursion / stack overflow on pathologically deep patches.
+    // At this boundary the patch is copied verbatim (nulls not stripped); this is acceptable
+    // because the resulting depth exceeds json.max-path-limit and the overall operation is
+    // rejected by CHECK_DOCUMENT_PATH_LIMIT in dom_merge_value before anything is committed.
     if (depth > static_cast<int>(json_get_max_path_limit())) {
         return JValue(new_val, alloc);
     }
@@ -250,17 +254,14 @@ JValue merge_values(const JValue &existing, const JValue &new_val, RapidJsonAllo
             if (new_it->value.IsNull()) {
                 continue;
             }
-            if (it->value.IsObject() && new_it->value.IsObject()) {
-                JValue val_result = merge_values(it->value, new_it->value, alloc, depth + 1);
-                JValue key_copy;
-                key_copy.SetString(key, alloc);
-                merged.AddMember(key_copy, val_result, alloc);
-            } else {
-                JValue val_result = JValue(new_it->value, alloc);
-                JValue key_copy;
-                key_copy.SetString(key, alloc);
-                merged.AddMember(key_copy, val_result, alloc);
-            }
+            // Per RFC 7396, Target[Name] = MergePatch(Target[Name], Value) whenever the patch
+            // value is present. merge_values handles every Value type: a non-object Value returns
+            // a verbatim copy (replace), while an object Value is merged into the existing value
+            // (coercing a non-object existing value to {} first, which strips embedded nulls).
+            JValue val_result = merge_values(it->value, new_it->value, alloc, depth + 1);
+            JValue key_copy;
+            key_copy.SetString(key, alloc);
+            merged.AddMember(key_copy, val_result, alloc);
         } else {
             JValue val_result = JValue(it->value, alloc);
             JValue key_copy;
@@ -385,7 +386,13 @@ JsonUtilCode dom_merge_value(ValkeyModuleCtx *ctx, JDocument *doc, const char *j
     }
 
     if (selector.hasInserts()) {
-        rc = selector.commitInsertsOnly(new_val);
+        // RFC 7396: an insert targets a path that does not yet exist, i.e. MergePatch(undefined,
+        // Patch). "undefined" is treated as {}, so any nulls in the patch must be stripped instead
+        // of stored. Update targets already go through merge_values above; inserts need the same
+        // treatment so a brand-new path is RFC-compliant (e.g. {"x":1,"tmp":null} -> {"x":1}).
+        JValue empty_obj(rapidjson::kObjectType);
+        JValue insert_val = merge_values(empty_obj, new_val, allocator, 0);
+        rc = selector.commitInsertsOnly(insert_val);
         if (rc != JSONUTIL_SUCCESS) return rc;
     }
 

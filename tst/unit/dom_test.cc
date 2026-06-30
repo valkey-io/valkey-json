@@ -769,6 +769,130 @@ TEST_F(DomTest, testDomMergeValue_RecursiveDescentDisjointTargets) {
     dom_free_doc(doc);
 }
 
+TEST_F(DomTest, testDomMergeValue_InsertPathNullStripped) {
+    const char *existing_json = "{\"u\":{}}";
+    const char *new_json = "{\"email\":\"x\",\"tmp\":null}";
+
+    JDocument *doc;
+    JsonUtilCode rc = dom_parse(nullptr, existing_json, strlen(existing_json), &doc);
+    EXPECT_EQ(rc, JSONUTIL_SUCCESS);
+
+    rc = dom_merge_value(nullptr, doc, ".u.bob", new_json, strlen(new_json));
+    EXPECT_EQ(rc, JSONUTIL_SUCCESS);
+
+    ReplyBuffer oss;
+    rc = dom_get_value_as_str(doc, ".u.bob", nullptr, oss, false);
+    EXPECT_EQ(rc, JSONUTIL_SUCCESS);
+    EXPECT_STREQ(GetString(&oss), "{\"email\":\"x\"}");
+
+    dom_free_doc(doc);
+}
+
+TEST_F(DomTest, testDomMergeValue_MultiTargetInsertNullStripped) {
+    const char *existing_json = "{\"users\":[{\"id\":1},{\"id\":2}]}";
+    const char *new_json = "{\"email\":\"x\",\"tmp\":null}";
+
+    JDocument *doc;
+    JsonUtilCode rc = dom_parse(nullptr, existing_json, strlen(existing_json), &doc);
+    EXPECT_EQ(rc, JSONUTIL_SUCCESS);
+
+    rc = dom_merge_value(nullptr, doc, "$.users[*].profile", new_json, strlen(new_json));
+    EXPECT_EQ(rc, JSONUTIL_SUCCESS);
+
+    ReplyBuffer oss;
+    rc = dom_get_value_as_str(doc, ".users[0].profile", nullptr, oss, false);
+    EXPECT_EQ(rc, JSONUTIL_SUCCESS);
+    EXPECT_STREQ(GetString(&oss), "{\"email\":\"x\"}");
+
+    Clear(&oss);
+    rc = dom_get_value_as_str(doc, ".users[1].profile", nullptr, oss, false);
+    EXPECT_EQ(rc, JSONUTIL_SUCCESS);
+    EXPECT_STREQ(GetString(&oss), "{\"email\":\"x\"}");
+
+    dom_free_doc(doc);
+}
+
+TEST_F(DomTest, testDomMergeValue_SubpathReplacedWithNull) {
+    const char *existing_json = "{\"a\":{\"x\":1},\"b\":2}";
+    const char *new_json = "null";
+
+    JDocument *doc;
+    JsonUtilCode rc = dom_parse(nullptr, existing_json, strlen(existing_json), &doc);
+    EXPECT_EQ(rc, JSONUTIL_SUCCESS);
+
+    rc = dom_merge_value(nullptr, doc, ".a", new_json, strlen(new_json));
+    EXPECT_EQ(rc, JSONUTIL_SUCCESS);
+
+    ReplyBuffer oss;
+    rc = dom_get_value_as_str(doc, ".a", nullptr, oss, false);
+    EXPECT_EQ(rc, JSONUTIL_SUCCESS);
+    EXPECT_STREQ(GetString(&oss), "null");
+
+    Clear(&oss);
+    rc = dom_get_value_as_str(doc, ".b", nullptr, oss, false);
+    EXPECT_EQ(rc, JSONUTIL_SUCCESS);
+    EXPECT_STREQ(GetString(&oss), "2");
+
+    dom_free_doc(doc);
+}
+
+TEST_F(DomTest, testDomMergeValue_SubpathReplacedWithString) {
+    const char *existing_json = "{\"a\":{\"x\":1}}";
+    const char *new_json = "\"bar\"";
+
+    JDocument *doc;
+    JsonUtilCode rc = dom_parse(nullptr, existing_json, strlen(existing_json), &doc);
+    EXPECT_EQ(rc, JSONUTIL_SUCCESS);
+
+    rc = dom_merge_value(nullptr, doc, ".a", new_json, strlen(new_json));
+    EXPECT_EQ(rc, JSONUTIL_SUCCESS);
+
+    ReplyBuffer oss;
+    rc = dom_get_value_as_str(doc, ".a", nullptr, oss, false);
+    EXPECT_EQ(rc, JSONUTIL_SUCCESS);
+    EXPECT_STREQ(GetString(&oss), "\"bar\"");
+
+    dom_free_doc(doc);
+}
+
+TEST_F(DomTest, testDomMergeValue_SubpathReplacedWithArray) {
+    const char *existing_json = "{\"a\":{\"x\":1}}";
+    const char *new_json = "[1,2,3]";
+
+    JDocument *doc;
+    JsonUtilCode rc = dom_parse(nullptr, existing_json, strlen(existing_json), &doc);
+    EXPECT_EQ(rc, JSONUTIL_SUCCESS);
+
+    rc = dom_merge_value(nullptr, doc, ".a", new_json, strlen(new_json));
+    EXPECT_EQ(rc, JSONUTIL_SUCCESS);
+
+    ReplyBuffer oss;
+    rc = dom_get_value_as_str(doc, ".a", nullptr, oss, false);
+    EXPECT_EQ(rc, JSONUTIL_SUCCESS);
+    EXPECT_STREQ(GetString(&oss), "[1,2,3]");
+
+    dom_free_doc(doc);
+}
+
+TEST_F(DomTest, testDomMergeValue_EmptyObjectOnNonObjectSubpath) {
+    const char *existing_json = "{\"a\":[1,2]}";
+    const char *new_json = "{}";
+
+    JDocument *doc;
+    JsonUtilCode rc = dom_parse(nullptr, existing_json, strlen(existing_json), &doc);
+    EXPECT_EQ(rc, JSONUTIL_SUCCESS);
+
+    rc = dom_merge_value(nullptr, doc, ".a", new_json, strlen(new_json));
+    EXPECT_EQ(rc, JSONUTIL_SUCCESS);
+
+    ReplyBuffer oss;
+    rc = dom_get_value_as_str(doc, ".a", nullptr, oss, false);
+    EXPECT_EQ(rc, JSONUTIL_SUCCESS);
+    EXPECT_STREQ(GetString(&oss), "{}");
+
+    dom_free_doc(doc);
+}
+
 TEST_F(DomTest, testMergeValues_DepthLimit) {
     const char *existing_json = "{\"a\":{\"b\":{\"c\":{\"d\":{\"e\":1}}}}}";
     const char *new_json = "{\"a\":{\"b\":{\"c\":{\"d\":{\"e\":2}}}}}";
@@ -1218,6 +1342,78 @@ TEST_F(DomTest, testMergeValues_RFC7396_TargetNullPreservedPatchAddsKey) {
     EXPECT_TRUE(merged["e"].IsNull());
     EXPECT_TRUE(merged.HasMember("a"));
     EXPECT_EQ(merged["a"].GetInt(), 1);
+    dom_free_doc(existing_doc);
+}
+
+TEST_F(DomTest, testMergeValues_RFC7396_NestedNonObjectTargetPatchObjectWithNull) {
+    const char *existing_json = "{\"a\":\"b\"}";
+    const char *new_json = "{\"a\":{\"x\":null,\"y\":1}}";
+    JDocument *existing_doc;
+    JsonUtilCode rc = dom_parse(nullptr, existing_json, strlen(existing_json), &existing_doc);
+    EXPECT_EQ(rc, JSONUTIL_SUCCESS);
+    JParser new_parser;
+    new_parser.Parse(new_json, strlen(new_json));
+    EXPECT_FALSE(new_parser.HasParseError());
+    JValue merged = merge_values(existing_doc->GetJValue(), new_parser.GetJValue(), allocator);
+    EXPECT_TRUE(merged.IsObject());
+    EXPECT_TRUE(merged.HasMember("a"));
+    EXPECT_TRUE(merged["a"].IsObject());
+    EXPECT_FALSE(merged["a"].HasMember("x"));
+    EXPECT_TRUE(merged["a"].HasMember("y"));
+    EXPECT_EQ(merged["a"]["y"].GetInt(), 1);
+    dom_free_doc(existing_doc);
+}
+
+TEST_F(DomTest, testMergeValues_RFC7396_NestedScalarToObjectDeepNull) {
+    const char *existing_json = "{\"a\":5}";
+    const char *new_json = "{\"a\":{\"bb\":{\"ccc\":null,\"d\":1}}}";
+    JDocument *existing_doc;
+    JsonUtilCode rc = dom_parse(nullptr, existing_json, strlen(existing_json), &existing_doc);
+    EXPECT_EQ(rc, JSONUTIL_SUCCESS);
+    JParser new_parser;
+    new_parser.Parse(new_json, strlen(new_json));
+    EXPECT_FALSE(new_parser.HasParseError());
+    JValue merged = merge_values(existing_doc->GetJValue(), new_parser.GetJValue(), allocator);
+    EXPECT_TRUE(merged.IsObject());
+    EXPECT_TRUE(merged.HasMember("a"));
+    EXPECT_TRUE(merged["a"].IsObject());
+    EXPECT_TRUE(merged["a"].HasMember("bb"));
+    EXPECT_TRUE(merged["a"]["bb"].IsObject());
+    EXPECT_FALSE(merged["a"]["bb"].HasMember("ccc"));
+    EXPECT_TRUE(merged["a"]["bb"].HasMember("d"));
+    EXPECT_EQ(merged["a"]["bb"]["d"].GetInt(), 1);
+    dom_free_doc(existing_doc);
+}
+
+TEST_F(DomTest, testMergeValues_RFC7396_NullOnMissingKeyNotAdded) {
+    const char *existing_json = "{\"a\":1}";
+    const char *new_json = "{\"b\":null}";
+    JDocument *existing_doc;
+    JsonUtilCode rc = dom_parse(nullptr, existing_json, strlen(existing_json), &existing_doc);
+    EXPECT_EQ(rc, JSONUTIL_SUCCESS);
+    JParser new_parser;
+    new_parser.Parse(new_json, strlen(new_json));
+    EXPECT_FALSE(new_parser.HasParseError());
+    JValue merged = merge_values(existing_doc->GetJValue(), new_parser.GetJValue(), allocator);
+    EXPECT_TRUE(merged.IsObject());
+    EXPECT_TRUE(merged.HasMember("a"));
+    EXPECT_EQ(merged["a"].GetInt(), 1);
+    EXPECT_FALSE(merged.HasMember("b"));
+    dom_free_doc(existing_doc);
+}
+
+TEST_F(DomTest, testMergeValues_RFC7396_EmptyObjectPatchOnNonObject) {
+    const char *existing_json = "[1,2]";
+    const char *new_json = "{}";
+    JDocument *existing_doc;
+    JsonUtilCode rc = dom_parse(nullptr, existing_json, strlen(existing_json), &existing_doc);
+    EXPECT_EQ(rc, JSONUTIL_SUCCESS);
+    JParser new_parser;
+    new_parser.Parse(new_json, strlen(new_json));
+    EXPECT_FALSE(new_parser.HasParseError());
+    JValue merged = merge_values(existing_doc->GetJValue(), new_parser.GetJValue(), allocator);
+    EXPECT_TRUE(merged.IsObject());
+    EXPECT_TRUE(merged.ObjectEmpty());
     dom_free_doc(existing_doc);
 }
 

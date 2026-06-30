@@ -4634,6 +4634,121 @@ class TestJsonBasic(JsonTestCase):
         finally:
             client.config_set('json.max-document-size', SIZE_64MB)
 
+    @pytest.mark.timeout(10)
+    def test_json_merge_command_new_key_strips_nulls(self):
+        """RFC 7396: creating a new key is MergePatch(undefined, patch); nulls in the patch
+        must be stripped rather than stored."""
+        client = self.server.get_new_client()
+
+        key = 'merge_new_key_null'
+        assert b'OK' == client.execute_command('JSON.MERGE', key, '.', '{"a":null,"b":1}')
+        assert b'{"b":1}' == client.execute_command('JSON.GET', key)
+
+        # Nested nulls in a new document are stripped recursively.
+        key2 = 'merge_new_key_nested_null'
+        assert b'OK' == client.execute_command(
+            'JSON.MERGE', key2, '.', '{"a":{"bb":{"ccc":null,"d":1}}}')
+        assert b'{"a":{"bb":{"d":1}}}' == client.execute_command('JSON.GET', key2)
+
+        # A non-object patch for a new key is stored as-is.
+        key3 = 'merge_new_key_scalar'
+        assert b'OK' == client.execute_command('JSON.MERGE', key3, '.', '[1,2,3]')
+        assert b'[1,2,3]' == client.execute_command('JSON.GET', key3)
+
+    @pytest.mark.timeout(10)
+    def test_json_merge_command_insert_path_strips_nulls(self):
+        """RFC 7396: merging into a non-existing path is MergePatch(undefined, patch); nulls in
+        the patch must be stripped instead of stored."""
+        client = self.server.get_new_client()
+
+        key = 'merge_insert_null'
+        assert b'OK' == client.execute_command('JSON.SET', key, '.', '{"u":{}}')
+        assert b'OK' == client.execute_command(
+            'JSON.MERGE', key, '.u.bob', '{"email":"x","tmp":null}')
+        assert b'{"email":"x"}' == client.execute_command('JSON.GET', key, '.u.bob')
+
+    @pytest.mark.timeout(10)
+    def test_json_merge_command_nested_non_object_target_null(self):
+        """RFC 7396: patching a non-object value with an object patch coerces the target to {}
+        and strips nulls in the patch."""
+        client = self.server.get_new_client()
+
+        key = 'merge_nested_non_object'
+        assert b'OK' == client.execute_command('JSON.SET', key, '.', '{"a":"b"}')
+        assert b'OK' == client.execute_command('JSON.MERGE', key, '.', '{"a":{"x":null,"y":1}}')
+        assert b'{"a":{"y":1}}' == client.execute_command('JSON.GET', key)
+
+    @pytest.mark.timeout(20)
+    @pytest.mark.parametrize("original,patch,expected", [
+        ('{"a":"b"}', '{"a":"c"}', '{"a":"c"}'),
+        ('{"a":"b"}', '{"b":"c"}', '{"a":"b","b":"c"}'),
+        ('{"a":"b"}', '{"a":null}', '{}'),
+        ('{"a":"b","b":"c"}', '{"a":null}', '{"b":"c"}'),
+        ('{"a":["b"]}', '{"a":"c"}', '{"a":"c"}'),
+        ('{"a":"c"}', '{"a":["b"]}', '{"a":["b"]}'),
+        ('{"a":{"b":"c"}}', '{"a":{"b":"d","c":null}}', '{"a":{"b":"d"}}'),
+        ('{"a":[{"b":"c"}]}', '{"a":[1]}', '{"a":[1]}'),
+        ('["a","b"]', '["c","d"]', '["c","d"]'),
+        ('{"a":"b"}', '["c"]', '["c"]'),
+        ('{"a":"foo"}', 'null', 'null'),
+        ('{"a":"foo"}', '"bar"', '"bar"'),
+        ('{"e":null}', '{"a":1}', '{"e":null,"a":1}'),
+        ('[1,2]', '{"a":"b","c":null}', '{"a":"b"}'),
+        ('{}', '{"a":{"bb":{"ccc":null}}}', '{"a":{"bb":{}}}'),
+    ])
+    def test_json_merge_command_rfc7396_appendix_a(self, original, patch, expected):
+        """Verify all RFC 7396 Appendix A example test cases against the live server."""
+        client = self.server.get_new_client()
+        key = 'merge_rfc_appendix'
+        client.execute_command('DEL', key)
+        assert b'OK' == client.execute_command('JSON.SET', key, '.', original)
+        assert b'OK' == client.execute_command('JSON.MERGE', key, '.', patch)
+        assert json.loads(client.execute_command('JSON.GET', key)) == json.loads(expected)
+
+    @pytest.mark.timeout(20)
+    @pytest.mark.parametrize("original,patch,expected", [
+        ('{"a":"b"}', '{"a":"c"}', '{"a":"c"}'),
+        ('{"a":"b"}', '{"b":"c"}', '{"a":"b","b":"c"}'),
+        ('{"a":"b"}', '{"a":null}', '{}'),
+        ('{"a":"b","b":"c"}', '{"a":null}', '{"b":"c"}'),
+        ('{"a":["b"]}', '{"a":"c"}', '{"a":"c"}'),
+        ('{"a":"c"}', '{"a":["b"]}', '{"a":["b"]}'),
+        ('{"a":{"b":"c"}}', '{"a":{"b":"d","c":null}}', '{"a":{"b":"d"}}'),
+        ('{"a":[{"b":"c"}]}', '{"a":[1]}', '{"a":[1]}'),
+        ('["a","b"]', '["c","d"]', '["c","d"]'),
+        ('{"a":"b"}', '["c"]', '["c"]'),
+        ('{"a":"foo"}', 'null', 'null'),
+        ('{"a":"foo"}', '"bar"', '"bar"'),
+        ('{"e":null}', '{"a":1}', '{"e":null,"a":1}'),
+        ('[1,2]', '{"a":"b","c":null}', '{"a":"b"}'),
+        ('{}', '{"a":{"bb":{"ccc":null}}}', '{"a":{"bb":{}}}'),
+    ])
+    def test_json_merge_command_rfc7396_appendix_a_subpath(self, original, patch, expected):
+        """Path-scoped JSON.MERGE must apply RFC 7396 semantics to the value at the target path.
+        Each Appendix A case is wrapped under a '.wrap' key and merged at that subpath."""
+        client = self.server.get_new_client()
+        key = 'merge_rfc_appendix_subpath'
+        client.execute_command('DEL', key)
+        assert b'OK' == client.execute_command(
+            'JSON.SET', key, '.', json.dumps({"wrap": json.loads(original)}))
+        assert b'OK' == client.execute_command('JSON.MERGE', key, '.wrap', patch)
+        assert json.loads(client.execute_command('JSON.GET', key, '.wrap')) == json.loads(expected)
+
+    @pytest.mark.timeout(10)
+    def test_json_merge_command_multi_target_insert_strips_nulls(self):
+        """RFC 7396: a multi-target merge that inserts at non-existing paths is
+        MergePatch(undefined, patch) for each target; nulls in the patch must be stripped."""
+        client = self.server.get_new_client()
+
+        key = 'merge_multi_insert_null'
+        assert b'OK' == client.execute_command(
+            'JSON.SET', key, '.', '{"users":[{"id":1},{"id":2}]}')
+        assert b'OK' == client.execute_command(
+            'JSON.MERGE', key, '$.users[*].profile', '{"email":"x","tmp":null}')
+
+        assert b'{"email":"x"}' == client.execute_command('JSON.GET', key, '.users[0].profile')
+        assert b'{"email":"x"}' == client.execute_command('JSON.GET', key, '.users[1].profile')
+
     def test_json_arity_per_command(self):
         client = self.server.get_new_client()
 
