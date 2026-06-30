@@ -288,6 +288,16 @@ JValue merge_values(const JValue &existing, const JValue &new_val, RapidJsonAllo
 }
 
 /**
+ * Return true if JSON pointer `ancestor` is a proper ancestor of JSON pointer `descendant`,
+ * e.g. "/a" is an ancestor of "/a/a", and the root pointer "" is an ancestor of "/a".
+ */
+STATIC bool path_is_ancestor(const jsn::string &ancestor, const jsn::string &descendant) {
+    if (ancestor.length() >= descendant.length()) return false;
+    if (descendant.compare(0, ancestor.length(), ancestor) != 0) return false;
+    return descendant[ancestor.length()] == '/';
+}
+
+/**
  * Merge a new JSON value into an existing document at the specified path.
  * 
  * Time Complexity:
@@ -319,41 +329,66 @@ JsonUtilCode dom_merge_value(ValkeyModuleCtx *ctx, JDocument *doc, const char *j
     }
 
     JValue &new_val = new_val_parser.GetJValue();
-    
-    bool has_updates = false;
+    using JPointerType = rapidjson::GenericPointer<RJValue, RapidJsonAllocator>;
+
     auto &rs = selector.getUniqueResultSet();
-    if (!rs.empty()) {
-        has_updates = true;
-        for (auto &vInfo : rs) {
-            JValue *existing_val = vInfo.first;
-            using JPointerType = rapidjson::GenericPointer<RJValue, RapidJsonAllocator>;
-            JPointerType ptr(vInfo.second.c_str(), vInfo.second.length(), &allocator);
-            if (!ptr.IsValid()) {
-                return JSONUTIL_INVALID_JSON_PATH;
+
+    // Phase 1: compute the merged value for every update target up front, without mutating
+    // the document. This lets us validate the path and size limits for the whole operation
+    // before anything is committed, so the command is all-or-nothing.
+    //
+    // When a recursive descent (e.g. $..a) matches both an ancestor and one of its
+    // descendants, only the top-most match is applied. This mirrors JSON.SET, where a
+    // descendant path no longer exists once its ancestor has been replaced, and prevents
+    // JSON.MERGE from re-applying a patch to a child after its parent was already replaced.
+    jsn::vector<std::pair<const jsn::string*, JValue>> pending_updates;
+
+    for (auto &vInfo : rs) {
+        const jsn::string &path = vInfo.second;
+
+        bool covered_by_ancestor = false;
+        for (auto &other : rs) {
+            if (&other == &vInfo) continue;
+            if (path_is_ancestor(other.second, path)) {
+                covered_by_ancestor = true;
+                break;
             }
-            
-            JValue merged = merge_values(*existing_val, new_val, allocator, 0);
-            
-            CHECK_DOCUMENT_PATH_LIMIT(ctx, selector, new_val_parser)
-            CHECK_DOCUMENT_SIZE_LIMIT(ctx, doc->size, new_val_parser.GetJValueSize())
-            
-            ptr.Swap(root, merged, allocator);
         }
+        if (covered_by_ancestor) continue;
+
+        JPointerType ptr(path.c_str(), path.length(), &allocator);
+        if (!ptr.IsValid()) return JSONUTIL_INVALID_JSON_PATH;
+
+        JValue *existing_val = ptr.Get(root);
+        if (existing_val == nullptr) continue;
+
+        JValue merged = merge_values(*existing_val, new_val, allocator, 0);
+        pending_updates.emplace_back(&path, std::move(merged));
     }
-    
-    if (selector.hasInserts()) {
+
+    // Validate the limits for the entire operation before committing anything. The merge
+    // applies a copy of the new value at every target (each update target plus each insert
+    // path), so the size contribution must be counted once per target, not just once.
+    if (!pending_updates.empty() || selector.hasInserts()) {
+        size_t target_count = pending_updates.size() + selector.getInsertPathCount();
         CHECK_DOCUMENT_PATH_LIMIT(ctx, selector, new_val_parser)
-        CHECK_DOCUMENT_SIZE_LIMIT(ctx, doc->size, new_val_parser.GetJValueSize())
-        
-        if (has_updates) {
-            rc = selector.commitInsertsOnly(new_val);
-            if (rc != JSONUTIL_SUCCESS) return rc;
-        } else {
-            rc = selector.commit(new_val);
-            if (rc != JSONUTIL_SUCCESS) return rc;
-        }
+        CHECK_DOCUMENT_SIZE_LIMIT(ctx, doc->size, target_count * new_val_parser.GetJValueSize())
     }
-    
+
+    // Phase 2: commit. Past this point no validation can fail, so the document is mutated
+    // atomically. The pending update paths are pairwise disjoint (descendants covered by an
+    // ancestor were skipped above), so the swaps do not interfere with each other.
+    for (auto &pending : pending_updates) {
+        JPointerType ptr(pending.first->c_str(), pending.first->length(), &allocator);
+        if (!ptr.IsValid()) return JSONUTIL_INVALID_JSON_PATH;
+        ptr.Swap(root, pending.second, allocator);
+    }
+
+    if (selector.hasInserts()) {
+        rc = selector.commitInsertsOnly(new_val);
+        if (rc != JSONUTIL_SUCCESS) return rc;
+    }
+
     return JSONUTIL_SUCCESS;
 }
 

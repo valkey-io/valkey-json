@@ -711,6 +711,64 @@ TEST_F(DomTest, testDomMergeValue_NullNewKeyNotAdded) {
     dom_free_doc(doc);
 }
 
+TEST_F(DomTest, testDomMergeValue_RecursiveDescentAncestorWins) {
+    const char *existing_json = "{\"a\":{\"a\":1}}";
+    const char *new_json = "5";
+
+    JDocument *doc;
+    JsonUtilCode rc = dom_parse(nullptr, existing_json, strlen(existing_json), &doc);
+    EXPECT_EQ(rc, JSONUTIL_SUCCESS);
+
+    rc = dom_merge_value(nullptr, doc, "$..a", new_json, strlen(new_json));
+    EXPECT_EQ(rc, JSONUTIL_SUCCESS);
+
+    ReplyBuffer oss;
+    rc = dom_get_value_as_str(doc, ".", nullptr, oss, false);
+    EXPECT_EQ(rc, JSONUTIL_SUCCESS);
+    EXPECT_STREQ(GetString(&oss), "{\"a\":5}");
+
+    dom_free_doc(doc);
+}
+
+TEST_F(DomTest, testDomMergeValue_RecursiveDescentAncestorWinsObjectPatch) {
+    const char *existing_json = "{\"a\":{\"a\":1}}";
+    const char *new_json = "{\"x\":2}";
+
+    JDocument *doc;
+    JsonUtilCode rc = dom_parse(nullptr, existing_json, strlen(existing_json), &doc);
+    EXPECT_EQ(rc, JSONUTIL_SUCCESS);
+
+    rc = dom_merge_value(nullptr, doc, "$..a", new_json, strlen(new_json));
+    EXPECT_EQ(rc, JSONUTIL_SUCCESS);
+
+    ReplyBuffer oss;
+    rc = dom_get_value_as_str(doc, ".", nullptr, oss, false);
+    EXPECT_EQ(rc, JSONUTIL_SUCCESS);
+    const char *result = GetString(&oss);
+    EXPECT_STREQ(result, "{\"a\":{\"a\":1,\"x\":2}}");
+
+    dom_free_doc(doc);
+}
+
+TEST_F(DomTest, testDomMergeValue_RecursiveDescentDisjointTargets) {
+    const char *existing_json = "{\"x\":{\"v\":1},\"y\":{\"v\":2}}";
+    const char *new_json = "9";
+
+    JDocument *doc;
+    JsonUtilCode rc = dom_parse(nullptr, existing_json, strlen(existing_json), &doc);
+    EXPECT_EQ(rc, JSONUTIL_SUCCESS);
+
+    rc = dom_merge_value(nullptr, doc, "$..v", new_json, strlen(new_json));
+    EXPECT_EQ(rc, JSONUTIL_SUCCESS);
+
+    ReplyBuffer oss;
+    rc = dom_get_value_as_str(doc, "$..v", nullptr, oss, false);
+    EXPECT_EQ(rc, JSONUTIL_SUCCESS);
+    EXPECT_STREQ(GetString(&oss), "[9,9]");
+
+    dom_free_doc(doc);
+}
+
 TEST_F(DomTest, testMergeValues_DepthLimit) {
     const char *existing_json = "{\"a\":{\"b\":{\"c\":{\"d\":{\"e\":1}}}}}";
     const char *new_json = "{\"a\":{\"b\":{\"c\":{\"d\":{\"e\":2}}}}}";

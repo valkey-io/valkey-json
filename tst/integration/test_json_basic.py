@@ -4581,6 +4581,59 @@ class TestJsonBasic(JsonTestCase):
         assert b'2' == client.execute_command('JSON.GET', key, '.b.x')
         assert b'3' == client.execute_command('JSON.GET', key, '.b.y')
 
+    @pytest.mark.timeout(10)
+    def test_json_merge_command_recursive_descent_ancestor_wins(self):
+        """A recursive descent path that matches both a parent and a child must behave like
+        JSON.SET: replacing the parent removes the child, so the child must not be patched."""
+        client = self.server.get_new_client()
+
+        key = 'merge_recursive_overlap'
+        assert b'OK' == client.execute_command('JSON.SET', key, '.', '{"a":{"a":1}}')
+        assert b'OK' == client.execute_command('JSON.MERGE', key, '$..a', '5')
+        assert b'{"a":5}' == client.execute_command('JSON.GET', key)
+
+        # JSON.MERGE must produce the same result as JSON.SET for this path.
+        key2 = 'merge_recursive_overlap_set'
+        assert b'OK' == client.execute_command('JSON.SET', key2, '.', '{"a":{"a":1}}')
+        assert b'OK' == client.execute_command('JSON.SET', key2, '$..a', '5')
+        assert client.execute_command('JSON.GET', key) == client.execute_command('JSON.GET', key2)
+
+    @pytest.mark.timeout(10)
+    def test_json_merge_command_size_limit_multi_target(self):
+        """The document size limit must account for every target of a multi-target merge,
+        not just a single copy of the patch."""
+        client = self.server.get_new_client()
+        try:
+            key = 'merge_size_limit'
+            assert b'OK' == client.execute_command('JSON.SET', key, '.', '{"a":{},"b":{}}')
+            base_size = client.execute_command('JSON.DEBUG', 'MEMORY', key)
+
+            patch = '{"data":"' + ('x' * 1000) + '"}'
+
+            # Measure how much the document grows when the patch is merged into a single target.
+            tmp = 'merge_size_limit_tmp'
+            assert b'OK' == client.execute_command('JSON.SET', tmp, '.', '{"a":{}}')
+            before = client.execute_command('JSON.DEBUG', 'MEMORY', tmp)
+            assert b'OK' == client.execute_command('JSON.MERGE', tmp, '$.a', patch)
+            after = client.execute_command('JSON.DEBUG', 'MEMORY', tmp)
+            single_growth = after - before
+            assert single_growth > 0
+
+            # Pick a limit that one target's growth fits under, but two targets exceed.
+            limit = base_size + single_growth + single_growth // 2
+            client.config_set('json.max-document-size', limit)
+
+            # Merging into both `a` and `b` would push the document over the limit.
+            with pytest.raises(ResponseError) as e:
+                client.execute_command('JSON.MERGE', key, '$.*', patch)
+            assert 'LIMIT' in str(e.value)
+
+            # The merge must be atomic: nothing should have been applied.
+            assert b'{}' == client.execute_command('JSON.GET', key, '.a')
+            assert b'{}' == client.execute_command('JSON.GET', key, '.b')
+        finally:
+            client.config_set('json.max-document-size', SIZE_64MB)
+
     def test_json_arity_per_command(self):
         client = self.server.get_new_client()
 
