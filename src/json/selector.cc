@@ -884,6 +884,27 @@ JsonUtilCode Selector::commit(JValue &new_val) {
     return JSONUTIL_SUCCESS;
 }
 
+JsonUtilCode Selector::commitInsertsOnly(JValue &new_val) {
+    if (insertPaths.empty()) return JSONUTIL_SUCCESS;
+    if (json_is_instrument_enabled_insert()) {
+        ValkeyModule_Log(nullptr, "warning", "inserting %zu values into doc %p",
+                        insertPaths.size(), static_cast<void *>(root));
+    }
+    if (insertPaths.size() == 1) {
+        JPointer ptr = JPointer(*insertPaths.begin());
+        if (ptr.HasError()) return ptr.error;
+        ptr.Set(*root, new_val, allocator);
+    } else {
+        for (auto &path : insertPaths) {
+            JValue new_val_copy(new_val, allocator);
+            JPointer ptr = JPointer(path);
+            if (ptr.HasError()) return ptr.error;
+            ptr.Set(*root, new_val_copy, allocator);
+        }
+    }
+    return JSONUTIL_SUCCESS;
+}
+
 JsonUtilCode Selector::init(JValue &root, const char *path, const Mode mode) {
     CHECK_QUERY_STRING_SIZE(path);
     this->mode = mode;

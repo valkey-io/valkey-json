@@ -195,6 +195,11 @@ class Selector {
      * Commit a 2-stage INSERT/UPDATE.
      */
     JsonUtilCode commit(JValue &new_val);
+    /**
+     * Commit only the insert paths from a prior prepareSetValues (no updates).
+     * Used when updates were already applied separately (e.g. JSON.MERGE).
+     */
+    JsonUtilCode commitInsertsOnly(JValue &new_val);
     bool isLegacyJsonPathSyntax() const { return !isV2Path; }
     bool isSyntaxError(JsonUtilCode code) const;
 
@@ -211,6 +216,7 @@ class Selector {
     bool hasValues() const { return !resultSet.empty(); }
     bool hasUpdates() const { return !resultSet.empty(); }
     bool hasInserts() const { return !insertPaths.empty(); }
+    size_t getInsertPathCount() const { return insertPaths.size(); }
     size_t getMaxPathDepth() const { return maxPathDepth; }
     const jsn::vector<ValueInfo>& getResultSet() const { return resultSet; }
     void getSelectedValues(jsn::vector<JValue*> &values) const;

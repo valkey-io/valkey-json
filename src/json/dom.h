@@ -282,7 +282,27 @@ inline JsonUtilCode dom_set_value(ValkeyModuleCtx *ctx, JDocument *doc, const ch
     return dom_set_value(ctx, doc, json_path, new_val_json, strlen(new_val_json), is_create_only, is_update_only);
 }
 
+/* Merge a value into the document at the path, applying RFC 7396 (JSON Merge Patch) semantics
+ * to each matched target. For an existing target, the result is MergePatch(existing, patch); for a
+ * path that does not yet exist, the result is MergePatch({}, patch), so nulls in the patch are
+ * stripped rather than stored. The operation is all-or-nothing: path and size limits are validated
+ * for every target before any mutation is committed.
+ * @param json_path: path that is compliant to the JSON Path syntax.
+ * @return JSONUTIL_SUCCESS for success, other code for failure.
+ */
+JsonUtilCode dom_merge_value(ValkeyModuleCtx *ctx, JDocument *doc, const char *json_path, const char *new_val_json,
+                             size_t new_val_len);
 
+inline JsonUtilCode dom_merge_value(ValkeyModuleCtx *ctx, JDocument *doc, const char *json_path, const char *new_val_json) {
+    return dom_merge_value(ctx, doc, json_path, new_val_json, strlen(new_val_json));
+}
+
+/* Recursively merge two JValue objects per RFC 7396 (JSON Merge Patch), returning MergePatch(existing,
+ * new_val). If new_val is an object, the existing value is treated as {} when it is not itself an
+ * object; then each member is applied recursively, with a null value removing the key. If new_val is
+ * not an object, a copy of new_val is returned (replacing the entire target).
+ */
+JValue merge_values(const JValue &existing, const JValue &new_val, RapidJsonAllocator &allocator, int depth = 0);
 
 /* Get JSON value at the path.
  * If the path is invalid, the method will return error code JSONUTIL_INVALID_JSON_PATH.

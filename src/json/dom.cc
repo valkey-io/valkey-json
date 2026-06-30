@@ -7,7 +7,9 @@
 #include <iostream>
 #include <iomanip>
 #include <cmath>
+#include <string>
 #include "json/rapidjson_includes.h"
+#include <rapidjson/pointer.h>
 
 #define STATIC /* decorator for static functions, remove so that backtrace symbols include these */
 
@@ -205,6 +207,195 @@ JsonUtilCode dom_set_value(ValkeyModuleCtx *ctx, JDocument *doc, const char *jso
     CHECK_DOCUMENT_SIZE_LIMIT(ctx, doc->size, new_val.GetJValueSize())
 
     selector.commit(new_val);
+    return JSONUTIL_SUCCESS;
+}
+
+/**
+ * Recursively merge two JValue objects per RFC 7396 (JSON Merge Patch).
+ *
+ * MergePatch(Target, Patch) semantics:
+ * - If Patch is an object: if Target is not an object, treat Target as {};
+ *   then for each name/value in Patch, null removes the key, else
+ *   Target[name] = MergePatch(Target[name], value). Return Target.
+ * - Otherwise: return Patch (replace entire target).
+ *
+ * Time Complexity: O(M + N). Null values in the patch delete keys.
+ */
+JValue merge_values(const JValue &existing, const JValue &new_val, RapidJsonAllocator &alloc, int depth) {
+    // Safety guard against unbounded recursion / stack overflow on pathologically deep patches.
+    // At this boundary the patch is copied verbatim (nulls not stripped); this is acceptable
+    // because the resulting depth exceeds json.max-path-limit and the overall operation is
+    // rejected by CHECK_DOCUMENT_PATH_LIMIT in dom_merge_value before anything is committed.
+    if (depth > static_cast<int>(json_get_max_path_limit())) {
+        return JValue(new_val, alloc);
+    }
+
+    if (!new_val.IsObject()) {
+        return JValue(new_val, alloc);
+    }
+
+    if (!existing.IsObject()) {
+        JValue empty_obj(rapidjson::kObjectType);
+        return merge_values(empty_obj, new_val, alloc, depth);
+    }
+
+    if (new_val.ObjectEmpty()) {
+        return JValue(existing, alloc);
+    }
+    
+    JValue merged(rapidjson::kObjectType);
+    
+    // First pass: process existing members
+    for (auto it = existing.MemberBegin(); it != existing.MemberEnd(); ++it) {
+        std::string_view key(it->name.GetString(), it->name.GetStringLength());
+        auto new_it = new_val.FindMember(key);
+
+        if (new_it != new_val.MemberEnd()) {
+            if (new_it->value.IsNull()) {
+                continue;
+            }
+            // Per RFC 7396, Target[Name] = MergePatch(Target[Name], Value) whenever the patch
+            // value is present. merge_values handles every Value type: a non-object Value returns
+            // a verbatim copy (replace), while an object Value is merged into the existing value
+            // (coercing a non-object existing value to {} first, which strips embedded nulls).
+            JValue val_result = merge_values(it->value, new_it->value, alloc, depth + 1);
+            JValue key_copy;
+            key_copy.SetString(key, alloc);
+            merged.AddMember(key_copy, val_result, alloc);
+        } else {
+            JValue val_result = JValue(it->value, alloc);
+            JValue key_copy;
+            key_copy.SetString(key, alloc);
+            merged.AddMember(key_copy, val_result, alloc);
+        }
+    }
+    
+    // Second pass: add keys that only exist in new_val (Target[Name] = MergePatch(undefined, Value))
+    JValue empty_obj(rapidjson::kObjectType);
+    for (auto it = new_val.MemberBegin(); it != new_val.MemberEnd(); ++it) {
+        std::string_view key(it->name.GetString(), it->name.GetStringLength());
+        if (!merged.HasMember(key)) {
+            if (it->value.IsNull()) {
+                continue;
+            }
+            JValue key_copy;
+            key_copy.SetString(key, alloc);
+            JValue val_result = merge_values(empty_obj, it->value, alloc, depth + 1);
+            merged.AddMember(key_copy, val_result, alloc);
+        }
+    }
+    
+    return merged;
+}
+
+/**
+ * Return true if JSON pointer `ancestor` is a proper ancestor of JSON pointer `descendant`,
+ * e.g. "/a" is an ancestor of "/a/a", and the root pointer "" is an ancestor of "/a".
+ */
+STATIC bool path_is_ancestor(const jsn::string &ancestor, const jsn::string &descendant) {
+    if (ancestor.length() >= descendant.length()) return false;
+    if (descendant.compare(0, ancestor.length(), ancestor) != 0) return false;
+    return descendant[ancestor.length()] == '/';
+}
+
+/**
+ * Merge a new JSON value into an existing document at the specified path.
+ * 
+ * Time Complexity:
+ * - Single path: O(M + N) where M = size of original value, N = size of new value
+ * - Multiple paths: O(P * M_avg + P * N) where P = number of matched paths,
+ *   M_avg = average size of original values, N = size of new value
+ * 
+ * Path evaluation complexity:
+ * - Simple path (e.g., .user.profile): O(D) where D = path depth
+ * - Wildcard path (e.g., $..field): O(K) where K = total document size
+ * 
+ * @param ctx Valkey module context
+ * @param doc The JSON document to modify
+ * @param json_path JSONPath expression to locate merge target(s)
+ * @param new_val_json JSON string of the value to merge
+ * @param new_val_size Size of the JSON string
+ * @return JsonUtilCode indicating success or error
+ */
+JsonUtilCode dom_merge_value(ValkeyModuleCtx *ctx, JDocument *doc, const char *json_path, const char *new_val_json,
+                             size_t new_val_size) {
+    Selector selector;
+    JValue &root = doc->GetJValue();
+    JsonUtilCode rc = selector.prepareSetValues(root, json_path);
+    if (rc != JSONUTIL_SUCCESS) return rc;
+
+    JParser new_val_parser;
+    if (new_val_parser.Parse(new_val_json, new_val_size).HasParseError()) {
+        return new_val_parser.GetParseErrorCode();
+    }
+
+    JValue &new_val = new_val_parser.GetJValue();
+    using JPointerType = rapidjson::GenericPointer<RJValue, RapidJsonAllocator>;
+
+    auto &rs = selector.getUniqueResultSet();
+
+    // Phase 1: compute the merged value for every update target up front, without mutating
+    // the document. This lets us validate the path and size limits for the whole operation
+    // before anything is committed, so the command is all-or-nothing.
+    //
+    // When a recursive descent (e.g. $..a) matches both an ancestor and one of its
+    // descendants, only the top-most match is applied. This mirrors JSON.SET, where a
+    // descendant path no longer exists once its ancestor has been replaced, and prevents
+    // JSON.MERGE from re-applying a patch to a child after its parent was already replaced.
+    jsn::vector<std::pair<const jsn::string*, JValue>> pending_updates;
+
+    for (auto &vInfo : rs) {
+        const jsn::string &path = vInfo.second;
+
+        bool covered_by_ancestor = false;
+        for (auto &other : rs) {
+            if (&other == &vInfo) continue;
+            if (path_is_ancestor(other.second, path)) {
+                covered_by_ancestor = true;
+                break;
+            }
+        }
+        if (covered_by_ancestor) continue;
+
+        JPointerType ptr(path.c_str(), path.length(), &allocator);
+        if (!ptr.IsValid()) return JSONUTIL_INVALID_JSON_PATH;
+
+        JValue *existing_val = ptr.Get(root);
+        if (existing_val == nullptr) continue;
+
+        JValue merged = merge_values(*existing_val, new_val, allocator, 0);
+        pending_updates.emplace_back(&path, std::move(merged));
+    }
+
+    // Validate the limits for the entire operation before committing anything. The merge
+    // applies a copy of the new value at every target (each update target plus each insert
+    // path), so the size contribution must be counted once per target, not just once.
+    if (!pending_updates.empty() || selector.hasInserts()) {
+        size_t target_count = pending_updates.size() + selector.getInsertPathCount();
+        CHECK_DOCUMENT_PATH_LIMIT(ctx, selector, new_val_parser)
+        CHECK_DOCUMENT_SIZE_LIMIT(ctx, doc->size, target_count * new_val_parser.GetJValueSize())
+    }
+
+    // Phase 2: commit. Past this point no validation can fail, so the document is mutated
+    // atomically. The pending update paths are pairwise disjoint (descendants covered by an
+    // ancestor were skipped above), so the swaps do not interfere with each other.
+    for (auto &pending : pending_updates) {
+        JPointerType ptr(pending.first->c_str(), pending.first->length(), &allocator);
+        if (!ptr.IsValid()) return JSONUTIL_INVALID_JSON_PATH;
+        ptr.Swap(root, pending.second, allocator);
+    }
+
+    if (selector.hasInserts()) {
+        // RFC 7396: an insert targets a path that does not yet exist, i.e. MergePatch(undefined,
+        // Patch). "undefined" is treated as {}, so any nulls in the patch must be stripped instead
+        // of stored. Update targets already go through merge_values above; inserts need the same
+        // treatment so a brand-new path is RFC-compliant (e.g. {"x":1,"tmp":null} -> {"x":1}).
+        JValue empty_obj(rapidjson::kObjectType);
+        JValue insert_val = merge_values(empty_obj, new_val, allocator, 0);
+        rc = selector.commitInsertsOnly(insert_val);
+        if (rc != JSONUTIL_SUCCESS) return rc;
+    }
+
     return JSONUTIL_SUCCESS;
 }
 
