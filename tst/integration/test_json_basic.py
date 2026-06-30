@@ -182,7 +182,7 @@ class TestJsonBasic(JsonTestCase):
         else:
             # Original local server setup
             server_path = f"{os.path.dirname(os.path.realpath(__file__))}/.build/binaries/{os.environ['SERVER_VERSION']}/valkey-server"
-            args = {'loadmodule': os.getenv('MODULE_PATH'), "enable-debug-command": "local", 'enable-protected-configs': 'yes'}
+            args = {'loadmodule': os.getenv('MODULE_PATH'), 'json.debug-mode': 'yes', "enable-debug-command": "local", 'enable-protected-configs': 'yes'}
             self.server, self.client = self.create_server(testdir=self.testdir, server_path=server_path, args=args)
 
         self.error_class = ErrorStringTester
@@ -2747,6 +2747,33 @@ class TestJsonBasic(JsonTestCase):
         exp_val = client.execute_command('JSON.DEBUG','MEMORY',wikipedia,'.')
         assert exp_val == metadate_val
 
+    def test_keytable_corrupt_injects_handle(self):
+        """JSON.DEBUG KEYTABLE-CORRUPT should inject a handle that KEYTABLE-CHECK detects as a mismatch."""
+        client = self.server.get_new_client()
+        # Baseline: KEYTABLE-CHECK should succeed
+        client.execute_command('JSON.DEBUG', 'KEYTABLE-CHECK')
+        # Inject a handle
+        client.execute_command('JSON.DEBUG', 'KEYTABLE-CORRUPT', 'unique_test_corrupt_string_abc123')
+        # KEYTABLE-CHECK now detects the mismatch
+        with pytest.raises(ResponseError, match="Mismatch"):
+            client.execute_command('JSON.DEBUG', 'KEYTABLE-CHECK')
+        # Clean up so teardown doesn't trip the assertion
+        client.execute_command('JSON.DEBUG', 'KEYTABLE-CLEAR')
+
+    def test_keytable_clear_releases_handles(self):
+        """JSON.DEBUG KEYTABLE-CLEAR should release all injected handles and restore integrity."""
+        client = self.server.get_new_client()
+        # Inject 3 handles
+        client.execute_command('JSON.DEBUG', 'KEYTABLE-CORRUPT', 'clear_test_string_1')
+        client.execute_command('JSON.DEBUG', 'KEYTABLE-CORRUPT', 'clear_test_string_2')
+        client.execute_command('JSON.DEBUG', 'KEYTABLE-CORRUPT', 'clear_test_string_3')
+        # Clear them
+        cleared = client.execute_command('JSON.DEBUG', 'KEYTABLE-CLEAR')
+        assert cleared == 3, f"Expected 3 cleared handles, got {cleared}"
+        # KEYTABLE-CHECK succeeds again after cleanup
+        client.execute_command('JSON.DEBUG', 'KEYTABLE-CHECK')
+
+
     def test_json_duplicate_keys(self):
         client = self.server.get_new_client()
         '''Test handling of object with duplicate keys'''
@@ -2947,6 +2974,67 @@ class TestJsonBasic(JsonTestCase):
                                    (wikipedia, '.isAlive', 'false')]:
             assert value.encode() == client.execute_command(
                 'JSON.GET', key, path)
+
+    def test_json_mset_duplicate_key_root_then_path(self):
+        """Best-effort: root replace then conflicting path op on same key.
+        The root op applies, the path op is skipped (path no longer valid),
+        command returns OK, server stays alive."""
+        client = self.server.get_new_client()
+        dk = 'dk'
+        client.execute_command('JSON.SET', dk, '$', '{"a":1}')
+        # Op1 replaces root with array, op2 references .a which no longer exists
+        assert b'OK' == client.execute_command('JSON.MSET', dk, '$', '[1,2,3]', dk, '.a', '99')
+        # Server alive
+        assert client.execute_command('PING')
+        # Op1 applied, op2 skipped
+        assert b'[1,2,3]' == client.execute_command('JSON.GET', dk, '.')
+
+    def test_json_mset_duplicate_key_nested_path(self):
+        """Best-effort: nested object replacement then deeper path on same key.
+        First op applies, second is skipped (path no longer valid),
+        command returns OK."""
+        client = self.server.get_new_client()
+        dk = 'dk'
+        client.execute_command('JSON.SET', dk, '$', '{"a":{"x":1}}')
+        # Op1 replaces .a with array, op2 references .a.x which no longer exists
+        assert b'OK' == client.execute_command('JSON.MSET', dk, '.a', '[9]', dk, '.a.x', '5')
+        assert client.execute_command('PING')
+        # Op1 applied, op2 skipped
+        assert b'[9]' == client.execute_command('JSON.GET', dk, '.a')
+
+    def test_json_mset_duplicate_key_3ops_best_effort(self):
+        """Best-effort continues past conflicts: op1 ok, op2 conflicts, op3 ok.
+        A conflicting op is skipped and the remaining ops are still applied."""
+        client = self.server.get_new_client()
+        dk = 'dk'
+        k = 'mset3opk'
+        client.execute_command('JSON.SET', dk, '$', '{"a":1}')
+        client.execute_command('JSON.SET', k, '$', '{"v":0}')
+        # Op1: replace dk root (ok)
+        # Op2: set dk .a (conflicts - path gone after op1, skipped)
+        # Op3: update k .v (applied - best-effort continues past op2)
+        assert b'OK' == client.execute_command('JSON.MSET',
+                                              dk, '$', '[1,2,3]',
+                                              dk, '.a', '99',
+                                              k, '.v', '42')
+        assert client.execute_command('PING')
+        # Op1 applied
+        assert b'[1,2,3]' == client.execute_command('JSON.GET', dk, '.')
+        # Op3 applied (best-effort continues past conflict)
+        assert b'{"v":42}' == client.execute_command('JSON.GET', k, '.')
+
+    def test_json_mset_duplicate_key_later_op_valid(self):
+        """Duplicate key where the later op IS valid against the earlier op's result.
+        Op1 replaces root with {"b":1}, op2 sets .b to 2 on the new doc.
+        Both ops apply because each iteration opens the key fresh."""
+        client = self.server.get_new_client()
+        dk = 'dk'
+        client.execute_command('JSON.SET', dk, '$', '{"a":1}')
+        # Op1 replaces root, op2 sets .b on the NEW root — valid composition
+        assert b'OK' == client.execute_command('JSON.MSET', dk, '$', '{"b":1}', dk, '.b', '2')
+        assert client.execute_command('PING')
+        # Both ops applied: op1 set {"b":1}, op2 updated .b to 2
+        assert b'{"b":2}' == client.execute_command('JSON.GET', dk, '.')
 
     def test_multi_exec(self):
         client = self.server.get_new_client()
@@ -4767,7 +4855,7 @@ class TestJsonBasic(JsonTestCase):
         cmd_arity = [('MEMORY', -3), ('FIELDS', -3), ('DEPTH', 3), ('HELP', 2),
                      ('MAX-DEPTH-KEY', 2), ('MAX-SIZE-KEY',
                                             2), ('KEYTABLE-CHECK', 2), ('KEYTABLE-CORRUPT', 3),
-                     ('KEYTABLE-DISTRIBUTION', 3), ('TEST-SHARED-API', -2)]
+                     ('KEYTABLE-CLEAR', 2), ('KEYTABLE-DISTRIBUTION', 3), ('TEST-SHARED-API', -2)]
         subcmd_dict = {f'JSON.DEBUG|{cmd}': arity for cmd, arity in cmd_arity}
 
         output = client.execute_command(
@@ -4909,3 +4997,43 @@ class TestJsonBasic(JsonTestCase):
             s = client.execute_command("json.debug", "test-shared-api", "k1", path)
             print("For Path:", path, " json.get:", g, " shared-api:", s)
             assert (g == s)
+
+
+class TestJsonDebugGating(JsonTestCase):
+    """Test that debug commands are gated behind json.debug-mode module config."""
+
+    @pytest.fixture(autouse=True)
+    def setup_test(self, setup):
+        use_external = os.environ.get("VALKEY_EXTERNAL_SERVER", "false").lower() == "true"
+
+        if use_external:
+            external_host = os.environ.get("VALKEY_HOST", "localhost")
+            external_port = int(os.environ.get("VALKEY_PORT", "6379"))
+            self.server, self.client = self.create_server(
+                testdir=self.testdir,
+                bind_ip=external_host,
+                port=external_port,
+                external_server=True
+            )
+        else:
+            server_path = f"{os.path.dirname(os.path.realpath(__file__))}/.build/binaries/{os.environ['SERVER_VERSION']}/valkey-server"
+            # Load module WITHOUT debug-mode — commands should be gated
+            args = {'loadmodule': os.getenv('MODULE_PATH'), "enable-debug-command": "local", 'enable-protected-configs': 'yes'}
+            self.server, self.client = self.create_server(testdir=self.testdir, server_path=server_path, args=args)
+
+        self.error_class = ErrorStringTester
+
+    def test_keytable_corrupt_requires_debug_mode(self):
+        """KEYTABLE-CORRUPT should be rejected without debug-mode."""
+        with pytest.raises(ResponseError, match="unknown subcommand"):
+            self.client.execute_command('JSON.DEBUG', 'KEYTABLE-CORRUPT', 'test_string')
+
+    def test_keytable_clear_requires_debug_mode(self):
+        """KEYTABLE-CLEAR should be rejected without debug-mode."""
+        with pytest.raises(ResponseError, match="unknown subcommand"):
+            self.client.execute_command('JSON.DEBUG', 'KEYTABLE-CLEAR')
+
+    def test_keytable_distribution_requires_debug_mode(self):
+        """KEYTABLE-DISTRIBUTION should be rejected without debug-mode."""
+        with pytest.raises(ResponseError, match="unknown subcommand"):
+            self.client.execute_command('JSON.DEBUG', 'KEYTABLE-DISTRIBUTION', '10')

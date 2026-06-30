@@ -76,7 +76,7 @@ class JsonTestCase(SimpleTestCase):
         else:
             # Original local server
             server_path = f"{os.path.dirname(os.path.realpath(__file__))}/.build/binaries/{os.environ['SERVER_VERSION']}/valkey-server"
-            args = {'loadmodule': os.getenv('MODULE_PATH'), "enable-debug-command": "local", 'enable-protected-configs': 'yes'}
+            args = {'loadmodule': os.getenv('MODULE_PATH'), 'json.debug-mode': 'yes', "enable-debug-command": "local", 'enable-protected-configs': 'yes'}
             self.server, self.client = self.create_server(testdir=self.testdir, server_path=server_path, args=args)
 
         self.error_class = ErrorStringTester

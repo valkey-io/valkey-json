@@ -49,6 +49,29 @@ To build the module with ASAN and run tests
 export ASAN_BUILD=true
 ./build.sh --integration
 ```
+To skip building Valkey from source and reuse an externally built `valkey-server` binary, set `VALKEY_SERVER_PATH` to its absolute path.
+The binary will be copied into the integration test directory; `valkeymodule.h` is still fetched from the Valkey repo for compiling the module:
+```text
+SERVER_VERSION=unstable \
+VALKEY_SERVER_PATH=/path/to/valkey-server \
+./build.sh --integration
+```
+
+To use a local `valkeymodule.h` (e.g. to match the exact version of the binary above, or to build offline), set `VALKEY_MODULE_H_PATH` to its absolute path.
+When both `VALKEY_SERVER_PATH` and `VALKEY_MODULE_H_PATH` are set, the Valkey repo is no longer cloned, enabling a fully offline build:
+```text
+SERVER_VERSION=unstable \
+VALKEY_SERVER_PATH=/path/to/valkey-server \
+VALKEY_MODULE_H_PATH=/path/to/valkeymodule.h \
+./build.sh --integration
+```
+
+By default, integration tests launch a local Valkey server.
+To run them against an external Valkey server instead (with the JSON module already loaded), set `VALKEY_EXTERNAL_SERVER=true`.
+The host and port can be customized via `VALKEY_HOST` (default `localhost`) and `VALKEY_PORT` (default `6379`):
+```text
+VALKEY_EXTERNAL_SERVER=true VALKEY_HOST=127.0.0.1 VALKEY_PORT=6379 ./build.sh --integration
+```
 
 ## Cleaning
 ```text
@@ -96,6 +119,25 @@ To change the limit (e.g. to 256):
 ```text
 CONFIG SET json.max-path-limit 256
 ```
+
+### Debug commands (`json.debug-mode`)
+
+The `JSON.DEBUG KEYTABLE-CORRUPT`, `JSON.DEBUG KEYTABLE-CLEAR`, and `JSON.DEBUG KEYTABLE-DISTRIBUTION` subcommands are intended for development and debugging only. They are gated behind the `json.debug-mode` hidden module config, which is **immutable** — it can only be set at module load time.
+
+To enable debug commands, load the module and set the config via Valkey's CLI or config file:
+
+```text
+valkey-server --loadmodule /path/to/libjson.so --json.debug-mode yes
+```
+
+Or in `valkey.conf`:
+
+```text
+loadmodule /path/to/libjson.so
+json.debug-mode yes
+```
+
+When `debug-mode` is not enabled (the default), these subcommands return an error.
 
 ## Supported  Module Commands
 ```text
