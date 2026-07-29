@@ -79,6 +79,18 @@ if [ -z "$SERVER_VERSION" ]; then
     export SERVER_VERSION="unstable"
 fi
 
+REPO_URL="https://github.com/valkey-io/valkey.git"
+MIN_SERVER_MAJOR="8"
+VALID_VERSIONS=$(printf 'unstable\n%s\n' "$(git ls-remote --heads "$REPO_URL" \
+  | sed 's#.*refs/heads/##' \
+  | grep -E '^[0-9]+\.[0-9]+$' \
+  | awk -F. -v M="$MIN_SERVER_MAJOR" '$1>=M')")
+if ! printf '%s\n' "$VALID_VERSIONS" | grep -qxF "$SERVER_VERSION"; then
+  echo "ERROR: Unsupported version - $SERVER_VERSION"
+  echo "Valid versions are: $(printf '%s\n' "$VALID_VERSIONS" | sort -V | tr '\n' ' ')"
+  exit 1
+fi
+
 mkdir -p "$BUILD_DIR"
 cd "$BUILD_DIR"
 

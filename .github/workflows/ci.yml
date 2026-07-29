@@ -1,14 +1,48 @@
 name: CI
 
-on: [push, pull_request]
+on:
+  push:
+  pull_request:
+  # All versions run at 06:00 UTC every day (full backwards-compat matrix).
+  schedule:
+    - cron: '0 6 * * *'
+  workflow_dispatch:
 
 jobs:
+  get-versions:
+    runs-on: ubuntu-latest
+    outputs:
+      versions: ${{ steps.discover.outputs.versions }}
+    steps:
+      - name: Discover valkey server versions
+        id: discover
+        env:
+          VALKEY_REPO_URL: https://github.com/valkey-io/valkey.git
+          MIN_SERVER_MAJOR: '8'
+        run: |
+          branches=$(git ls-remote --heads "$VALKEY_REPO_URL" \
+            | sed 's#.*refs/heads/##' \
+            | grep -E '^[0-9]+\.[0-9]+$' \
+            | awk -F. -v M="$MIN_SERVER_MAJOR" '$1>=M' \
+            | sort -V)
+          # PRs/pushes: fast signal — only "unstable" + the latest official release.
+          # schedule/workflow_dispatch: full supported matrix for backwards-compat.
+          if [ "$GITHUB_EVENT_NAME" = "schedule" ] || [ "$GITHUB_EVENT_NAME" = "workflow_dispatch" ]; then
+            selected="$branches"
+          else
+            selected=$(printf '%s\n' $branches | tail -n 1)
+          fi
+          json=$(printf '%s\n' unstable $selected | jq -R . | jq -sc .)
+          echo "Event: $GITHUB_EVENT_NAME -> versions: $json"
+          echo "versions=$json" >> "$GITHUB_OUTPUT"
+
   build-release:
+    needs: get-versions
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
-        server_version: ['unstable', '8.0', '8.1', '9.0']
+        server_version: ${{ fromJSON(needs.get-versions.outputs.versions) }}
     steps:
       - uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # v4.1.1
       - name: Set the server version
@@ -17,11 +51,12 @@ jobs:
         run: ./build.sh
 
   unit-tests:
+    needs: get-versions
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
-        server_version: ['unstable', '8.0', '8.1', '9.0']
+        server_version: ${{ fromJSON(needs.get-versions.outputs.versions) }}
     steps:
       - uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # v4.1.1
       - name: Set the server version
@@ -30,11 +65,12 @@ jobs:
         run: ./build.sh --unit
 
   integration-tests:
+    needs: get-versions
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
-        server_version: ['unstable', '8.0', '8.1', '9.0']
+        server_version: ${{ fromJSON(needs.get-versions.outputs.versions) }}
     steps:
       - uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # v4.1.1
       - name: Set the server version
@@ -51,11 +87,12 @@ jobs:
         run: ./build.sh --integration
 
   asan-tests:
+    needs: get-versions
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
-        server_version: ['unstable', '8.0', '8.1', '9.0']
+        server_version: ${{ fromJSON(needs.get-versions.outputs.versions) }}
     steps:
       - uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # v4.1.1
       - name: Set the server version
