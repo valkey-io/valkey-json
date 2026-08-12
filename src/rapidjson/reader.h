@@ -71,7 +71,7 @@ RAPIDJSON_DIAG_OFF(effc++)
     \ingroup RAPIDJSON_ERRORS
     \brief Macro to indicate a parse error.
     \param parseErrorCode \ref rapidjson::ParseErrorCode of the error
-    \param offset  position of the error in JSON input (\c size_t)
+    \param offset position of the error in JSON input (\c size_t)
 
     This macros can be used as a customization point for the internal
     error handling mechanism of RapidJSON.
@@ -109,7 +109,7 @@ RAPIDJSON_DIAG_OFF(effc++)
     \ingroup RAPIDJSON_ERRORS
     \brief (Internal) macro to indicate and handle a parse error.
     \param parseErrorCode \ref rapidjson::ParseErrorCode of the error
-    \param offset  position of the error in JSON input (\c size_t)
+    \param offset position of the error in JSON input (\c size_t)
 
     Invokes RAPIDJSON_PARSE_ERROR_NORETURN and stops the parsing.
 
@@ -1210,7 +1210,7 @@ private:
         is.dst_ = q;
     }
 
-    // When read/write pointers are the same for insitu stream, just skip unescaped characters
+    // When read/write pointers are the same for in situ stream, just skip unescaped characters
     static RAPIDJSON_FORCEINLINE void SkipUnescapedString(InsituStringStream& is) {
         RAPIDJSON_ASSERT(is.src_ == is.dst_);
         char* p = is.src_;
@@ -1382,7 +1382,7 @@ private:
         is.dst_ = q;
     }
 
-    // When read/write pointers are the same for insitu stream, just skip unescaped characters
+    // When read/write pointers are the same for in situ stream, just skip unescaped characters
     static RAPIDJSON_FORCEINLINE void SkipUnescapedString(InsituStringStream& is) {
         RAPIDJSON_ASSERT(is.src_ == is.dst_);
         char* p = is.src_;
@@ -1428,7 +1428,7 @@ private:
         is.src_ = is.dst_ = p;
     }
 #else
-    // When read/write pointers are the same for insitu stream, just skip unescaped characters
+    // When read/write pointers are the same for in situ stream, just skip unescaped characters
     static RAPIDJSON_FORCEINLINE void SkipUnescapedString(InsituStringStream& is) {
         RAPIDJSON_ASSERT(is.src_ == is.dst_);
         char* p = is.src_;
