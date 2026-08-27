@@ -1,5 +1,8 @@
 name: CI
 
+permissions:
+  contents: read
+
 on:
   push:
   pull_request:
@@ -25,13 +28,18 @@ jobs:
             | grep -E '^[0-9]+\.[0-9]+$' \
             | awk -F. -v M="$MIN_SERVER_MAJOR" '$1>=M' \
             | sort -V)
-          # PRs/pushes: fast signal — only "unstable" + the latest official release.
-          # schedule/workflow_dispatch: full supported matrix for backwards-compat.
-          if [ "$GITHUB_EVENT_NAME" = "schedule" ] || [ "$GITHUB_EVENT_NAME" = "workflow_dispatch" ]; then
-            selected="$branches"
-          else
-            selected=$(printf '%s\n' $branches | tail -n 1)
-          fi
+          target="${GITHUB_BASE_REF:-$GITHUB_REF_NAME}"
+          case "$GITHUB_EVENT_NAME" in
+            schedule|workflow_dispatch) selected="$branches" ;;
+            *)
+              if [ "$target" = "unstable" ]; then
+                selected=$(printf '%s\n' $branches | tail -n 1)
+              else
+                selected="$branches"
+              fi
+              ;;
+          esac
+          echo "valkey-json branch under test: $target"
           json=$(printf '%s\n' unstable $selected | jq -R . | jq -sc .)
           echo "Event: $GITHUB_EVENT_NAME -> versions: $json"
           echo "versions=$json" >> "$GITHUB_OUTPUT"
