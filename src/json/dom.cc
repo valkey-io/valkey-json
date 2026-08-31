@@ -7,6 +7,7 @@
 #include <iostream>
 #include <iomanip>
 #include <cmath>
+#include <algorithm>
 #include "json/rapidjson_includes.h"
 
 #define STATIC /* decorator for static functions, remove so that backtrace symbols include these */
@@ -37,6 +38,28 @@
 
 // the one true allocator
 RapidJsonAllocator allocator;
+
+ /**
+ * Order a unique result set deepest first, using most '/' separators.
+ * Ties retain original relative order via stable sort.
+ *
+ * A size changing mutation on an array invalidates cached JValue*
+ * pointers to its elements. Acting on descendants before ancestors ensures
+ * every pointer is still valid when dereferenced as a parent's buffer is never
+ * reallocated before its children are consumed.
+ *
+ * For result sets with no parent descendant overlap, this is a stable no-op.
+ */
+STATIC jsn::vector<size_t> order_result_set_deepest_first(const jsn::vector<Selector::ValueInfo> &rs) {
+    jsn::vector<size_t> order(rs.size());
+    for (size_t i = 0; i < rs.size(); i++) order[i] = i;
+    std::stable_sort(order.begin(), order.end(), [&rs](size_t a, size_t b) {
+        size_t depth_a = std::count(rs[a].second.begin(), rs[a].second.end(), '/');
+        size_t depth_b = std::count(rs[b].second.begin(), rs[b].second.end(), '/');
+        return depth_a > depth_b;  // deeper paths first
+    });
+    return order;
+}
 
 /**
  * We want to avoid all redundant creations of an allocator -- for performance reasons.
@@ -750,7 +773,11 @@ JsonUtilCode dom_array_append(ValkeyModuleCtx *ctx, JDocument *doc, const char *
     }
     CHECK_DOCUMENT_SIZE_LIMIT(ctx, doc->size, totalJValueSize)
 
-    for (auto &v : selector.getUniqueResultSet()) {
+    auto &rs = selector.getUniqueResultSet();
+    vec.resize(rs.size());
+    // Process matches deepest first. Results are written back to their original index.
+    for (size_t idx : order_result_set_deepest_first(rs)) {
+        auto &v = rs[idx];
         if (v.first->IsArray()) {
             for (size_t i=0; i < num_values; i++) {
                 // Need to make a copy of the value because after the first call of JValue::PushBack,
@@ -758,15 +785,15 @@ JsonUtilCode dom_array_append(ValkeyModuleCtx *ctx, JDocument *doc, const char *
                 JValue copy(appendVals[i], allocator);
                 v.first->PushBack(copy, allocator);
             }
-            vec.push_back(v.first->Size());
+            vec[idx] = v.first->Size();
         } else {
-            vec.push_back(SIZE_MAX);  // indicates non-array value
+            vec[idx] = SIZE_MAX;  // indicates non-array value
         }
     }
     return JSONUTIL_SUCCESS;
 }
 
-STATIC void internal_array_pop(JValue &arrVal, int64_t index, jsn::vector<rapidjson::StringBuffer> &vec,
+STATIC void internal_array_pop(JValue &arrVal, int64_t index, rapidjson::StringBuffer &out,
                                rapidjson::StringBuffer &oss) {
     // Convert negative index to positive
     int64_t size = arrVal.Size();
@@ -778,7 +805,7 @@ STATIC void internal_array_pop(JValue &arrVal, int64_t index, jsn::vector<rapidj
 
     serialize_value(arrVal[index], 0, nullptr, oss);
     arrVal.Erase(arrVal.Begin() + index);
-    vec.push_back(std::move(oss));
+    out = std::move(oss);
 }
 
 JsonUtilCode dom_array_pop(JDocument *doc, const char *path, int64_t index,
@@ -800,16 +827,20 @@ JsonUtilCode dom_array_pop(JDocument *doc, const char *path, int64_t index,
         if (!has_array_value(values)) return JSONUTIL_JSON_ELEMENT_NOT_ARRAY;
     }
 
-    for (auto &v : selector.getUniqueResultSet()) {
+    auto &rs = selector.getUniqueResultSet();
+    vec.resize(rs.size());
+    // Process matches deepest first. Results are written back to their original index.
+    for (size_t idx : order_result_set_deepest_first(rs)) {
+        auto &v = rs[idx];
         rapidjson::StringBuffer oss;
         if (v.first->IsArray()) {
             if (v.first->Empty()) {
-                vec.push_back(std::move(oss));  // empty array, oss is empty
+                vec[idx] = std::move(oss);  // empty array, oss is empty
             } else {
-                internal_array_pop(*v.first, index, vec, oss);
+                internal_array_pop(*v.first, index, vec[idx], oss);
             }
         } else {
-            vec.push_back(std::move(oss));  // non-array value, oss is empty
+            vec[idx] = std::move(oss);  // non-array value, oss is empty
         }
     }
 
@@ -817,7 +848,7 @@ JsonUtilCode dom_array_pop(JDocument *doc, const char *path, int64_t index,
 }
 
 STATIC JsonUtilCode internal_array_insert(JValue &arrVal, jsn::vector<JParser> &insertVals,
-                                          const size_t num_values, int64_t index, jsn::vector<size_t> &vec) {
+                                          const size_t num_values, int64_t index, size_t &out) {
     size_t size = arrVal.Size();
 
     // Negative index values are interpreted as starting from the end.
@@ -847,7 +878,7 @@ STATIC JsonUtilCode internal_array_insert(JValue &arrVal, jsn::vector<JParser> &
         arrVal[i] = copy;
     }
 
-    vec.push_back(arrVal.Size());
+    out = arrVal.Size();
     return JSONUTIL_SUCCESS;
 }
 
@@ -883,21 +914,25 @@ JsonUtilCode dom_array_insert(ValkeyModuleCtx *ctx, JDocument *doc, const char *
     }
     CHECK_DOCUMENT_SIZE_LIMIT(ctx, doc->size, totalJValueSize)
 
-    for (auto &v : selector.getUniqueResultSet()) {
+    auto &rs = selector.getUniqueResultSet();
+    vec.resize(rs.size());
+    // Process matches deepest first. Results are written back to their original index.
+    for (size_t idx : order_result_set_deepest_first(rs)) {
+        auto &v = rs[idx];
         if (v.first->IsArray()) {
-            rc = internal_array_insert(*v.first, insertVals, num_values, index, vec);
+            rc = internal_array_insert(*v.first, insertVals, num_values, index, vec[idx]);
             if (rc != JSONUTIL_SUCCESS) return rc;
         } else {
-            vec.push_back(SIZE_MAX);  // indicates non-array value
+            vec[idx] = SIZE_MAX;  // indicates non-array value
         }
     }
     return JSONUTIL_SUCCESS;
 }
 
-STATIC void internal_array_trim(JValue &arrVal, int64_t start, int64_t stop, jsn::vector<size_t> &vec) {
+STATIC void internal_array_trim(JValue &arrVal, int64_t start, int64_t stop, size_t &out) {
     int64_t size = static_cast<int64_t>(arrVal.Size());
     if (size == 0) {
-        vec.push_back(0);
+        out = 0;
         return;
     }
 
@@ -910,7 +945,7 @@ STATIC void internal_array_trim(JValue &arrVal, int64_t start, int64_t stop, jsn
     if (start >= size || start > stop) {
         // If start >= size or start > stop, empty the array and return *new_len as 0.
         arrVal.Erase(arrVal.Begin(), arrVal.End());
-        vec.push_back(0);
+        out = 0;
         return;
     }
 
@@ -919,7 +954,7 @@ STATIC void internal_array_trim(JValue &arrVal, int64_t start, int64_t stop, jsn
     if (start > 0)
         arrVal.Erase(arrVal.Begin(), arrVal.Begin() + start);
 
-    vec.push_back(arrVal.Size());
+    out = arrVal.Size();
 }
 
 JsonUtilCode dom_array_trim(JDocument *doc, const char *path, int64_t start, int64_t stop,
@@ -941,11 +976,15 @@ JsonUtilCode dom_array_trim(JDocument *doc, const char *path, int64_t start, int
         if (!has_array_value(values)) return JSONUTIL_JSON_ELEMENT_NOT_ARRAY;
     }
 
-    for (auto &v : selector.getUniqueResultSet()) {
+    auto &rs = selector.getUniqueResultSet();
+    vec.resize(rs.size());
+    // Process matches deepest first. Results are written back to their original index.
+    for (size_t idx : order_result_set_deepest_first(rs)) {
+        auto &v = rs[idx];
         if (v.first->IsArray()) {
-            internal_array_trim(*v.first, start, stop, vec);
+            internal_array_trim(*v.first, start, stop, vec[idx]);
         } else {
-            vec.push_back(SIZE_MAX);  // indicates non-array value
+            vec[idx] = SIZE_MAX;  // indicates non-array value
         }
     }
     return JSONUTIL_SUCCESS;
@@ -957,7 +996,10 @@ JsonUtilCode dom_clear(JDocument *doc, const char *path, size_t &elements_cleare
     JsonUtilCode rc = selector.getValues(doc->GetJValue(), path);
     if (rc != JSONUTIL_SUCCESS) return rc;
 
-    for (auto &v : selector.getUniqueResultSet()) {
+    auto &rs = selector.getUniqueResultSet();
+    // Process matches deepest-first. The reply is just a count, so order is irrelevant.
+    for (size_t idx : order_result_set_deepest_first(rs)) {
+        auto &v = rs[idx];
         if (v.first->IsArray()) {
             if (!v.first->Empty()) {
                 v.first->Erase(v.first->Begin(), v.first->End());
