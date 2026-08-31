@@ -1,5 +1,38 @@
 Valkey JSON 1.0 release notes
 ========================
+
+Upgrade urgency levels:
+
+| Level    | Meaning                                                             |
+|----------|---------------------------------------------------------------------|
+| LOW      | No need to upgrade unless there are new features you want to use.   |
+| MODERATE | Program an upgrade of the server, but it's not urgent.              |
+| HIGH     | There is a critical bug that may affect a subset of users. Upgrade! |
+| CRITICAL | There is a critical bug affecting MOST USERS. Upgrade ASAP.         |
+| SECURITY | There are security fixes in the release.                            |
+
+================================================================================
+Valkey JSON 1.0.3  -  Released Mon 31 August 2026
+================================================================================
+
+Upgrade urgency SECURITY: This release includes security fixes we recommend you
+apply as soon as possible.
+
+Security fixes
+==============
+* (GHSA-q7rf-74qm-hr9g) Fix use-after-free in recursive JSONPath mutations, affecting `JSON.ARRAPPEND`, `JSON.ARRINSERT`, `JSON.ARRPOP`, `JSON.ARRTRIM` and `JSON.CLEAR` by @zackcam (#120)
+
+Bug fixes
+=========
+* Fix crash when converting a stored number that is out of range for a double by @zackcam (#109)
+* Fix out-of-bounds read when a member name contains `~` by @zackcam (#108)
+* Fix crash in `JSON.MSET` when the same key is given more than once by @roshkhatri (#112)
+* Bound array pre-allocation on legacy RDB and `RESTORE` load, and reject truncated streams by @roshkhatri (#111)
+* Fix heap use-after-free in `JSON.MSET` caused by unclosed key handles by @zackcam (#116)
+* Restrict `JSON.DEBUG KEYTABLE-CORRUPT`, `KEYTABLE-CLEAR` and `KEYTABLE-DISTRIBUTION` to modules loaded with `json.debug-mode` by @roshkhatri (#98)
+* Set `VALKEYMODULE_OPTIONS_HANDLE_REPL_ASYNC_LOAD` to handle asynchronous replication load by @dmitrypol (#89)
+* Fix build failure on GCC 16 for a `maybe_unused` variable by @hanxizh9910 (#97)
+
 ================================================================================
 Valkey JSON 1.0.2 - Released Mon 8 September 2025
 ================================================================================
