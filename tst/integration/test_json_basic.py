@@ -4998,6 +4998,56 @@ class TestJsonBasic(JsonTestCase):
             print("For Path:", path, " json.get:", g, " shared-api:", s)
             assert (g == s)
 
+    def test_recursive_path_mutation_use_after_free(self):
+        '''
+        Regression test for a use-after-free crash in size-changing array/clear mutators.
+
+        Root cause: a node's JValue* points into its parent array's element buffer. When a
+        recursive path (e.g. $.. or $[*]) selects both a parent array and a descendant that
+        lives inside it, mutating the parent reallocates/frees that buffer, leaving the
+        descendant's cached pointer dangling. The subsequent dereference of the descendant
+        pointer is a use-after-free.
+
+        JSON.SET k $ '[[0],0]' followed by JSON.ARRAPPEND k '$..' <value> crashes the server.
+
+        The fix processes matches deepest-first while writing replies back to their original
+        index.
+        '''
+        c = self.server.get_new_client()
+
+        # Each case starts from the document [[0],0].
+        # Format is (command, key, command-args, expected_reply, expected_doc_after)
+        cases = [
+            ('ARRAPPEND', 'uaf_append', ('JSON.ARRAPPEND', '$..', '"x"'),
+            [3, 2], [[0, 'x'], 0, 'x']),
+            ('ARRINSERT', 'uaf_insert', ('JSON.ARRINSERT', '$..', 0, '"x"'),
+            [3, 2], ['x', ['x', 0], 0]),
+            ('ARRPOP', 'uaf_pop', ('JSON.ARRPOP', '$..'),
+            [b'0', b'0'], [[]]),
+            ('ARRTRIM', 'uaf_trim', ('JSON.ARRTRIM', '$..', 0, 0),
+            [1, 1], [[0]]),
+            ('CLEAR', 'uaf_clear', ('JSON.CLEAR', '$..'),
+            2, []),
+        ]
+
+        for label, key, cmd, expected_reply, expected_doc in cases:
+            cmd_name = cmd[0]
+            cmd_args = cmd[1:]
+            # A document where a recursive path selects both a parent array and a
+            # descendant array nested inside it.
+            assert b'OK' == c.execute_command('JSON.SET', key, '$', '[[0],0]')
+
+            reply = c.execute_command(cmd_name, key, *cmd_args)
+
+            # The reply must be correct and in document order.
+            assert reply == expected_reply, f'JSON.{label} reply {reply!r} != {expected_reply!r}'
+
+            # The resulting document must be correct (JSON.GET $ wraps the result in an array).
+            expected_get = json.dumps([expected_doc], separators=(',', ':')).encode()
+            actual_get = c.execute_command('JSON.GET', key, '$')
+            assert actual_get == expected_get, f'JSON.{label} doc {actual_get!r} != {expected_get!r}'
+
+
 
 class TestJsonDebugGating(JsonTestCase):
     """Test that debug commands are gated behind json.debug-mode module config."""
