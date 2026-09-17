@@ -971,13 +971,27 @@ class TestJsonBasic(JsonTestCase):
             ('$[6::-1]',       '[]'),
             ('$[6:0:-2]',      '[6,4,2]'),
             ('$[6::-2]',       '[]'),
-            ('$[8:0:-2]',      '[8,6,4,2]')
+            ('$[8:0:-2]',      '[8,6,4,2]'),
+            ('$[0:2:4294967296]',             '[0]'),
+            ('$[2:0:-4294967296]',            '[2]'),
+            ('$[1:3:9223372036854775807]',    '[1]'),
+            ('$[2:0:-9223372036854775807]',   '[2]'),
+            ('$[2:0:-9223372036854775808]',   '[2]')
         ]
 
         client.execute_command(
             'JSON.SET', k1, '.', '[0,1,2,3,4,5,6,7,8,9]')
         for (path, exp) in test_cases:
             assert exp.encode() == client.execute_command('JSON.GET', k1, path)
+
+        invalid_steps = [
+            '$[0:2:9223372036854775808]',
+            '$[2:0:-9223372036854775809]',
+            '$[0:2:18446744073709551616]'
+        ]
+        for path in invalid_steps:
+            with pytest.raises(ResponseError, match='Invalid number'):
+                client.execute_command('JSON.GET', k1, path)
 
     def test_json_get_v2path_array_union(self):
         '''
