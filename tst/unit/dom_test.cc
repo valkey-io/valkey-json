@@ -3015,6 +3015,44 @@ TEST_F(DomTest, testSelector_get_array_slice_v2path_wildcard) {
     EXPECT_EQ(rs6[0].first->GetInt(), 5);
 }
 
+TEST_F(DomTest, testSelector_get_array_slice_large_step) {
+    Selector selector;
+
+    JsonUtilCode rc = selector.getValues(*doc4, "$.e[0:5:4294967296]");
+    ASSERT_EQ(rc, JSONUTIL_SUCCESS);
+    auto &large_positive_step = selector.getResultSet();
+    ASSERT_EQ(large_positive_step.size(), 1);
+    EXPECT_EQ(large_positive_step[0].first->GetInt(), 1);
+
+    rc = selector.getValues(*doc4, "$.e[4:0:-4294967296]");
+    ASSERT_EQ(rc, JSONUTIL_SUCCESS);
+    auto &large_negative_step = selector.getResultSet();
+    ASSERT_EQ(large_negative_step.size(), 1);
+    EXPECT_EQ(large_negative_step[0].first->GetInt(), 5);
+
+    rc = selector.getValues(*doc4, "$.e[1:5:9223372036854775807]");
+    ASSERT_EQ(rc, JSONUTIL_SUCCESS);
+    auto &max_positive_step = selector.getResultSet();
+    ASSERT_EQ(max_positive_step.size(), 1);
+    EXPECT_EQ(max_positive_step[0].first->GetInt(), 2);
+
+    rc = selector.getValues(*doc4, "$.e[4:0:-9223372036854775807]");
+    ASSERT_EQ(rc, JSONUTIL_SUCCESS);
+    auto &max_negative_step = selector.getResultSet();
+    ASSERT_EQ(max_negative_step.size(), 1);
+    EXPECT_EQ(max_negative_step[0].first->GetInt(), 5);
+
+    rc = selector.getValues(*doc4, "$.e[4:0:-9223372036854775808]");
+    ASSERT_EQ(rc, JSONUTIL_SUCCESS);
+    auto &min_negative_step = selector.getResultSet();
+    ASSERT_EQ(min_negative_step.size(), 1);
+    EXPECT_EQ(min_negative_step[0].first->GetInt(), 5);
+
+    EXPECT_EQ(selector.getValues(*doc4, "$.e[0:5:9223372036854775808]"), JSONUTIL_INVALID_NUMBER);
+    EXPECT_EQ(selector.getValues(*doc4, "$.e[4:0:-9223372036854775809]"), JSONUTIL_INVALID_NUMBER);
+    EXPECT_EQ(selector.getValues(*doc4, "$.e[0:5:18446744073709551616]"), JSONUTIL_INVALID_NUMBER);
+}
+
 // Test array union
 TEST_F(DomTest, testSelector_get_array_union_v2path) {
     const char *path = "$.e[0,2]";

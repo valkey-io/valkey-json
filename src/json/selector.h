@@ -3,6 +3,7 @@
 
 #include "json/dom.h"
 #include "json/rapidjson_includes.h"
+#include <cstdint>
 #include <string_view>
 
 struct Token {
@@ -93,7 +94,7 @@ class Lexer {
  private:
     Lexer(const Lexer &t);  // disable copy constructor
     Lexer& operator=(const Lexer &rhs);  // disable assignment constructor
-    int64_t scanUnsignedInteger();
+    JsonUtilCode scanUnsignedInteger(uint64_t limit, uint64_t &val);
     const char *path;
     size_t rdTokens;  // number of recursive descent tokens
 };
