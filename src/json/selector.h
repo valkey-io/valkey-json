@@ -327,7 +327,7 @@ class Selector {
     JsonUtilCode processWildcard();
     JsonUtilCode processWildcardKey();
     JsonUtilCode processWildcardIndex();
-    JsonUtilCode parseWildcardFilter();
+    JsonUtilCode validateWildcardFilter() const;
     JsonUtilCode processSubscript(const int64_t idx);
     JsonUtilCode processSlice(int64_t start, int64_t end, const int64_t step = 1);
     JsonUtilCode processUnion(jsn::vector<int64_t> union_indices);

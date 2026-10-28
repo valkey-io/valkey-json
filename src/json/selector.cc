@@ -70,12 +70,11 @@ class RecursionDepthTracker {
  *   DotPath             ::= "." QualifiedPath
  *   QualifiedPath       ::= QualifiedPathElement RelativePath
  *   QualifiedPathElement ::= Key | BracketPathElement
- *   Key                 ::= "*" [ [ "." ] WildcardFilter ] | UnquotedMemberName
- *   WildcardFilter      ::=  "[" "?" "(" FilterExpr ")" "]"
+ *   Key                 ::= "*" | UnquotedMemberName
  *   UnquotedMemberName  ::= char { char }
  *   BracketPath         ::= BracketPathElement [ RelativePath ]
  *   BracketPathElement  ::= "[" {SPACE} ( WildcardInBrackets | ((NameInBrackets | IndexExpr) ) {SPACE} "]")
- *   WildcardInBrackets  ::= "*" {SPACE} "]" [ "[" {SPACE} "?" "(" FilterExpr ")" {SPACE} "]" ]
+ *   WildcardInBrackets  ::= "*" {SPACE} "]"
  *   NameInBrackets      ::= QuotedMemberName [ ({SPACE} "," {SPACE} QuotedMemberName)+ ]
  *   QuotedMemberName    ::= "\"" {char} "\"" | "'" {char} "'"
  *   IndexExpr           ::= Filter | SliceStartsWithColon | SliceOrUnionOrIndex
@@ -1097,7 +1096,7 @@ JsonUtilCode Selector::parseBracketPath() {
 
 /**
  *   BracketPathElement  ::= "[" {SPACE} ( WildcardInBrackets | ((NameInBrackets | IndexExpr) ) {SPACE} "]")
- *   WildcardInBrackets  ::= "*" {SPACE} "]" [ "[" {SPACE} "?" "(" FilterExpr ")" {SPACE} "]" ]
+ *   WildcardInBrackets  ::= "*" {SPACE} "]"
  *   NameInBrackets      ::= QuotedMemberName [ ({SPACE} "," {SPACE} QuotedMemberName)+ ]
  *   QuotedMemberName    ::= """ {char} """ | "'" {char} "'"
  *   IndexExpr           ::= Filter | SliceStartsWithColon | SliceOrUnionOrIndex
@@ -1128,28 +1127,13 @@ JsonUtilCode Selector::parseBracketPathElement() {
 }
 
 /**
- *   WildcardInBrackets  ::= "*" {SPACE} "]" [ "[" {SPACE} "?" "(" FilterExpr ")" {SPACE} "]" ]
+ *   WildcardInBrackets  ::= "*" {SPACE} "]"
  */
 JsonUtilCode Selector::parseWildcardInBrackets() {
     if (!lex.matchToken(Token::WILDCARD, true)) return JSONUTIL_INVALID_JSON_PATH;
     if (!lex.matchToken(Token::RBRACKET, true)) return JSONUTIL_INVALID_JSON_PATH;
 
-    if (lex.currToken().type == Token::LBRACKET && lex.peekToken() == Token::QUESTION_MARK) {
-        if (!lex.matchToken(Token::LBRACKET, true)) return JSONUTIL_INVALID_JSON_PATH;
-        lex.skipSpaces();
-        if (!lex.matchToken(Token::QUESTION_MARK)) return JSONUTIL_INVALID_JSON_PATH;
-        if (!lex.matchToken(Token::LPAREN)) return JSONUTIL_INVALID_JSON_PATH;
-
-        jsn::vector<int64_t> result;  // candidate indexes/ordinals for the current container
-        JsonUtilCode rc = parseFilterExpr(result);
-        if (rc != JSONUTIL_SUCCESS) return rc;
-
-        if (!lex.matchToken(Token::RPAREN, true)) return JSONUTIL_INVALID_JSON_PATH;
-        if (!lex.matchToken(Token::RBRACKET, true)) return JSONUTIL_INVALID_JSON_PATH;
-        return processFilterResult(result);
-    } else {
-        return processWildcard();
-    }
+    return processWildcard();
 }
 
 /**
@@ -1247,17 +1231,12 @@ JsonUtilCode Selector::parseQualifiedPathElement() {
 }
 
 /**
- *   Key                 ::= "*" [ [ "." ] WildcardFilter ] | UnquotedMemberName
- *   WildcardFilter  ::=  "[" "?" "(" FilterExpr ")" "]"
+ *   Key                 ::= "*" | UnquotedMemberName
  */
 JsonUtilCode Selector::parseKey() {
     if (lex.matchToken(Token::WILDCARD)) {
         if (lex.currToken().type == Token::DOT) lex.nextToken();  // skip DOT
-        if (lex.currToken().type == Token::LBRACKET && lex.peekToken() == Token::QUESTION_MARK) {
-            return parseWildcardFilter();
-        } else {
-            return processWildcard();
-        }
+        return processWildcard();
     } else {
         StringViewHelper name;
         JsonUtilCode rc = parseUnquotedMemberName(name);
@@ -1276,27 +1255,23 @@ JsonUtilCode Selector::parseUnquotedMemberName(StringViewHelper &name) {
     return JSONUTIL_SUCCESS;
 }
 
-/**
- *   WildcardFilter  ::= "[" "?" "(" FilterExpr ")" "]"
- */
-JsonUtilCode Selector::parseWildcardFilter() {
-    if (!node->IsArray() && !node->IsObject()) return JSONUTIL_INVALID_JSON_PATH;
-
-    if (!lex.matchToken(Token::LBRACKET)) return JSONUTIL_INVALID_JSON_PATH;
-    if (!lex.matchToken(Token::QUESTION_MARK)) return JSONUTIL_INVALID_JSON_PATH;
-    if (!lex.matchToken(Token::LPAREN, true)) return JSONUTIL_INVALID_JSON_PATH;
-
-    jsn::vector<int64_t> result;  // subset of indexes of the current array
-    JsonUtilCode rc = parseFilterExpr(result);
+JsonUtilCode Selector::validateWildcardFilter() const {
+    Selector validator(isV2Path);
+    const JsonUtilCode rc = validator.init(*root, lex.p, READ);
     if (rc != JSONUTIL_SUCCESS) return rc;
+    validator.lex.skipSpaces();
+    if (validator.lex.currToken().type != Token::QUESTION_MARK) return JSONUTIL_SUCCESS;
 
-    if (!lex.matchToken(Token::RPAREN, true)) return JSONUTIL_INVALID_JSON_PATH;
-    if (!lex.matchToken(Token::RBRACKET)) return JSONUTIL_INVALID_JSON_PATH;
-
-    return processFilterResult(result);
+    JValue empty_array(rapidjson::kArrayType);
+    validator.node = &empty_array;
+    return validator.parseFilter();
 }
 
 JsonUtilCode Selector::processWildcard() {
+    if (lex.currToken().type == Token::LBRACKET) {
+        JsonUtilCode rc = validateWildcardFilter();
+        if (rc != JSONUTIL_SUCCESS) return rc;
+    }
     if (node->IsObject()) {
         return processWildcardKey();
     } else if (node->IsArray()) {
@@ -1495,7 +1470,7 @@ JsonUtilCode Selector::traverseToArrayIndex(int64_t idx) {
  *   parseIndexExpr() is called from parseBracketPathElement().
  *
  *   BracketPathElement  ::= "[" {SPACE} ( WildcardInBrackets | ((NameInBrackets | IndexExpr) {SPACE} ) "]")
- *   WildcardInBrackets  ::= "*" {SPACE} "]" [ "[" {SPACE} "?" "(" FilterExpr ")" {SPACE} "]" ]
+ *   WildcardInBrackets  ::= "*" {SPACE} "]"
  *   IndexExpr           ::= Filter | SliceStartsWithColon | SliceOrUnionOrIndex
  *   Filter              ::= "?" "(" "@" "." FilterExpr ")"
  *   SliceStartsWithColon ::= {SPACE} ":" {SPACE} [ ":" {SPACE} [Step] | EndAndStep ] ]
@@ -2361,8 +2336,6 @@ JsonUtilCode Selector::processAttributeFilter(const StringViewHelper &member_nam
             if (resolveMember(member.value, member_name) != nullptr) result.push_back(ordinal);
             ++ordinal;
         }
-    } else {
-        return JSONUTIL_INVALID_JSON_PATH;
     }
     return JSONUTIL_SUCCESS;
 }
