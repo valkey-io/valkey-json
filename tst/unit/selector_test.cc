@@ -1551,6 +1551,8 @@ TEST_F(SelectorTest, test_wildcard_filter_sequential_values_and_paths) {
                 EXPECT_EQ(results[0].second, test.path);
                 ASSERT_TRUE(results[0].first->IsObject());
                 ASSERT_EQ(results[0].first->MemberCount(), 1u);
+                ASSERT_TRUE(results[0].first->HasMember("a"));
+                ASSERT_TRUE((*results[0].first)["a"].IsInt());
                 EXPECT_EQ((*results[0].first)["a"].GetInt(), 1);
             }
         }
@@ -1599,6 +1601,8 @@ TEST_F(SelectorTest, test_wildcard_attribute_filter_scalar_and_mixed_children) {
                 EXPECT_EQ(results[0].second, test.path);
                 ASSERT_TRUE(results[0].first->IsObject());
                 ASSERT_EQ(results[0].first->MemberCount(), 1u);
+                ASSERT_TRUE(results[0].first->HasMember("a"));
+                ASSERT_TRUE((*results[0].first)["a"].IsInt());
                 EXPECT_EQ((*results[0].first)["a"].GetInt(), 1);
             }
         }
@@ -1618,6 +1622,9 @@ TEST_F(SelectorTest, test_wildcard_filter_rooted_comparison) {
         EXPECT_EQ(results.size(), 1u);
         if (results.size() == 1) {
             EXPECT_EQ(results[0].second, "/groups/0/0");
+            ASSERT_TRUE(results[0].first->IsObject());
+            ASSERT_TRUE(results[0].first->HasMember("a"));
+            ASSERT_TRUE((*results[0].first)["a"].IsInt());
             EXPECT_EQ((*results[0].first)["a"].GetInt(), 1);
         }
     }
@@ -1645,6 +1652,7 @@ TEST_F(SelectorTest, test_wildcard_filter_validation_preserves_recursive_token_b
         for (size_t i = 0; i < results.size(); ++i) {
             const std::string expected_path = "/" + std::to_string(i) + "/0/x";
             EXPECT_STREQ(results[i].second.c_str(), expected_path.c_str());
+            ASSERT_TRUE(results[i].first->IsUint64());
             EXPECT_EQ(results[i].first->GetUint64(), i);
         }
     }
