@@ -1611,12 +1611,13 @@ INSTANTIATE_TEST_SUITE_P(
             WildcardFilterQueryCase{"BracketWildcard", "$.groups[*][ ?(@.a==$.limit)]"})),
     WildcardFilterTest::caseName);
 
-struct EmptyWildcardDocumentCase {
+struct WildcardFilterSyntaxDocumentCase {
     const char *name;
     const char *document;
+    bool reaches_filter;
 };
 
-using WildcardFilterSyntaxParam = std::tuple<EmptyWildcardDocumentCase, WildcardFilterQueryCase>;
+using WildcardFilterSyntaxParam = std::tuple<WildcardFilterSyntaxDocumentCase, WildcardFilterQueryCase>;
 
 class WildcardFilterSyntaxTest
     : public SelectorTest,
@@ -1627,23 +1628,31 @@ class WildcardFilterSyntaxTest
     }
 };
 
-TEST_P(WildcardFilterSyntaxTest, rejects_malformed_filter_after_empty_selection) {
+TEST_P(WildcardFilterSyntaxTest, validates_only_reached_filters) {
     const auto &[document_case, query_case] = GetParam();
     JDocument *doc = nullptr;
     ASSERT_EQ(dom_parse(nullptr, document_case.document, strlen(document_case.document), &doc), JSONUTIL_SUCCESS);
     const std::unique_ptr<JDocument, decltype(&dom_free_doc)> document_owner(doc, dom_free_doc);
     Selector selector;
-    EXPECT_NE(selector.getValues(*doc, query_case.query), JSONUTIL_SUCCESS);
+    const JsonUtilCode rc = selector.getValues(*doc, query_case.query);
+    if (document_case.reaches_filter) {
+        EXPECT_TRUE(selector.isSyntaxError(rc));
+    } else {
+        EXPECT_EQ(rc, JSONUTIL_SUCCESS);
+        EXPECT_FALSE(selector.hasValues());
+    }
 }
 
 INSTANTIATE_TEST_SUITE_P(
-    EmptySelections, WildcardFilterSyntaxTest,
+    LazyParsing, WildcardFilterSyntaxTest,
     ::testing::Combine(
         ::testing::Values(
-            EmptyWildcardDocumentCase{"Array", "[]"},
-            EmptyWildcardDocumentCase{"Object", "{}"},
-            EmptyWildcardDocumentCase{"NestedArray", "[[]]"},
-            EmptyWildcardDocumentCase{"NestedObject", "{\"empty\":{}}"}),
+            WildcardFilterSyntaxDocumentCase{"Array", "[]", false},
+            WildcardFilterSyntaxDocumentCase{"Object", "{}", false},
+            WildcardFilterSyntaxDocumentCase{"NestedArray", "[[]]", true},
+            WildcardFilterSyntaxDocumentCase{"NestedObject", "{\"empty\":{}}", true},
+            WildcardFilterSyntaxDocumentCase{"NullArrayChild", "[null]", true},
+            WildcardFilterSyntaxDocumentCase{"NullObjectChild", "{\"child\":null}", true}),
         ::testing::Values(
             WildcardFilterQueryCase{"DotMissingParen", "$.*[?(@.a==1]"},
             WildcardFilterQueryCase{"BracketMissingParen", "$[*][?(@.a==1]"},
@@ -1657,16 +1666,17 @@ struct EmptySelectionFilterCase {
     const char *name;
     const char *query;
     JsonUtilCode expected;
+    const char *document = "[]";
 };
 
 class EmptySelectionFilterTest
     : public SelectorTest,
       public ::testing::WithParamInterface<EmptySelectionFilterCase> {};
 
-TEST_P(EmptySelectionFilterTest, parses_remaining_path_without_candidates) {
+TEST_P(EmptySelectionFilterTest, validates_only_reached_segments) {
     const auto &test_case = GetParam();
     JDocument *doc = nullptr;
-    ASSERT_EQ(dom_parse(nullptr, "[]", 2, &doc), JSONUTIL_SUCCESS);
+    ASSERT_EQ(dom_parse(nullptr, test_case.document, strlen(test_case.document), &doc), JSONUTIL_SUCCESS);
     const std::unique_ptr<JDocument, decltype(&dom_free_doc)> document_owner(doc, dom_free_doc);
     Selector selector;
     ASSERT_EQ(selector.getValues(*doc, "$"), JSONUTIL_SUCCESS);
@@ -1676,7 +1686,7 @@ TEST_P(EmptySelectionFilterTest, parses_remaining_path_without_candidates) {
 }
 
 INSTANTIATE_TEST_SUITE_P(
-    SharedParser, EmptySelectionFilterTest,
+    LazyParsing, EmptySelectionFilterTest,
     ::testing::Values(
         EmptySelectionFilterCase{"DirectFilter", "$[?(@.a==1)]", JSONUTIL_SUCCESS},
         EmptySelectionFilterCase{"Wildcard", "$[*][?(@.a==1)]", JSONUTIL_SUCCESS},
@@ -1696,18 +1706,23 @@ INSTANTIATE_TEST_SUITE_P(
         EmptySelectionFilterCase{"Recursive", "$[*]..a[?(@.a==1)]", JSONUTIL_SUCCESS},
         EmptySelectionFilterCase{"ChainedFilter", "$[?(@.a==1)][?(@.b==1)]", JSONUTIL_SUCCESS},
         EmptySelectionFilterCase{"MalformedDirect", "$[?(@.a==1]", JSONUTIL_INVALID_JSON_PATH},
-        EmptySelectionFilterCase{"MalformedChainedWildcard", "$[*][*][?(@.a==1]", JSONUTIL_INVALID_JSON_PATH},
-        EmptySelectionFilterCase{"MalformedMember", "$[*].missing[?(@.a==1]", JSONUTIL_INVALID_JSON_PATH},
-        EmptySelectionFilterCase{"MalformedIndex", "$[*][0][?(@.a==1]", JSONUTIL_INVALID_JSON_PATH},
-        EmptySelectionFilterCase{"MalformedSlice", "$[*][:][?(@.a==1]", JSONUTIL_INVALID_JSON_PATH},
-        EmptySelectionFilterCase{"MalformedBoundedSlice", "$[*][0:1][?(@.a==1]", JSONUTIL_INVALID_JSON_PATH},
-        EmptySelectionFilterCase{"MalformedIndexUnion", "$[*][0,1][?(@.a==1]", JSONUTIL_INVALID_JSON_PATH},
-        EmptySelectionFilterCase{"MalformedMemberUnion", "$[*]['a','b'][?(@.a==1]", JSONUTIL_INVALID_JSON_PATH},
-        EmptySelectionFilterCase{"MalformedRecursive", "$[*]..a[?(@.a==1]", JSONUTIL_INVALID_JSON_PATH},
-        EmptySelectionFilterCase{"MalformedChainedFilter", "$[?(@.a==1)][?(@.b==1]", JSONUTIL_INVALID_JSON_PATH},
-        EmptySelectionFilterCase{"MalformedNestedComparison", "$[*][?(@.a[?(@>1])]", JSONUTIL_INVALID_JSON_PATH},
-        EmptySelectionFilterCase{"MalformedRecursiveDots", "$[*]...a", JSONUTIL_INVALID_DOT_SEQUENCE},
-        EmptySelectionFilterCase{"MalformedNestedRecursiveDots", "$[*]..a...b", JSONUTIL_INVALID_DOT_SEQUENCE}),
+        EmptySelectionFilterCase{"UnreachedChainedWildcard", "$[*][*][?(@.a==1]", JSONUTIL_SUCCESS},
+        EmptySelectionFilterCase{"UnreachedMember", "$[*].missing[?(@.a==1]", JSONUTIL_SUCCESS},
+        EmptySelectionFilterCase{"UnreachedIndex", "$[*][0][?(@.a==1]", JSONUTIL_SUCCESS},
+        EmptySelectionFilterCase{"UnreachedSlice", "$[*][:][?(@.a==1]", JSONUTIL_SUCCESS},
+        EmptySelectionFilterCase{"UnreachedBoundedSlice", "$[*][0:1][?(@.a==1]", JSONUTIL_SUCCESS},
+        EmptySelectionFilterCase{"UnreachedIndexUnion", "$[*][0,1][?(@.a==1]", JSONUTIL_SUCCESS},
+        EmptySelectionFilterCase{"UnreachedMemberUnion", "$[*]['a','b'][?(@.a==1]", JSONUTIL_SUCCESS},
+        EmptySelectionFilterCase{"UnreachedRecursive", "$[*]..a[?(@.a==1]", JSONUTIL_SUCCESS},
+        EmptySelectionFilterCase{"UnreachedChainedFilter", "$[?(@.a==1)][?(@.b==1]", JSONUTIL_SUCCESS},
+        EmptySelectionFilterCase{"UnreachedThirdFilter", "$[?(@.a==1)][?(@.b==1)][?(@.c==1]", JSONUTIL_SUCCESS},
+        EmptySelectionFilterCase{"UnreachedNestedComparison", "$[*][?(@.a[?(@>1])]", JSONUTIL_SUCCESS},
+        EmptySelectionFilterCase{"UnreachedRecursiveDots", "$[*]...a", JSONUTIL_SUCCESS},
+        EmptySelectionFilterCase{"UnreachedNestedRecursiveDots", "$[*]..a...b", JSONUTIL_SUCCESS},
+        EmptySelectionFilterCase{"ReachedNullRoot", "$[?(@.a==1]", JSONUTIL_INVALID_JSON_PATH, "null"},
+        EmptySelectionFilterCase{"ReachedNullChild", "$[?(@==null)][?(@.a==1]", JSONUTIL_INVALID_JSON_PATH, "[null]"},
+        EmptySelectionFilterCase{"ReachedThirdFilter", "$[?(@.a==1)][?(@.b==1)][?(@.c==1]",
+                                 JSONUTIL_INVALID_JSON_PATH, "[{\"a\":1,\"child\":{\"b\":1}}]"}),
     [](const ::testing::TestParamInfo<EmptySelectionFilterCase> &info) { return info.param.name; });
 
 class WildcardFilterRecursiveTest

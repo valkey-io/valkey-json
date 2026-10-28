@@ -158,7 +158,6 @@ class Selector {
             , uniqueResultSet()
             , mode(READ)
             , isRecursiveSearch(false)
-            , querySyntaxParsed(false)
             , error(JSONUTIL_SUCCESS)
     {}
 
@@ -377,7 +376,6 @@ class Selector {
 
     Mode mode;
     bool isRecursiveSearch;  // if we are doing a recursive search we do not wish to add new fields
-    bool querySyntaxParsed;
     JsonUtilCode error;  // JSONUTIL_SUCCESS indicates no error
 };
 
