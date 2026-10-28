@@ -158,6 +158,7 @@ class Selector {
             , uniqueResultSet()
             , mode(READ)
             , isRecursiveSearch(false)
+            , querySyntaxParsed(false)
             , error(JSONUTIL_SUCCESS)
     {}
 
@@ -327,7 +328,6 @@ class Selector {
     JsonUtilCode processWildcard();
     JsonUtilCode processWildcardKey();
     JsonUtilCode processWildcardIndex();
-    JsonUtilCode validateWildcardFilter() const;
     JsonUtilCode processSubscript(const int64_t idx);
     JsonUtilCode processSlice(int64_t start, int64_t end, const int64_t step = 1);
     JsonUtilCode processUnion(jsn::vector<int64_t> union_indices);
@@ -377,6 +377,7 @@ class Selector {
 
     Mode mode;
     bool isRecursiveSearch;  // if we are doing a recursive search we do not wish to add new fields
+    bool querySyntaxParsed;
     JsonUtilCode error;  // JSONUTIL_SUCCESS indicates no error
 };
 

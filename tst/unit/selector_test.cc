@@ -1,4 +1,3 @@
-#include <array>
 #include <cstdlib>
 #include <cstddef>
 #include <cstring>
@@ -9,6 +8,7 @@
 #include <vector>
 #include <string>
 #include <sstream>
+#include <tuple>
 #include <gtest/gtest.h>
 #include "json/dom.h"
 #include "json/json.h"
@@ -1519,118 +1519,202 @@ TEST_F(SelectorTest, test_wildcard_filter_on_object_members) {
     dom_free_doc(d1);
 }
 
-TEST_F(SelectorTest, test_wildcard_filter_sequential_values_and_paths) {
-    struct Case {
-        const char *document;
-        const char *path;
-    };
-    const std::array<Case, 9> cases{{
-        {"[{\"a\":1}]", nullptr},
-        {"{\"b\":{\"a\":1}}", nullptr},
-        {"[[{\"a\":1},{\"a\":2}]]", "/0/0"},
-        {"{\"group\":{\"a/b~c\":{\"a\":1},\"keep\":{\"a\":2}}}",
-         "/group/a~1b~0c"},
-        {"{\"group\":[{\"a\":1},{\"a\":2}]}", "/group/0"},
-        {"[{\"pick\":{\"a\":1},\"keep\":{\"a\":2}}]", "/0/pick"},
-        {"[]", nullptr},
-        {"{}", nullptr},
-        {"[[],{},1]", nullptr},
-    }};
-    for (const auto &test : cases) {
-        for (const char *path : {"$.*[?(@.a==1)]", "$[*][?(@.a==1)]"}) {
-            SCOPED_TRACE(test.document);
-            SCOPED_TRACE(path);
-            JDocument *doc = nullptr;
-            ASSERT_EQ(dom_parse(nullptr, test.document, strlen(test.document), &doc), JSONUTIL_SUCCESS);
-            const std::unique_ptr<JDocument, decltype(&dom_free_doc)> document_owner(doc, dom_free_doc);
-            Selector selector;
-            ASSERT_EQ(selector.getValues(*doc, path), JSONUTIL_SUCCESS);
-            const auto &results = selector.getResultSet();
-            EXPECT_EQ(results.size(), test.path ? 1u : 0u);
-            if (test.path && results.size() == 1) {
-                EXPECT_EQ(results[0].second, test.path);
-                ASSERT_TRUE(results[0].first->IsObject());
-                ASSERT_EQ(results[0].first->MemberCount(), 1u);
-                ASSERT_TRUE(results[0].first->HasMember("a"));
-                ASSERT_TRUE((*results[0].first)["a"].IsInt());
-                EXPECT_EQ((*results[0].first)["a"].GetInt(), 1);
-            }
-        }
-    }
-}
+struct WildcardFilterDocumentCase {
+    const char *name;
+    const char *document;
+    const char *expected_path;
+};
 
-TEST_F(SelectorTest, test_empty_wildcard_validates_filter) {
-    for (const char *input : {"[]", "{}", "[[]]", "{\"empty\":{}}"}) {
-        JDocument *doc = nullptr;
-        ASSERT_EQ(dom_parse(nullptr, input, strlen(input), &doc), JSONUTIL_SUCCESS);
-        const std::unique_ptr<JDocument, decltype(&dom_free_doc)> document_owner(doc, dom_free_doc);
-        for (const char *path : {"$.*[?(@.a==1]", "$[*][?(@.a==1]",
-                                 "$.*[?(@.a==)]", "$[*][?(@.a==)]",
-                                 "$.*[ ?(@.a==1]", "$[*][ ?(@.a==1]"}) {
-            SCOPED_TRACE(input);
-            SCOPED_TRACE(path);
-            Selector selector;
-            EXPECT_NE(selector.getValues(*doc, path), JSONUTIL_SUCCESS);
-        }
-    }
-}
+struct WildcardFilterQueryCase {
+    const char *name;
+    const char *query;
+};
 
-TEST_F(SelectorTest, test_wildcard_attribute_filter_scalar_and_mixed_children) {
-    struct Case {
-        const char *document;
-        const char *path;
-    };
-    const std::array<Case, 4> cases{{
-        {"[1,\"text\",true,null]", nullptr},
-        {"[1,{\"pick\":{\"a\":1},\"keep\":2}]", "/1/pick"},
-        {"{\"scalar\":1,\"group\":{\"pick\":{\"a\":1},\"keep\":2}}", "/group/pick"},
-        {"[1,[{\"a\":1},{\"b\":2}]]", "/1/0"},
-    }};
-    for (const auto &test : cases) {
-        for (const char *query : {"$.*[?(@.a)]", "$[*][?(@.a)]"}) {
-            SCOPED_TRACE(test.document);
-            SCOPED_TRACE(query);
-            JDocument *doc = nullptr;
-            ASSERT_EQ(dom_parse(nullptr, test.document, strlen(test.document), &doc), JSONUTIL_SUCCESS);
-            const std::unique_ptr<JDocument, decltype(&dom_free_doc)> document_owner(doc, dom_free_doc);
-            Selector selector;
-            ASSERT_EQ(selector.getValues(*doc, query), JSONUTIL_SUCCESS);
-            const auto &results = selector.getResultSet();
-            EXPECT_EQ(results.size(), test.path ? 1u : 0u);
-            if (test.path && results.size() == 1) {
-                EXPECT_EQ(results[0].second, test.path);
-                ASSERT_TRUE(results[0].first->IsObject());
-                ASSERT_EQ(results[0].first->MemberCount(), 1u);
-                ASSERT_TRUE(results[0].first->HasMember("a"));
-                ASSERT_TRUE((*results[0].first)["a"].IsInt());
-                EXPECT_EQ((*results[0].first)["a"].GetInt(), 1);
-            }
-        }
-    }
-}
+using WildcardFilterParam = std::tuple<WildcardFilterDocumentCase, WildcardFilterQueryCase>;
 
-TEST_F(SelectorTest, test_wildcard_filter_rooted_comparison) {
-    const char *input = "{\"limit\":1,\"groups\":[[{\"a\":1}],[{\"a\":2}]]}";
+class WildcardFilterTest
+    : public SelectorTest,
+      public ::testing::WithParamInterface<WildcardFilterParam> {
+ public:
+    static std::string caseName(const ::testing::TestParamInfo<WildcardFilterParam> &info) {
+        return std::string(std::get<0>(info.param).name) + std::get<1>(info.param).name;
+    }
+};
+
+TEST_P(WildcardFilterTest, returns_matching_children_and_paths) {
+    const auto &[document_case, query_case] = GetParam();
     JDocument *doc = nullptr;
-    ASSERT_EQ(dom_parse(nullptr, input, strlen(input), &doc), JSONUTIL_SUCCESS);
+    ASSERT_EQ(dom_parse(nullptr, document_case.document, strlen(document_case.document), &doc), JSONUTIL_SUCCESS);
     const std::unique_ptr<JDocument, decltype(&dom_free_doc)> document_owner(doc, dom_free_doc);
-    for (const char *query : {"$.groups.*[ ?(@.a==$.limit)]", "$.groups[*][ ?(@.a==$.limit)]"}) {
-        SCOPED_TRACE(query);
-        Selector selector;
-        ASSERT_EQ(selector.getValues(*doc, query), JSONUTIL_SUCCESS);
-        const auto &results = selector.getResultSet();
-        EXPECT_EQ(results.size(), 1u);
-        if (results.size() == 1) {
-            EXPECT_EQ(results[0].second, "/groups/0/0");
-            ASSERT_TRUE(results[0].first->IsObject());
-            ASSERT_TRUE(results[0].first->HasMember("a"));
-            ASSERT_TRUE((*results[0].first)["a"].IsInt());
-            EXPECT_EQ((*results[0].first)["a"].GetInt(), 1);
-        }
-    }
+    Selector selector;
+    ASSERT_EQ(selector.getValues(*doc, query_case.query), JSONUTIL_SUCCESS);
+    const auto &results = selector.getResultSet();
+    ASSERT_EQ(results.size(), document_case.expected_path ? 1u : 0u);
+    if (document_case.expected_path == nullptr) return;
+
+    EXPECT_EQ(results[0].second, document_case.expected_path);
+    ASSERT_TRUE(results[0].first->IsObject());
+    ASSERT_EQ(results[0].first->MemberCount(), 1u);
+    ASSERT_TRUE(results[0].first->HasMember("a"));
+    ASSERT_TRUE((*results[0].first)["a"].IsInt());
+    EXPECT_EQ((*results[0].first)["a"].GetInt(), 1);
 }
 
-TEST_F(SelectorTest, test_wildcard_filter_validation_preserves_recursive_token_budget) {
+INSTANTIATE_TEST_SUITE_P(
+    Sequential, WildcardFilterTest,
+    ::testing::Combine(
+        ::testing::Values(
+            WildcardFilterDocumentCase{"ArrayObject", "[{\"a\":1}]", nullptr},
+            WildcardFilterDocumentCase{"ObjectObject", "{\"b\":{\"a\":1}}", nullptr},
+            WildcardFilterDocumentCase{"NestedArray", "[[{\"a\":1},{\"a\":2}]]", "/0/0"},
+            WildcardFilterDocumentCase{"EmptyFirst", "[[],[{\"a\":1}]]", "/1/0"},
+            WildcardFilterDocumentCase{"EmptyLast", "[[{\"a\":1}],[]]", "/0/0"},
+            WildcardFilterDocumentCase{
+                "EscapedObjectMember", "{\"group\":{\"a/b~c\":{\"a\":1},\"keep\":{\"a\":2}}}",
+                "/group/a~1b~0c"},
+            WildcardFilterDocumentCase{
+                "ObjectArray", "{\"group\":[{\"a\":1},{\"a\":2}]}", "/group/0"},
+            WildcardFilterDocumentCase{
+                "ArrayMembers", "[{\"pick\":{\"a\":1},\"keep\":{\"a\":2}}]", "/0/pick"},
+            WildcardFilterDocumentCase{"EmptyArray", "[]", nullptr},
+            WildcardFilterDocumentCase{"EmptyObject", "{}", nullptr},
+            WildcardFilterDocumentCase{"MixedEmpty", "[[],{},1]", nullptr}),
+        ::testing::Values(
+            WildcardFilterQueryCase{"DotWildcard", "$.*[?(@.a==1)]"},
+            WildcardFilterQueryCase{"BracketWildcard", "$[*][?(@.a==1)]"})),
+    WildcardFilterTest::caseName);
+
+INSTANTIATE_TEST_SUITE_P(
+    ScalarAndMixedAttribute, WildcardFilterTest,
+    ::testing::Combine(
+        ::testing::Values(
+            WildcardFilterDocumentCase{"Scalars", "[1,\"text\",true,null]", nullptr},
+            WildcardFilterDocumentCase{
+                "ScalarAndObject", "[1,{\"pick\":{\"a\":1},\"keep\":2}]", "/1/pick"},
+            WildcardFilterDocumentCase{
+                "MixedObjectMembers", "{\"scalar\":1,\"group\":{\"pick\":{\"a\":1},\"keep\":2}}",
+                "/group/pick"},
+            WildcardFilterDocumentCase{
+                "ScalarAndArray", "[1,[{\"a\":1},{\"b\":2}]]", "/1/0"}),
+        ::testing::Values(
+            WildcardFilterQueryCase{"DotWildcard", "$.*[?(@.a)]"},
+            WildcardFilterQueryCase{"BracketWildcard", "$[*][?(@.a)]"})),
+    WildcardFilterTest::caseName);
+
+INSTANTIATE_TEST_SUITE_P(
+    RootedComparison, WildcardFilterTest,
+    ::testing::Combine(
+        ::testing::Values(WildcardFilterDocumentCase{
+            "RootLimit", "{\"limit\":1,\"groups\":[[{\"a\":1}],[{\"a\":2}]]}", "/groups/0/0"}),
+        ::testing::Values(
+            WildcardFilterQueryCase{"DotWildcard", "$.groups.*[ ?(@.a==$.limit)]"},
+            WildcardFilterQueryCase{"BracketWildcard", "$.groups[*][ ?(@.a==$.limit)]"})),
+    WildcardFilterTest::caseName);
+
+struct EmptyWildcardDocumentCase {
+    const char *name;
+    const char *document;
+};
+
+using WildcardFilterSyntaxParam = std::tuple<EmptyWildcardDocumentCase, WildcardFilterQueryCase>;
+
+class WildcardFilterSyntaxTest
+    : public SelectorTest,
+      public ::testing::WithParamInterface<WildcardFilterSyntaxParam> {
+ public:
+    static std::string caseName(const ::testing::TestParamInfo<WildcardFilterSyntaxParam> &info) {
+        return std::string(std::get<0>(info.param).name) + std::get<1>(info.param).name;
+    }
+};
+
+TEST_P(WildcardFilterSyntaxTest, rejects_malformed_filter_after_empty_selection) {
+    const auto &[document_case, query_case] = GetParam();
+    JDocument *doc = nullptr;
+    ASSERT_EQ(dom_parse(nullptr, document_case.document, strlen(document_case.document), &doc), JSONUTIL_SUCCESS);
+    const std::unique_ptr<JDocument, decltype(&dom_free_doc)> document_owner(doc, dom_free_doc);
+    Selector selector;
+    EXPECT_NE(selector.getValues(*doc, query_case.query), JSONUTIL_SUCCESS);
+}
+
+INSTANTIATE_TEST_SUITE_P(
+    EmptySelections, WildcardFilterSyntaxTest,
+    ::testing::Combine(
+        ::testing::Values(
+            EmptyWildcardDocumentCase{"Array", "[]"},
+            EmptyWildcardDocumentCase{"Object", "{}"},
+            EmptyWildcardDocumentCase{"NestedArray", "[[]]"},
+            EmptyWildcardDocumentCase{"NestedObject", "{\"empty\":{}}"}),
+        ::testing::Values(
+            WildcardFilterQueryCase{"DotMissingParen", "$.*[?(@.a==1]"},
+            WildcardFilterQueryCase{"BracketMissingParen", "$[*][?(@.a==1]"},
+            WildcardFilterQueryCase{"DotMissingOperand", "$.*[?(@.a==)]"},
+            WildcardFilterQueryCase{"BracketMissingOperand", "$[*][?(@.a==)]"},
+            WildcardFilterQueryCase{"DotSpacedMissingParen", "$.*[ ?(@.a==1]"},
+            WildcardFilterQueryCase{"BracketSpacedMissingParen", "$[*][ ?(@.a==1]"})),
+    WildcardFilterSyntaxTest::caseName);
+
+struct EmptySelectionFilterCase {
+    const char *name;
+    const char *query;
+    JsonUtilCode expected;
+};
+
+class EmptySelectionFilterTest
+    : public SelectorTest,
+      public ::testing::WithParamInterface<EmptySelectionFilterCase> {};
+
+TEST_P(EmptySelectionFilterTest, parses_remaining_path_without_candidates) {
+    const auto &test_case = GetParam();
+    JDocument *doc = nullptr;
+    ASSERT_EQ(dom_parse(nullptr, "[]", 2, &doc), JSONUTIL_SUCCESS);
+    const std::unique_ptr<JDocument, decltype(&dom_free_doc)> document_owner(doc, dom_free_doc);
+    Selector selector;
+    ASSERT_EQ(selector.getValues(*doc, "$"), JSONUTIL_SUCCESS);
+    ASSERT_TRUE(selector.hasValues());
+    EXPECT_EQ(selector.getValues(*doc, test_case.query), test_case.expected);
+    EXPECT_FALSE(selector.hasValues());
+}
+
+INSTANTIATE_TEST_SUITE_P(
+    SharedParser, EmptySelectionFilterTest,
+    ::testing::Values(
+        EmptySelectionFilterCase{"DirectFilter", "$[?(@.a==1)]", JSONUTIL_SUCCESS},
+        EmptySelectionFilterCase{"Wildcard", "$[*][?(@.a==1)]", JSONUTIL_SUCCESS},
+        EmptySelectionFilterCase{"SelfComparison", "$[*][?(@>1)]", JSONUTIL_SUCCESS},
+        EmptySelectionFilterCase{"InvertedComparison", "$[*][?(1<@)]", JSONUTIL_SUCCESS},
+        EmptySelectionFilterCase{"Attribute", "$[*][?(@.a)]", JSONUTIL_SUCCESS},
+        EmptySelectionFilterCase{"IndexedComparison", "$[*][?(@.a[0]==1)]", JSONUTIL_SUCCESS},
+        EmptySelectionFilterCase{"NestedComparison", "$[*][?(@.a[?(@>1)])]", JSONUTIL_SUCCESS},
+        EmptySelectionFilterCase{"LogicalExpression", "$[*][?(@.a==1 || @.b==2)]", JSONUTIL_SUCCESS},
+        EmptySelectionFilterCase{"ChainedWildcard", "$[*][*][?(@.a==1)]", JSONUTIL_SUCCESS},
+        EmptySelectionFilterCase{"Member", "$[*].missing[?(@.a==1)]", JSONUTIL_SUCCESS},
+        EmptySelectionFilterCase{"Index", "$[*][0][?(@.a==1)]", JSONUTIL_SUCCESS},
+        EmptySelectionFilterCase{"Slice", "$[*][:][?(@.a==1)]", JSONUTIL_SUCCESS},
+        EmptySelectionFilterCase{"BoundedSlice", "$[*][0:1][?(@.a==1)]", JSONUTIL_SUCCESS},
+        EmptySelectionFilterCase{"IndexUnion", "$[*][0,1][?(@.a==1)]", JSONUTIL_SUCCESS},
+        EmptySelectionFilterCase{"MemberUnion", "$[*]['a','b'][?(@.a==1)]", JSONUTIL_SUCCESS},
+        EmptySelectionFilterCase{"Recursive", "$[*]..a[?(@.a==1)]", JSONUTIL_SUCCESS},
+        EmptySelectionFilterCase{"ChainedFilter", "$[?(@.a==1)][?(@.b==1)]", JSONUTIL_SUCCESS},
+        EmptySelectionFilterCase{"MalformedDirect", "$[?(@.a==1]", JSONUTIL_INVALID_JSON_PATH},
+        EmptySelectionFilterCase{"MalformedChainedWildcard", "$[*][*][?(@.a==1]", JSONUTIL_INVALID_JSON_PATH},
+        EmptySelectionFilterCase{"MalformedMember", "$[*].missing[?(@.a==1]", JSONUTIL_INVALID_JSON_PATH},
+        EmptySelectionFilterCase{"MalformedIndex", "$[*][0][?(@.a==1]", JSONUTIL_INVALID_JSON_PATH},
+        EmptySelectionFilterCase{"MalformedSlice", "$[*][:][?(@.a==1]", JSONUTIL_INVALID_JSON_PATH},
+        EmptySelectionFilterCase{"MalformedBoundedSlice", "$[*][0:1][?(@.a==1]", JSONUTIL_INVALID_JSON_PATH},
+        EmptySelectionFilterCase{"MalformedIndexUnion", "$[*][0,1][?(@.a==1]", JSONUTIL_INVALID_JSON_PATH},
+        EmptySelectionFilterCase{"MalformedMemberUnion", "$[*]['a','b'][?(@.a==1]", JSONUTIL_INVALID_JSON_PATH},
+        EmptySelectionFilterCase{"MalformedRecursive", "$[*]..a[?(@.a==1]", JSONUTIL_INVALID_JSON_PATH},
+        EmptySelectionFilterCase{"MalformedChainedFilter", "$[?(@.a==1)][?(@.b==1]", JSONUTIL_INVALID_JSON_PATH},
+        EmptySelectionFilterCase{"MalformedNestedComparison", "$[*][?(@.a[?(@>1])]", JSONUTIL_INVALID_JSON_PATH},
+        EmptySelectionFilterCase{"MalformedRecursiveDots", "$[*]...a", JSONUTIL_INVALID_DOT_SEQUENCE},
+        EmptySelectionFilterCase{"MalformedNestedRecursiveDots", "$[*]..a...b", JSONUTIL_INVALID_DOT_SEQUENCE}),
+    [](const ::testing::TestParamInfo<EmptySelectionFilterCase> &info) { return info.param.name; });
+
+class WildcardFilterRecursiveTest
+    : public SelectorTest,
+      public ::testing::WithParamInterface<WildcardFilterQueryCase> {};
+
+TEST_P(WildcardFilterRecursiveTest, preserves_recursive_token_budget) {
     const size_t count = json_get_max_recursive_descent_tokens();
     std::ostringstream document;
     document << "[";
@@ -1643,20 +1727,24 @@ TEST_F(SelectorTest, test_wildcard_filter_validation_preserves_recursive_token_b
     JDocument *doc = nullptr;
     ASSERT_EQ(dom_parse(nullptr, input.c_str(), input.size(), &doc), JSONUTIL_SUCCESS);
     const std::unique_ptr<JDocument, decltype(&dom_free_doc)> document_owner(doc, dom_free_doc);
-    for (const char *query : {"$.*[?(@.a==1)]..x", "$[*][?(@.a==1)]..x"}) {
-        SCOPED_TRACE(query);
-        Selector selector;
-        ASSERT_EQ(selector.getValues(*doc, query), JSONUTIL_SUCCESS);
-        const auto &results = selector.getResultSet();
-        EXPECT_EQ(results.size(), count);
-        for (size_t i = 0; i < results.size(); ++i) {
-            const std::string expected_path = "/" + std::to_string(i) + "/0/x";
-            EXPECT_STREQ(results[i].second.c_str(), expected_path.c_str());
-            ASSERT_TRUE(results[i].first->IsUint64());
-            EXPECT_EQ(results[i].first->GetUint64(), i);
-        }
+    Selector selector;
+    ASSERT_EQ(selector.getValues(*doc, GetParam().query), JSONUTIL_SUCCESS);
+    const auto &results = selector.getResultSet();
+    ASSERT_EQ(results.size(), count);
+    for (size_t i = 0; i < results.size(); ++i) {
+        const std::string expected_path = "/" + std::to_string(i) + "/0/x";
+        EXPECT_STREQ(results[i].second.c_str(), expected_path.c_str());
+        ASSERT_TRUE(results[i].first->IsUint64());
+        EXPECT_EQ(results[i].first->GetUint64(), i);
     }
 }
+
+INSTANTIATE_TEST_SUITE_P(
+    RecursiveSuffix, WildcardFilterRecursiveTest,
+    ::testing::Values(
+        WildcardFilterQueryCase{"DotWildcard", "$.*[?(@.a==1)]..x"},
+        WildcardFilterQueryCase{"BracketWildcard", "$[*][?(@.a==1)]..x"}),
+    [](const ::testing::TestParamInfo<WildcardFilterQueryCase> &info) { return info.param.name; });
 
 TEST_F(SelectorTest, test_filter_object_scalar_members) {
     const char *input = "{\"low\":1,\"high\":3}";
