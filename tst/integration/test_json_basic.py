@@ -3705,6 +3705,150 @@ class TestJsonBasic(JsonTestCase):
             client.execute_command('JSON.GET', k1, verification_path))
         assert expected == actual
 
+    @pytest.mark.parametrize("wildcard", [".*", "[*]"])
+    @pytest.mark.parametrize("document", [
+        [{"group": {"a/b~c": {"a": 1, "n": 2}, "keep": {"a": 2, "n": 3}}}],
+        {"outer": {"group": {"a/b~c": {"a": 1, "n": 2}, "keep": {"a": 2, "n": 3}}}},
+    ])
+    def test_jsonpath_wildcard_filter_mutations(self, wildcard, document):
+        client = self.server.get_new_client()
+        path = "$" + wildcard + wildcard + "[?(@.a==1)]"
+        client.execute_command('JSON.SET', k1, '$', json.dumps(document))
+        assert [{"a": 1, "n": 2}] == json.loads(client.execute_command('JSON.GET', k1, path))
+        assert [7] == json.loads(client.execute_command('JSON.NUMINCRBY', k1, path + '.n', 5))
+        assert [7] == json.loads(client.execute_command('JSON.GET', k1, path + '.n'))
+        assert b'OK' == client.execute_command('JSON.SET', k1, path + '.n', '9')
+        assert [9] == json.loads(client.execute_command('JSON.GET', k1, path + '.n'))
+        assert 1 == client.execute_command('JSON.DEL', k1, path)
+        expected = json.loads(json.dumps(document))
+        group = expected[0]['group'] if isinstance(expected, list) else expected['outer']['group']
+        del group['a/b~c']
+        assert expected == json.loads(client.execute_command('JSON.GET', k1))
+
+    @pytest.mark.parametrize("wildcard", [".*", "[*]"])
+    @pytest.mark.parametrize("document", [[], {}, [[], {}, 1], [{"a": 1}], {"b": {"a": 1}}])
+    def test_jsonpath_wildcard_filter_no_match(self, wildcard, document):
+        client = self.server.get_new_client()
+        path = '$' + wildcard + '[?(@.a==1)]'
+        client.execute_command('JSON.SET', k1, '$', json.dumps(document))
+        assert b'[]' == client.execute_command('JSON.GET', k1, path)
+        client.execute_command('JSON.SET', k1, path, '{"changed":true}')
+        assert 0 == client.execute_command('JSON.DEL', k1, path)
+        assert b'[]' == client.execute_command('JSON.NUMINCRBY', k1, path + '.a', 5)
+        assert document == json.loads(client.execute_command('JSON.GET', k1))
+
+    @pytest.mark.parametrize("document,reaches_filter", [
+        ([], False), ({}, False), ([[]], True), ({"empty": {}}, True),
+        ([None], True), ({"child": None}, True),
+    ])
+    @pytest.mark.parametrize("path", ['$.*[?(@.a==1]', '$[*][?(@.a==1]',
+                                      '$.*[?(@.a==)]', '$[*][?(@.a==)]',
+                                      '$.*[ ?(@.a==1]', '$[*][ ?(@.a==1]'])
+    def test_jsonpath_wildcard_filter_lazy_syntax(self, document, reaches_filter, path):
+        client = self.server.get_new_client()
+        client.execute_command('JSON.SET', k1, '$', json.dumps(document))
+        if reaches_filter:
+            with pytest.raises(ResponseError, match='SYNTAXERR'):
+                client.execute_command('JSON.GET', k1, path)
+        else:
+            assert b'[]' == client.execute_command('JSON.GET', k1, path)
+
+    @pytest.mark.parametrize("prefix,reaches_filter", [
+        ('$', True), ('$[*]', False), ('$[*][*]', False), ('$[*].missing', False),
+        ('$[*][0]', False), ('$[*][:]', False), ('$[*][0:1]', False),
+        ('$[*][0,1]', False), ("$[*]['a','b']", False), ('$[*]..a', False),
+        ('$[?(@.a==1)]', False),
+    ])
+    def test_jsonpath_empty_selection_filter_is_lazy(self, prefix, reaches_filter):
+        client = self.server.get_new_client()
+        client.execute_command('JSON.SET', k1, '$', '[]')
+        path = prefix + '[?(@.a==1)]'
+        assert b'[]' == client.execute_command('JSON.GET', k1, path)
+        client.execute_command('JSON.SET', k1, path + '.added', '1')
+        assert 0 == client.execute_command('JSON.DEL', k1, path)
+        assert [] == json.loads(client.execute_command('JSON.GET', k1))
+        malformed_path = prefix + '[?(@.a==1]'
+        if reaches_filter:
+            with pytest.raises(ResponseError, match='SYNTAXERR'):
+                client.execute_command('JSON.GET', k1, malformed_path)
+            with pytest.raises(ResponseError, match='SYNTAXERR'):
+                client.execute_command('JSON.SET', k1, malformed_path, '1')
+        else:
+            assert b'[]' == client.execute_command('JSON.GET', k1, malformed_path)
+            client.execute_command('JSON.SET', k1, malformed_path, '1')
+            assert 0 == client.execute_command('JSON.DEL', k1, malformed_path)
+            assert b'[]' == client.execute_command('JSON.NUMINCRBY', k1, malformed_path, 1)
+        assert [] == json.loads(client.execute_command('JSON.GET', k1))
+
+    @pytest.mark.parametrize("document,reaches_last_filter", [
+        ([], False), ([{}], False), ([{"a": 1}], False), ([None], False),
+        ([{"a": 1, "child": {"b": 1}}], True),
+    ])
+    def test_jsonpath_filter_chain_lazy_syntax(self, document, reaches_last_filter):
+        client = self.server.get_new_client()
+        client.execute_command('JSON.SET', k1, '$', json.dumps(document))
+        path = '$[?(@.a==1)][?(@.b==1)][?(@.c==1]'
+        if reaches_last_filter:
+            with pytest.raises(ResponseError, match='SYNTAXERR'):
+                client.execute_command('JSON.GET', k1, path)
+            with pytest.raises(ResponseError, match='SYNTAXERR'):
+                client.execute_command('JSON.SET', k1, path, '1')
+        else:
+            assert b'[]' == client.execute_command('JSON.GET', k1, path)
+            client.execute_command('JSON.SET', k1, path, '1')
+            assert 0 == client.execute_command('JSON.DEL', k1, path)
+        assert document == json.loads(client.execute_command('JSON.GET', k1))
+
+    @pytest.mark.parametrize("document", [
+        {"limit": 1, "groups": []}, {"limit": 1, "groups": {}},
+    ])
+    def test_jsonpath_empty_selection_filter_skips_rooted_suffix(self, document):
+        client = self.server.get_new_client()
+        client.execute_command('JSON.SET', k1, '$', json.dumps(document))
+        path = '$.groups[*][?(@.a==$.limit)]'
+        assert b'[]' == client.execute_command('JSON.GET', k1, path)
+        assert b'[]' == client.execute_command('JSON.GET', k1, '$.groups[*][?(@.a==$.limit]')
+        assert b'[]' == client.execute_command('JSON.GET', k1, '$.groups[*][?(@.a==$.missing)]')
+
+    @pytest.mark.parametrize("wildcard", [".*", "[*]"])
+    @pytest.mark.parametrize("document,expected,after_delete", [
+        ([1, "text", True, None], [], [1, "text", True, None]),
+        ([1, {"pick": {"a": 1}, "keep": 2}], [{"a": 1}], [1, {"keep": 2}]),
+        ({"scalar": 1, "group": {"pick": {"a": 1}, "keep": 2}},
+         [{"a": 1}], {"scalar": 1, "group": {"keep": 2}}),
+        ([1, [{"a": 1}, {"b": 2}]], [{"a": 1}], [1, [{"b": 2}]]),
+    ])
+    def test_jsonpath_wildcard_filter_scalar_and_mixed_attribute_candidates(
+            self, wildcard, document, expected, after_delete):
+        client = self.server.get_new_client()
+        path = '$' + wildcard + '[?(@.a)]'
+        assert b'OK' == client.execute_command('JSON.SET', k1, '$', json.dumps(document))
+        assert expected == json.loads(client.execute_command('JSON.GET', k1, path))
+        client.execute_command('JSON.SET', k1, path + '.a', '9')
+        updated = [{"a": 9}] if expected else []
+        assert updated == json.loads(client.execute_command('JSON.GET', k1, path))
+        assert len(expected) == client.execute_command('JSON.DEL', k1, path)
+        assert after_delete == json.loads(client.execute_command('JSON.GET', k1))
+
+    @pytest.mark.parametrize("wildcard", [".*", "[*]"])
+    def test_jsonpath_wildcard_filter_rooted_comparison(self, wildcard):
+        client = self.server.get_new_client()
+        document = {"limit": 1, "groups": [[{"a": 1}], [{"a": 2}]]}
+        path = '$.groups' + wildcard + '[ ?(@.a==$.limit)]'
+        assert b'OK' == client.execute_command('JSON.SET', k1, '$', json.dumps(document))
+        assert [{"a": 1}] == json.loads(client.execute_command('JSON.GET', k1, path))
+        assert 1 == client.execute_command('JSON.DEL', k1, path)
+        assert {"limit": 1, "groups": [[], [{"a": 2}]]} == json.loads(
+            client.execute_command('JSON.GET', k1))
+
+    @pytest.mark.parametrize("wildcard", [".*", "[*]"])
+    def test_jsonpath_wildcard_filter_recursive_suffix(self, wildcard):
+        client = self.server.get_new_client()
+        document = [[{"a": 1, "x": i}] for i in range(20)]
+        path = '$' + wildcard + '[?(@.a==1)]..x'
+        assert b'OK' == client.execute_command('JSON.SET', k1, '$', json.dumps(document))
+        assert list(range(20)) == json.loads(client.execute_command('JSON.GET', k1, path))
+
     def test_jsonpath_filter_expression(self):
         client = self.server.get_new_client()
 

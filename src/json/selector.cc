@@ -69,40 +69,48 @@ class RecursionDepthTracker {
  *   DotPath             ::= "." QualifiedPath
  *   QualifiedPath       ::= QualifiedPathElement RelativePath
  *   QualifiedPathElement ::= Key | BracketPathElement
- *   Key                 ::= "*" [ [ "." ] WildcardFilter ] | UnquotedMemberName
- *   WildcardFilter      ::=  "[" "?" "(" FilterExpr ")" "]"
+ *   Key                 ::= "*" ["."] | UnquotedMemberName
  *   UnquotedMemberName  ::= char { char }
  *   BracketPath         ::= BracketPathElement [ RelativePath ]
- *   BracketPathElement  ::= "[" {SPACE} ( WildcardInBrackets | ((NameInBrackets | IndexExpr) ) {SPACE} "]")
- *   WildcardInBrackets  ::= "*" {SPACE} "]" [ "[" {SPACE} "?" "(" FilterExpr ")" {SPACE} "]" ]
- *   NameInBrackets      ::= QuotedMemberName [ ({SPACE} "," {SPACE} QuotedMemberName)+ ]
+ *   BracketPathElement  ::= WildcardInBrackets | NameInBrackets | IndexExpr
+ *   WildcardInBrackets  ::= "[" {SPACE} "*" {SPACE} "]"
+ *   NameInBrackets      ::= "[" {SPACE} QuotedMemberName [ ({SPACE} "," {SPACE} QuotedMemberName)+ ] {SPACE} "]"
  *   QuotedMemberName    ::= "\"" {char} "\"" | "'" {char} "'"
  *   IndexExpr           ::= Filter | SliceStartsWithColon | SliceOrUnionOrIndex
- *   SliceStartsWithColon ::= {SPACE} ":" {SPACE} [ ":" {SPACE} [Step] | EndAndStep ] ]
- *   EndAndStep          ::= End [{SPACE} ":" {SPACE} [Step]] ]
+ *   SliceStartsWithColon ::= "[" {SPACE} ":" {SPACE} [EndAndStep | ":" {SPACE} [Step]] {SPACE} "]"
+ *   EndAndStep          ::= End {SPACE} [":" {SPACE} [Step]]
  *   SliceOrUnionOrIndex ::= SliceStartsWithInteger | Index | UnionOfIndexes
- *   SliceStartsWithInteger ::= Start {SPACE} ":" {SPACE} [ ":" {SPACE} [Step] | EndAndStep
- *   Index               ::= Integer
+ *   SliceStartsWithInteger ::= "[" {SPACE} Start {SPACE} ":" {SPACE} [EndAndStep | ":" {SPACE} [Step]] {SPACE} "]"
+ *   Index               ::= "[" {SPACE} Integer {SPACE} "]"
  *   Integer             ::= ["+" | "-"] digit {digit}
  *   Start               ::= Integer
  *   End                 ::= Integer
  *   Step                ::= Integer
- *   UnionOfIndexes      ::= Integer ({SPACE} "," {SPACE} Integer)+
- *   Filter              ::= "?" "(" FilterExpr ")"
- *   FilterExpr          ::= {SPACE} Term { {SPACE} "||" {SPACE} Term {SPACE} }
+ *   UnionOfIndexes      ::= "[" {SPACE} Integer ({SPACE} "," {SPACE} Integer)+ {SPACE} "]"
+ *   Filter              ::= "[" {SPACE} "?" "(" FilterExpr ")" {SPACE} "]"
+ *   FilterExpr          ::= {SPACE} Term { {SPACE} "||" {SPACE} Term } {SPACE}
  *   Term                ::= Factor { {SPACE} "&&" {SPACE} Factor }
- *   Factor              ::= ( "@" ( MemberName | ( [ MemberName ] ComparisonOp ComparisonValue) ) ) |
- *                           ( ComparisonValue ComparisonOp "@" ( MemberName | ( [ MemberName ]) ) ) |
+ *   Factor              ::= ( "@" ( MemberName {SPACE} [MemberIndex ComparisonOp ComparisonValue |
+ *                           ComparisonOp ComparisonValue | NestedAnyMatch] | ComparisonOp ComparisonValue ) ) |
+ *                           ( ComparisonValue ComparisonOp "@" {SPACE} [MemberName [MemberIndex]] ) |
  *                           ( {SPACE} "(" FilterExpr ")" {SPACE} )
+ *   MemberIndex         ::= "[" {SPACE} Integer "]"
+ *   NestedAnyMatch      ::= "[" {SPACE} "?" {SPACE} "(" SelfComparison {SPACE} ")" {SPACE} "]"
+ *   SelfComparison      ::= "@" ComparisonOp ComparisonValue | ComparisonValue ComparisonOp "@"
  *   MemberName          ::= ("." (UnquotedMemberName | BracketedMemberName)) | BracketedMemberName
  *   BracketedMemberName ::= "[" {SPACE} QuotedMemberName {SPACE} "]"
- *   ComparisonOp        ::= {SPACE} "<" | "<="] | ">" | ">=" | "==" | "!=" {SPACE}
+ *   ComparisonOp        ::= {SPACE} ("<" | "<=" | ">" | ">=" | "==" | "!=") {SPACE}
  *   ComparisonValue     ::= "null" | Bool | Number | QuotedString | PartialPath
  *   Bool                ::= "true" | "false"
- *   Number              ::= Integer | MemberNameInFilter | ScientificNumber
- *   QuotedString        ::= "\"" {char} "\""
+ *   Number              ::= ["-"] ("0" | NonZeroDigit {digit}) ["." digit {digit}]
+ *                           [("e" | "E") ["+" | "-"] digit {digit}]
+ *   NonZeroDigit        ::= "1" | "2" | "3" | "4" | "5" | "6" | "7" | "8" | "9"
+ *   digit               ::= "0" | NonZeroDigit
+ *   QuotedString        ::= QuotedMemberName
  *   PartialPath         ::= "$" RelativePath
  *   SPACE               ::= ' '
+ *
+ * PartialPath brackets accept one quoted name or signed index without spaces.
  */
 
 void Lexer::init(const char *path) {
@@ -973,6 +981,10 @@ JsonUtilCode Selector::parseSupportedPath() {
 
 /**
  *  RelativePath        ::= empty | RecursivePath | DotPath | BracketPath | QualifiedPath
+ *
+ * Path segments are parsed lazily. Once no candidates remain, the suffix is not parsed,
+ * so malformed unvisited segments can return an empty result. This intentionally differs
+ * from RFC 9535's data-independent query validation.
  */
 JsonUtilCode Selector::parseRelativePath() {
     if (node == nullptr || lex.matchToken(Token::END)) return JSONUTIL_SUCCESS;
@@ -1081,10 +1093,10 @@ JsonUtilCode Selector::parseBracketPath() {
 }
 
 /**
- *   BracketPathElement  ::= "[" {SPACE} ( WildcardInBrackets | ((NameInBrackets | IndexExpr) ) {SPACE} "]")
- *   WildcardInBrackets  ::= "*" {SPACE} "]" [ "[" {SPACE} "?" "(" FilterExpr ")" {SPACE} "]" ]
- *   NameInBrackets      ::= QuotedMemberName [ ({SPACE} "," {SPACE} QuotedMemberName)+ ]
- *   QuotedMemberName    ::= """ {char} """ | "'" {char} "'"
+ *   BracketPathElement  ::= WildcardInBrackets | NameInBrackets | IndexExpr
+ *   WildcardInBrackets  ::= "[" {SPACE} "*" {SPACE} "]"
+ *   NameInBrackets      ::= "[" {SPACE} QuotedMemberName [ ({SPACE} "," {SPACE} QuotedMemberName)+ ] {SPACE} "]"
+ *   QuotedMemberName    ::= "\"" {char} "\"" | "'" {char} "'"
  *   IndexExpr           ::= Filter | SliceStartsWithColon | SliceOrUnionOrIndex
  */
 JsonUtilCode Selector::parseBracketPathElement() {
@@ -1113,33 +1125,18 @@ JsonUtilCode Selector::parseBracketPathElement() {
 }
 
 /**
- *   WildcardInBrackets  ::= "*" {SPACE} "]" [ "[" {SPACE} "?" "(" FilterExpr ")" {SPACE} "]" ]
+ *   WildcardInBrackets  ::= "[" {SPACE} "*" {SPACE} "]"
  */
 JsonUtilCode Selector::parseWildcardInBrackets() {
     if (!lex.matchToken(Token::WILDCARD, true)) return JSONUTIL_INVALID_JSON_PATH;
     if (!lex.matchToken(Token::RBRACKET, true)) return JSONUTIL_INVALID_JSON_PATH;
 
-    if (lex.currToken().type == Token::LBRACKET && lex.peekToken() == Token::QUESTION_MARK) {
-        if (!lex.matchToken(Token::LBRACKET, true)) return JSONUTIL_INVALID_JSON_PATH;
-        lex.skipSpaces();
-        if (!lex.matchToken(Token::QUESTION_MARK)) return JSONUTIL_INVALID_JSON_PATH;
-        if (!lex.matchToken(Token::LPAREN)) return JSONUTIL_INVALID_JSON_PATH;
-
-        jsn::vector<int64_t> result;  // candidate indexes/ordinals for the current container
-        JsonUtilCode rc = parseFilterExpr(result);
-        if (rc != JSONUTIL_SUCCESS) return rc;
-
-        if (!lex.matchToken(Token::RPAREN, true)) return JSONUTIL_INVALID_JSON_PATH;
-        if (!lex.matchToken(Token::RBRACKET, true)) return JSONUTIL_INVALID_JSON_PATH;
-        return processFilterResult(result);
-    } else {
-        return processWildcard();
-    }
+    return processWildcard();
 }
 
 /**
- *   NameInBrackets      ::= QuotedMemberName { {SPACE} "," {SPACE} QuotedMemberName }
- *   QuotedMemberName    ::= """ {char} """ | "'" {char} "'"
+ *   NameInBrackets      ::= "[" {SPACE} QuotedMemberName { {SPACE} "," {SPACE} QuotedMemberName } {SPACE} "]"
+ *   QuotedMemberName    ::= "\"" {char} "\"" | "'" {char} "'"
  */
 JsonUtilCode Selector::parseNameInBrackets() {
     jsn::vector<jsn::string> member_names;
@@ -1194,7 +1191,7 @@ JsonUtilCode Selector::processUnionOfMembers(const jsn::vector<jsn::string> &mem
 }
 
 /**
- *   QuotedMemberName   ::= """ {char} """ | "'" {char} "'"
+ *   QuotedMemberName   ::= "\"" {char} "\"" | "'" {char} "'"
  */
 JsonUtilCode Selector::parseQuotedMemberName(jsn::stringstream &ss) {
     const Token &token = lex.currToken();
@@ -1232,17 +1229,12 @@ JsonUtilCode Selector::parseQualifiedPathElement() {
 }
 
 /**
- *   Key                 ::= "*" [ [ "." ] WildcardFilter ] | UnquotedMemberName
- *   WildcardFilter  ::=  "[" "?" "(" FilterExpr ")" "]"
+ *   Key                 ::= "*" ["."] | UnquotedMemberName
  */
 JsonUtilCode Selector::parseKey() {
     if (lex.matchToken(Token::WILDCARD)) {
         if (lex.currToken().type == Token::DOT) lex.nextToken();  // skip DOT
-        if (lex.currToken().type == Token::LBRACKET && lex.peekToken() == Token::QUESTION_MARK) {
-            return parseWildcardFilter();
-        } else {
-            return processWildcard();
-        }
+        return processWildcard();
     } else {
         StringViewHelper name;
         JsonUtilCode rc = parseUnquotedMemberName(name);
@@ -1259,26 +1251,6 @@ JsonUtilCode Selector::parseUnquotedMemberName(StringViewHelper &name) {
     if (rc != JSONUTIL_SUCCESS) return rc;
     TRACE("DEBUG", "parseUnquotedMemberName name: " << name.getView() << ", nodePath: " << nodePath)
     return JSONUTIL_SUCCESS;
-}
-
-/**
- *   WildcardFilter  ::= "[" "?" "(" FilterExpr ")" "]"
- */
-JsonUtilCode Selector::parseWildcardFilter() {
-    if (!node->IsArray() && !node->IsObject()) return JSONUTIL_INVALID_JSON_PATH;
-
-    if (!lex.matchToken(Token::LBRACKET)) return JSONUTIL_INVALID_JSON_PATH;
-    if (!lex.matchToken(Token::QUESTION_MARK)) return JSONUTIL_INVALID_JSON_PATH;
-    if (!lex.matchToken(Token::LPAREN, true)) return JSONUTIL_INVALID_JSON_PATH;
-
-    jsn::vector<int64_t> result;  // subset of indexes of the current array
-    JsonUtilCode rc = parseFilterExpr(result);
-    if (rc != JSONUTIL_SUCCESS) return rc;
-
-    if (!lex.matchToken(Token::RPAREN, true)) return JSONUTIL_INVALID_JSON_PATH;
-    if (!lex.matchToken(Token::RBRACKET)) return JSONUTIL_INVALID_JSON_PATH;
-
-    return processFilterResult(result);
 }
 
 JsonUtilCode Selector::processWildcard() {
@@ -1329,12 +1301,12 @@ JsonUtilCode Selector::processWildcardIndex() {
  * Recursively call eval to evaluate the member and continue parsing the remaining path.
  * Multiple wildcards/filter expressions are handled through recursion. e.g.,
  *
- * $.a[?(@.price < $.expensive)].[*].[?(@.x > 15]
+ * $.a[?(@.price < $.expensive)].[*].[?(@.x > 15)]
  *
  * 1. The first filter expression is evaluated, resulting in a slice of the current array ($.a).
  * 2. The search path forks out, one per element of the slice. We'll explore each path.
  * 3. For each path, continue parsing the remaining json path. When the wildcard is processed, each
- *    path forks out n subpaths, where n is the length of the current array.
+ *    path forks out n subpaths, where n is the number of children of the current value.
  * 4. For each subpath, the 2nd filter expression is evaluated, which results in a slice of the current array.
  * 5. Again, each subpath continues to fork out, one per element of the slice.
  */
@@ -1479,21 +1451,21 @@ JsonUtilCode Selector::traverseToArrayIndex(int64_t idx) {
 /**
  *   parseIndexExpr() is called from parseBracketPathElement().
  *
- *   BracketPathElement  ::= "[" {SPACE} ( WildcardInBrackets | ((NameInBrackets | IndexExpr) {SPACE} ) "]")
- *   WildcardInBrackets  ::= "*" {SPACE} "]" [ "[" {SPACE} "?" "(" FilterExpr ")" {SPACE} "]" ]
+ *   BracketPathElement  ::= WildcardInBrackets | NameInBrackets | IndexExpr
+ *   WildcardInBrackets  ::= "[" {SPACE} "*" {SPACE} "]"
  *   IndexExpr           ::= Filter | SliceStartsWithColon | SliceOrUnionOrIndex
- *   Filter              ::= "?" "(" "@" "." FilterExpr ")"
- *   SliceStartsWithColon ::= {SPACE} ":" {SPACE} [ ":" {SPACE} [Step] | EndAndStep ] ]
- *   EndAndStep          ::= End [{SPACE} ":" {SPACE} [Step]] ]
+ *   Filter              ::= "[" {SPACE} "?" "(" FilterExpr ")" {SPACE} "]"
+ *   SliceStartsWithColon ::= "[" {SPACE} ":" {SPACE} [EndAndStep | ":" {SPACE} [Step]] {SPACE} "]"
+ *   EndAndStep          ::= End {SPACE} [":" {SPACE} [Step]]
  *   SliceOrUnionOrIndex ::= SliceStartsWithInteger | Index | UnionOfIndexes
- *   SliceStartsWithInteger ::= Start {SPACE} ":" {SPACE} [ ":" {SPACE} [Step] | EndAndStep
- *   EndAndStep          ::= End [{SPACE} ":" {SPACE} [Step]] ]
- *   Index               ::= Integer
+ *   SliceStartsWithInteger ::= "[" {SPACE} Start {SPACE} ":" {SPACE} [EndAndStep | ":" {SPACE} [Step]] {SPACE} "]"
+ *   EndAndStep          ::= End {SPACE} [":" {SPACE} [Step]]
+ *   Index               ::= "[" {SPACE} Integer {SPACE} "]"
  *   Integer             ::= ["+" | "-"] digit {digit}
  *   Start               ::= Integer
  *   End                 ::= Integer
  *   Step                ::= Integer
- *   UnionOfIndexes      ::= Integer ({SPACE} "," {SPACE} Integer)+
+ *   UnionOfIndexes      ::= "[" {SPACE} Integer ({SPACE} "," {SPACE} Integer)+ {SPACE} "]"
  */
 JsonUtilCode Selector::parseIndexExpr() {
     switch (lex.currToken().type) {
@@ -1511,8 +1483,8 @@ JsonUtilCode Selector::parseIndexExpr() {
 }
 
 /**
- *   SliceStartsWithColon ::= {SPACE} ":" [ {SPACE} ":" [Step] | {SPACE} EndAndStep ] ]
- *   EndAndStep           ::= End [{SPACE} ":" {SPACE} [Step]] ]
+ *   SliceStartsWithColon ::= "[" {SPACE} ":" {SPACE} [EndAndStep | ":" {SPACE} [Step]] {SPACE} "]"
+ *   EndAndStep           ::= End {SPACE} [":" {SPACE} [Step]]
  *   End                  ::= Integer
  *   Step                 ::= Integer
  *   Integer              ::= ["+" | "-"] digit {digit}
@@ -1535,10 +1507,10 @@ JsonUtilCode Selector::parseSliceStartsWithColon() {
 
 /**
  *   SliceOrUnionOrIndex    ::= SliceStartsWithInteger | UnionOfIndexes | Index
- *   SliceStartsWithInteger ::= Start {SPACE} ":" {SPACE} [ ":" {SPACE} [Step] | EndAndStep
- *   EndAndStep             ::= End [{SPACE} ":" {SPACE} [Step]] ]
- *   UnionOfIndexes         ::= Integer ({SPACE} "," {SPACE} Integer)+
- *   Index                  ::= Integer
+ *   SliceStartsWithInteger ::= "[" {SPACE} Start {SPACE} ":" {SPACE} [EndAndStep | ":" {SPACE} [Step]] {SPACE} "]"
+ *   EndAndStep             ::= End {SPACE} [":" {SPACE} [Step]]
+ *   UnionOfIndexes         ::= "[" {SPACE} Integer ({SPACE} "," {SPACE} Integer)+ {SPACE} "]"
+ *   Index                  ::= "[" {SPACE} Integer {SPACE} "]"
  */
 JsonUtilCode Selector::parseSliceOrUnionOrIndex() {
     int64_t start;
@@ -1557,8 +1529,8 @@ JsonUtilCode Selector::parseSliceOrUnionOrIndex() {
 }
 
 /**
- *   SliceStartsWithInteger ::= Start {SPACE} ":" {SPACE} [ ":" {SPACE} [Step] | EndAndStep
- *   EndAndStep             ::= End [{SPACE} ":" {SPACE} [Step]] ]
+ *   SliceStartsWithInteger ::= "[" {SPACE} Start {SPACE} ":" {SPACE} [EndAndStep | ":" {SPACE} [Step]] {SPACE} "]"
+ *   EndAndStep             ::= End {SPACE} [":" {SPACE} [Step]]
  */
 JsonUtilCode Selector::parseSliceStartsWithInteger(const int64_t start) {
     if (!node->IsArray()) return JSONUTIL_JSON_ELEMENT_NOT_ARRAY;
@@ -1578,7 +1550,7 @@ JsonUtilCode Selector::parseSliceStartsWithInteger(const int64_t start) {
 }
 
 /**
- *   EndAndStep ::= End [{SPACE} ":" {SPACE} [Step]] ]
+ *   EndAndStep ::= End {SPACE} [":" {SPACE} [Step]]
  */
 JsonUtilCode Selector::parseEndAndStep(const int64_t start) {
     int64_t end;
@@ -1660,19 +1632,21 @@ JsonUtilCode Selector::processSlice(int64_t start, int64_t end, const int64_t st
 }
 
 /**
- *   Filter              ::= "?" "(" FilterExpr ")"
- *   FilterExpr          ::= {SPACE} Term { {SPACE} "||" {SPACE} Term {SPACE} }
+ *   Filter              ::= "[" {SPACE} "?" "(" FilterExpr ")" {SPACE} "]"
+ *   FilterExpr          ::= {SPACE} Term { {SPACE} "||" {SPACE} Term } {SPACE}
  *   Term                ::= Factor { {SPACE} "&&" {SPACE} Factor }
- *   Factor              ::= ( "@" ( MemberName | ( [ MemberName ] ComparisonOp ComparisonValue) ) ) |
- *                           ( ComparisonValue ComparisonOp "@" ( MemberName | ( [ MemberName ]) ) ) |
+ *   Factor              ::= ( "@" ( MemberName {SPACE} [MemberIndex ComparisonOp ComparisonValue |
+ *                           ComparisonOp ComparisonValue | NestedAnyMatch] | ComparisonOp ComparisonValue ) ) |
+ *                           ( ComparisonValue ComparisonOp "@" {SPACE} [MemberName [MemberIndex]] ) |
  *                           ( {SPACE} "(" FilterExpr ")" {SPACE} )
  *   MemberName          ::= ("." (UnquotedMemberName | BracketedMemberName)) | BracketedMemberName
  *   BracketedMemberName ::= "[" {SPACE} QuotedMemberName {SPACE} "]"
- *   ComparisonOp        ::= {SPACE} "<" | "<="] | ">" | ">=" | "==" | "!=" {SPACE}
+ *   ComparisonOp        ::= {SPACE} ("<" | "<=" | ">" | ">=" | "==" | "!=") {SPACE}
  *   ComparisonValue     ::= "null" | Bool | Number | QuotedString | PartialPath
  *   Bool                ::= "true" | "false"
- *   Number              ::= Integer | MemberNameInFilter | ScientificNumber
- *   QuotedString        ::= "\"" {char} "\""
+ *   Number              ::= ["-"] ("0" | NonZeroDigit {digit}) ["." digit {digit}]
+ *                           [("e" | "E") ["+" | "-"] digit {digit}]
+ *   QuotedString        ::= QuotedMemberName
  *   PartialPath         ::= "$" RelativePath
  */
 JsonUtilCode Selector::parseFilter() {
@@ -1732,7 +1706,7 @@ JsonUtilCode Selector::processFilterResult(jsn::vector<int64_t> &result) {
 }
 
 /**
- *   FilterExpr          ::= {SPACE} Term { {SPACE} "||" {SPACE} Term {SPACE} }
+ *   FilterExpr          ::= {SPACE} Term { {SPACE} "||" {SPACE} Term } {SPACE}
  */
 JsonUtilCode Selector::parseFilterExpr(jsn::vector<int64_t> &result) {
     CHECK_RECURSION_DEPTH();
@@ -1783,16 +1757,18 @@ JsonUtilCode Selector::parseTerm(jsn::vector<int64_t> &result) {
 }
 
 /**
- *   Factor              ::= ( "@" ( MemberName | ( [ MemberName ] ComparisonOp ComparisonValue) ) ) |
- *                           ( ComparisonValue ComparisonOp "@" ( MemberName | ( [ MemberName ]) ) ) |
+ *   Factor              ::= ( "@" ( MemberName {SPACE} [MemberIndex ComparisonOp ComparisonValue |
+ *                           ComparisonOp ComparisonValue | NestedAnyMatch] | ComparisonOp ComparisonValue ) ) |
+ *                           ( ComparisonValue ComparisonOp "@" {SPACE} [MemberName [MemberIndex]] ) |
  *                           ( {SPACE} "(" FilterExpr ")" {SPACE} )
  *   MemberName          ::= ("." (UnquotedMemberName | BracketedMemberName)) | BracketedMemberName
  *   BracketedMemberName ::= "[" {SPACE} QuotedMemberName {SPACE} "]"
- *   ComparisonOp        ::= {SPACE} "<" | "<="] | ">" | ">=" | "==" | "!=" {SPACE}
+ *   ComparisonOp        ::= {SPACE} ("<" | "<=" | ">" | ">=" | "==" | "!=") {SPACE}
  *   ComparisonValue     ::= "null" | Bool | Number | QuotedString | PartialPath
  *   Bool                ::= "true" | "false"
- *   Number              ::= Integer | MemberNameInFilter | ScientificNumber
- *   QuotedString        ::= "\"" {char} "\""
+ *   Number              ::= ["-"] ("0" | NonZeroDigit {digit}) ["." digit {digit}]
+ *                           [("e" | "E") ["+" | "-"] digit {digit}]
+ *   QuotedString        ::= QuotedMemberName
  *   PartialPath         ::= "$" RelativePath
 */
 JsonUtilCode Selector::parseFactor(jsn::vector<int64_t> &result) {
@@ -1961,8 +1937,9 @@ JsonUtilCode Selector::parseBracketedMemberName(StringViewHelper &member_name) {
 /**
  *   ComparisonValue     ::= "null" | Bool | Number | QuotedString | PartialPath
  *   Bool                ::= "true" | "false"
- *   Number              ::= Integer | MemberNameInFilter | ScientificNumber
- *   QuotedString        ::= "\"" {char} "\""
+ *   Number              ::= ["-"] ("0" | NonZeroDigit {digit}) ["." digit {digit}]
+ *                           [("e" | "E") ["+" | "-"] digit {digit}]
+ *   QuotedString        ::= QuotedMemberName
  *   PartialPath         ::= "$" RelativePath
  */
 JsonUtilCode Selector::parseComparisonValue(JValue &v) {
@@ -2023,7 +2000,7 @@ JsonUtilCode Selector::parseComparisonValue(JValue &v) {
 }
 
 /**
- *   ComparisonOp        := {SPACE} "<" | "<="] | ">" | ">=" | "==" | "!=" {SPACE}
+ *   ComparisonOp        ::= {SPACE} ("<" | "<=" | ">" | ">=" | "==" | "!=") {SPACE}
  */
 JsonUtilCode Selector::parseComparisonOp(Token::TokenType &op) {
     lex.skipSpaces();
@@ -2346,8 +2323,6 @@ JsonUtilCode Selector::processAttributeFilter(const StringViewHelper &member_nam
             if (resolveMember(member.value, member_name) != nullptr) result.push_back(ordinal);
             ++ordinal;
         }
-    } else {
-        return JSONUTIL_INVALID_JSON_PATH;
     }
     return JSONUTIL_SUCCESS;
 }
@@ -2381,7 +2356,7 @@ void Selector::vectorIntersection(const jsn::vector<int64_t> &v1, const jsn::vec
 }
 
 /**
- *   UnionOfIndexes      ::= Integer ({SPACE} "," {SPACE} Integer)+
+ *   UnionOfIndexes      ::= "[" {SPACE} Integer ({SPACE} "," {SPACE} Integer)+ {SPACE} "]"
  */
 JsonUtilCode Selector::parseUnionOfIndexes(const int64_t start) {
     if (!node->IsArray()) return JSONUTIL_JSON_ELEMENT_NOT_ARRAY;
