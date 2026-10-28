@@ -1,0 +1,2187 @@
+{
+  "metadata": {
+    "before": {
+      "revision": "aeaa68237eb862069061d2797de8c0e790c57c11",
+      "module_sha256": "bd5f9f5c3a6243033836484b4119a039e952b26e02fae5a463f63826a5efa74d",
+      "evidence": ".verification/valkey-json/evidence/20261028T164905Z-703868/transcript-wildcard-compatibility.txt",
+      "source": "selector.cc and selector.h from revision, linked with unchanged objects from this checkout"
+    },
+    "after": {
+      "revision": "aeaa68237eb862069061d2797de8c0e790c57c11",
+      "module_sha256": "aac6249bf5ca1e6d436589f9e8977bfe50d28eafbcbb0e0eddbe3ecda24b813d",
+      "evidence": ".verification/valkey-json/evidence/20261028T164915Z-708645/transcript-wildcard-compatibility.txt",
+      "source": "working tree patch over revision; module hash identifies the tested artifact",
+      "selector_cc_sha256": "b5c400a20b74b97b666fe86a78bc4efd3c8f0a91cdca8ed04c45f8cba9882a48"
+    },
+    "redisjson": {
+      "image": "sha256:4ebc55076527dd8404d215a288a538cd6676efa684abb616f958d9a7282d9e13",
+      "module_list": "name\nsearch\nver\n21020\npath\n/opt/redis-stack/lib/redisearch.so\nargs\nMAXSEARCHRESULTS\n10000\nMAXAGGREGATERESULTS\n10000\nname\ntimeseries\nver\n11206\npath\n/opt/redis-stack/lib/redistimeseries.so\nargs\n\nname\nredisgears_2\nver\n20020\npath\n/opt/redis-stack/lib/redisgears.so\nargs\nv8-plugin-path\n/opt/redis-stack/lib/libredisgears_v8_plugin.so\nname\nbf\nver\n20816\npath\n/opt/redis-stack/lib/redisbloom.so\nargs\n\nname\nRedisCompat\nver\n1\npath\n/opt/redis-stack/lib/rediscompat.so\nargs\n\nname\nReJSON\nver\n20809\npath\n/opt/redis-stack/lib/rejson.so\nargs",
+      "image_digest": "redis/redis-stack-server@sha256:798ab84d9f266936b034ab11c4d04a2b8e4b441884c5aa7d17ac951eefdf742a"
+    },
+    "redisjson_8": {
+      "image": "sha256:b1f5674cdfd4588a3d8111f9771fb65471b093304fe11b45b47f0a29b6f42530",
+      "module_list": "name\nbf\nver\n81001\npath\n/usr/local/lib/redis/modules//redisbloom.so\nargs\n\nname\ntimeseries\nver\n81000\npath\n/usr/local/lib/redis/modules//redistimeseries.so\nargs\n\nname\nsearch\nver\n81000\npath\n/usr/local/lib/redis/modules//redisearch.so\nargs\n\nname\nvectorset\nver\n1\npath\n\nargs\n\nname\nReJSON\nver\n81000\npath\n/usr/local/lib/redis/modules//rejson.so\nargs",
+      "image_digest": "redis@sha256:298e5b3bc566bade82f46ad5511777a4a07a294097ce16ada2f6a42be5239df5"
+    },
+    "cts_revision": "20ebdcce5008c8a777ee9c80ad853ecf606950b5",
+    "cburgmer_revision": "e090dae440ac22a5da2a33a74ea65c351124fe97",
+    "measured_at": "2026-10-28"
+  },
+  "cases": [
+    {
+      "name": "array-object.*",
+      "document": [
+        {
+          "a": 1
+        }
+      ],
+      "selector": "$.*[?(@.a==1)]",
+      "before": "[{\"a\":1}]",
+      "after": "[]",
+      "redisjson": "[]",
+      "redisjson_8": "[]"
+    },
+    {
+      "name": "array-object[*]",
+      "document": [
+        {
+          "a": 1
+        }
+      ],
+      "selector": "$[*][?(@.a==1)]",
+      "before": "[{\"a\":1}]",
+      "after": "[]",
+      "redisjson": "[]",
+      "redisjson_8": "[]"
+    },
+    {
+      "name": "object-object.*",
+      "document": {
+        "b": {
+          "a": 1
+        }
+      },
+      "selector": "$.*[?(@.a==1)]",
+      "before": "[{\"a\":1}]",
+      "after": "[]",
+      "redisjson": "[]",
+      "redisjson_8": "[]"
+    },
+    {
+      "name": "object-object[*]",
+      "document": {
+        "b": {
+          "a": 1
+        }
+      },
+      "selector": "$[*][?(@.a==1)]",
+      "before": "[{\"a\":1}]",
+      "after": "[]",
+      "redisjson": "[]",
+      "redisjson_8": "[]"
+    },
+    {
+      "name": "nested-array.*",
+      "document": [
+        [
+          {
+            "a": 1
+          },
+          {
+            "a": 2
+          }
+        ]
+      ],
+      "selector": "$.*[?(@.a==1)]",
+      "before": "[]",
+      "after": "[{\"a\":1}]",
+      "redisjson": "[{\"a\":1}]",
+      "redisjson_8": "[{\"a\":1}]"
+    },
+    {
+      "name": "nested-array[*]",
+      "document": [
+        [
+          {
+            "a": 1
+          },
+          {
+            "a": 2
+          }
+        ]
+      ],
+      "selector": "$[*][?(@.a==1)]",
+      "before": "[]",
+      "after": "[{\"a\":1}]",
+      "redisjson": "[{\"a\":1}]",
+      "redisjson_8": "[{\"a\":1}]"
+    },
+    {
+      "name": "nested-object.*",
+      "document": {
+        "group": {
+          "a/b~c": {
+            "a": 1
+          },
+          "keep": {
+            "a": 2
+          }
+        }
+      },
+      "selector": "$.*[?(@.a==1)]",
+      "before": "[]",
+      "after": "[{\"a\":1}]",
+      "redisjson": "[{\"a\":1}]",
+      "redisjson_8": "[{\"a\":1}]"
+    },
+    {
+      "name": "nested-object[*]",
+      "document": {
+        "group": {
+          "a/b~c": {
+            "a": 1
+          },
+          "keep": {
+            "a": 2
+          }
+        }
+      },
+      "selector": "$[*][?(@.a==1)]",
+      "before": "[]",
+      "after": "[{\"a\":1}]",
+      "redisjson": "[{\"a\":1}]",
+      "redisjson_8": "[{\"a\":1}]"
+    },
+    {
+      "name": "empty-array.*",
+      "document": [],
+      "selector": "$.*[?(@.a==1)]",
+      "before": "[]",
+      "after": "[]",
+      "redisjson": "[]",
+      "redisjson_8": "[]"
+    },
+    {
+      "name": "empty-array[*]",
+      "document": [],
+      "selector": "$[*][?(@.a==1)]",
+      "before": "[]",
+      "after": "[]",
+      "redisjson": "[]",
+      "redisjson_8": "[]"
+    },
+    {
+      "name": "empty-object.*",
+      "document": {
+
+      },
+      "selector": "$.*[?(@.a==1)]",
+      "before": "[]",
+      "after": "[]",
+      "redisjson": "[]",
+      "redisjson_8": "[]"
+    },
+    {
+      "name": "empty-object[*]",
+      "document": {
+
+      },
+      "selector": "$[*][?(@.a==1)]",
+      "before": "[]",
+      "after": "[]",
+      "redisjson": "[]",
+      "redisjson_8": "[]"
+    },
+    {
+      "name": "mixed-empty.*",
+      "document": [
+        [],
+        {
+
+        },
+        1
+      ],
+      "selector": "$.*[?(@.a==1)]",
+      "before": "[]",
+      "after": "[]",
+      "redisjson": "[]",
+      "redisjson_8": "[]"
+    },
+    {
+      "name": "mixed-empty[*]",
+      "document": [
+        [],
+        {
+
+        },
+        1
+      ],
+      "selector": "$[*][?(@.a==1)]",
+      "before": "[]",
+      "after": "[]",
+      "redisjson": "[]",
+      "redisjson_8": "[]"
+    },
+    {
+      "name": "scalar-self.*",
+      "document": [1, 3],
+      "selector": "$.*[?(@>2)]",
+      "before": "[3]",
+      "after": "[3]",
+      "redisjson": "[3]",
+      "redisjson_8": "[]"
+    },
+    {
+      "name": "scalar-self[*]",
+      "document": [1, 3],
+      "selector": "$[*][?(@>2)]",
+      "before": "[3]",
+      "after": "[3]",
+      "redisjson": "[3]",
+      "redisjson_8": "[]"
+    },
+    {
+      "name": "cburgmer/filter_expression_with_value_after_dot_notation_with_wildcard_on_array_of_objects",
+      "document": [
+        {
+          "some": "some value"
+        },
+        {
+          "key": "value"
+        }
+      ],
+      "selector": "$.*[?(@.key)]",
+      "before": "[{\"key\":\"value\"}]",
+      "after": "[]",
+      "redisjson": "[]",
+      "redisjson_8": "[]"
+    },
+    {
+      "name": "cburgmer/filter_expression_after_dot_notation_with_wildcard_after_recursive_descent",
+      "document": [
+        {
+          "complext": {
+            "one": [
+              {
+                "name": "first",
+                "id": 1
+              },
+              {
+                "name": "next",
+                "id": 2
+              },
+              {
+                "name": "another",
+                "id": 3
+              },
+              {
+                "name": "more",
+                "id": 4
+              }
+            ],
+            "more": {
+              "name": "next to last",
+              "id": 5
+            }
+          }
+        },
+        {
+          "name": "last",
+          "id": 6
+        }
+      ],
+      "selector": "$..*[?(@.id>2)]",
+      "before": "[{\"name\":\"last\",\"id\":6},{\"name\":\"next to last\",\"id\":5},{\"name\":\"another\",\"id\":3},{\"name\":\"more\",\"id\":4}]",
+      "after": "[{\"name\":\"next to last\",\"id\":5},{\"name\":\"another\",\"id\":3},{\"name\":\"more\",\"id\":4}]",
+      "redisjson": "[{\"name\":\"next to last\",\"id\":5},{\"name\":\"another\",\"id\":3},{\"name\":\"more\",\"id\":4}]",
+      "redisjson_8": "[{\"name\":\"next to last\",\"id\":5},{\"name\":\"another\",\"id\":3},{\"name\":\"more\",\"id\":4}]"
+    },
+    {
+      "name": "malformed/[]$.*[?(@.a==1]",
+      "document": [],
+      "selector": "$.*[?(@.a==1]",
+      "before": "SYNTAXERR Invalid JSON path",
+      "after": "SYNTAXERR Invalid JSON path",
+      "redisjson": "Error occurred on position 12, \"$.*[?(@.a==1 ---->>>> ]\", expected one of the following: and, or.",
+      "redisjson_8": "Error occurred at position 12, Error at position 12: expected one of the following: add, sub, mul, div, rem, postfix_method, get_keys_op, and, or"
+    },
+    {
+      "name": "malformed/[]$[*][?(@.a==1]",
+      "document": [],
+      "selector": "$[*][?(@.a==1]",
+      "before": "SYNTAXERR Invalid JSON path",
+      "after": "SYNTAXERR Invalid JSON path",
+      "redisjson": "Error occurred on position 13, \"$[*][?(@.a==1 ---->>>> ]\", expected one of the following: and, or.",
+      "redisjson_8": "Error occurred at position 13, Error at position 13: expected one of the following: add, sub, mul, div, rem, postfix_method, get_keys_op, and, or"
+    },
+    {
+      "name": "malformed/[]$.*[ ?(@.a==1]",
+      "document": [],
+      "selector": "$.*[ ?(@.a==1]",
+      "before": "[]",
+      "after": "SYNTAXERR Invalid JSON path",
+      "redisjson": "Error occurred on position 13, \"$.*[ ?(@.a==1 ---->>>> ]\", expected one of the following: and, or.",
+      "redisjson_8": "Error occurred at position 13, Error at position 13: expected one of the following: add, sub, mul, div, rem, postfix_method, get_keys_op, and, or"
+    },
+    {
+      "name": "malformed/[]$[*][ ?(@.a==1]",
+      "document": [],
+      "selector": "$[*][ ?(@.a==1]",
+      "before": "[]",
+      "after": "SYNTAXERR Invalid JSON path",
+      "redisjson": "Error occurred on position 14, \"$[*][ ?(@.a==1 ---->>>> ]\", expected one of the following: and, or.",
+      "redisjson_8": "Error occurred at position 14, Error at position 14: expected one of the following: add, sub, mul, div, rem, postfix_method, get_keys_op, and, or"
+    },
+    {
+      "name": "malformed/{}$.*[?(@.a==1]",
+      "document": {
+
+      },
+      "selector": "$.*[?(@.a==1]",
+      "before": "SYNTAXERR Invalid JSON path",
+      "after": "SYNTAXERR Invalid JSON path",
+      "redisjson": "Error occurred on position 12, \"$.*[?(@.a==1 ---->>>> ]\", expected one of the following: and, or.",
+      "redisjson_8": "Error occurred at position 12, Error at position 12: expected one of the following: add, sub, mul, div, rem, postfix_method, get_keys_op, and, or"
+    },
+    {
+      "name": "malformed/{}$[*][?(@.a==1]",
+      "document": {
+
+      },
+      "selector": "$[*][?(@.a==1]",
+      "before": "SYNTAXERR Invalid JSON path",
+      "after": "SYNTAXERR Invalid JSON path",
+      "redisjson": "Error occurred on position 13, \"$[*][?(@.a==1 ---->>>> ]\", expected one of the following: and, or.",
+      "redisjson_8": "Error occurred at position 13, Error at position 13: expected one of the following: add, sub, mul, div, rem, postfix_method, get_keys_op, and, or"
+    },
+    {
+      "name": "malformed/{}$.*[ ?(@.a==1]",
+      "document": {
+
+      },
+      "selector": "$.*[ ?(@.a==1]",
+      "before": "[]",
+      "after": "SYNTAXERR Invalid JSON path",
+      "redisjson": "Error occurred on position 13, \"$.*[ ?(@.a==1 ---->>>> ]\", expected one of the following: and, or.",
+      "redisjson_8": "Error occurred at position 13, Error at position 13: expected one of the following: add, sub, mul, div, rem, postfix_method, get_keys_op, and, or"
+    },
+    {
+      "name": "malformed/{}$[*][ ?(@.a==1]",
+      "document": {
+
+      },
+      "selector": "$[*][ ?(@.a==1]",
+      "before": "[]",
+      "after": "SYNTAXERR Invalid JSON path",
+      "redisjson": "Error occurred on position 14, \"$[*][ ?(@.a==1 ---->>>> ]\", expected one of the following: and, or.",
+      "redisjson_8": "Error occurred at position 14, Error at position 14: expected one of the following: add, sub, mul, div, rem, postfix_method, get_keys_op, and, or"
+    },
+    {
+      "name": "cts/basic, wildcard shorthand, object data",
+      "document": {
+        "a": "A",
+        "b": "B"
+      },
+      "selector": "$.*",
+      "before": "[\"A\",\"B\"]",
+      "after": "[\"A\",\"B\"]",
+      "redisjson": "[\"A\",\"B\"]",
+      "redisjson_8": "[\"A\",\"B\"]"
+    },
+    {
+      "name": "cts/basic, wildcard shorthand, array data",
+      "document": ["first", "second"],
+      "selector": "$.*",
+      "before": "[\"first\",\"second\"]",
+      "after": "[\"first\",\"second\"]",
+      "redisjson": "[\"first\",\"second\"]",
+      "redisjson_8": "[\"first\",\"second\"]"
+    },
+    {
+      "name": "cts/basic, wildcard selector, array data",
+      "document": ["first", "second"],
+      "selector": "$[*]",
+      "before": "[\"first\",\"second\"]",
+      "after": "[\"first\",\"second\"]",
+      "redisjson": "[\"first\",\"second\"]",
+      "redisjson_8": "[\"first\",\"second\"]"
+    },
+    {
+      "name": "scalar-attribute.*",
+      "document": [1, "text", true, null],
+      "selector": "$.*[?(@.a)]",
+      "before": "[]",
+      "after": "[]",
+      "redisjson": "[]",
+      "redisjson_8": "[]"
+    },
+    {
+      "name": "scalar-attribute[*]",
+      "document": [1, "text", true, null],
+      "selector": "$[*][?(@.a)]",
+      "before": "[]",
+      "after": "[]",
+      "redisjson": "[]",
+      "redisjson_8": "[]"
+    },
+    {
+      "name": "mixed-object-attribute.*",
+      "document": [
+        1,
+        {
+          "pick": {
+            "a": 1
+          },
+          "keep": 2
+        }
+      ],
+      "selector": "$.*[?(@.a)]",
+      "before": "[]",
+      "after": "[{\"a\":1}]",
+      "redisjson": "[{\"a\":1}]",
+      "redisjson_8": "[{\"a\":1}]"
+    },
+    {
+      "name": "mixed-object-attribute[*]",
+      "document": [
+        1,
+        {
+          "pick": {
+            "a": 1
+          },
+          "keep": 2
+        }
+      ],
+      "selector": "$[*][?(@.a)]",
+      "before": "[]",
+      "after": "[{\"a\":1}]",
+      "redisjson": "[{\"a\":1}]",
+      "redisjson_8": "[{\"a\":1}]"
+    },
+    {
+      "name": "mixed-array-attribute.*",
+      "document": [
+        1,
+        [
+          {
+            "a": 1
+          },
+          {
+            "b": 2
+          }
+        ]
+      ],
+      "selector": "$.*[?(@.a)]",
+      "before": "[]",
+      "after": "[{\"a\":1}]",
+      "redisjson": "[{\"a\":1}]",
+      "redisjson_8": "[{\"a\":1}]"
+    },
+    {
+      "name": "mixed-array-attribute[*]",
+      "document": [
+        1,
+        [
+          {
+            "a": 1
+          },
+          {
+            "b": 2
+          }
+        ]
+      ],
+      "selector": "$[*][?(@.a)]",
+      "before": "[]",
+      "after": "[{\"a\":1}]",
+      "redisjson": "[{\"a\":1}]",
+      "redisjson_8": "[{\"a\":1}]"
+    },
+    {
+      "name": "mixed-members-attribute.*",
+      "document": {
+        "scalar": 1,
+        "group": {
+          "pick": {
+            "a": 1
+          },
+          "keep": 2
+        }
+      },
+      "selector": "$.*[?(@.a)]",
+      "before": "[]",
+      "after": "[{\"a\":1}]",
+      "redisjson": "[{\"a\":1}]",
+      "redisjson_8": "[{\"a\":1}]"
+    },
+    {
+      "name": "mixed-members-attribute[*]",
+      "document": {
+        "scalar": 1,
+        "group": {
+          "pick": {
+            "a": 1
+          },
+          "keep": 2
+        }
+      },
+      "selector": "$[*][?(@.a)]",
+      "before": "[]",
+      "after": "[{\"a\":1}]",
+      "redisjson": "[{\"a\":1}]",
+      "redisjson_8": "[{\"a\":1}]"
+    },
+    {
+      "name": "rooted-comparison.*",
+      "document": {
+        "limit": 1,
+        "groups": [
+          [
+            {
+              "a": 1
+            }
+          ],
+          [
+            {
+              "a": 2
+            }
+          ]
+        ]
+      },
+      "selector": "$.groups.*[ ?(@.a==$.limit)]",
+      "before": "[{\"a\":1}]",
+      "after": "[{\"a\":1}]",
+      "redisjson": "[{\"a\":1}]",
+      "redisjson_8": "[{\"a\":1}]"
+    },
+    {
+      "name": "recursive-suffix.*",
+      "document": [
+        [
+          {
+            "a": 1,
+            "x": 0
+          }
+        ],
+        [
+          {
+            "a": 1,
+            "x": 1
+          }
+        ],
+        [
+          {
+            "a": 1,
+            "x": 2
+          }
+        ],
+        [
+          {
+            "a": 1,
+            "x": 3
+          }
+        ],
+        [
+          {
+            "a": 1,
+            "x": 4
+          }
+        ],
+        [
+          {
+            "a": 1,
+            "x": 5
+          }
+        ],
+        [
+          {
+            "a": 1,
+            "x": 6
+          }
+        ],
+        [
+          {
+            "a": 1,
+            "x": 7
+          }
+        ],
+        [
+          {
+            "a": 1,
+            "x": 8
+          }
+        ],
+        [
+          {
+            "a": 1,
+            "x": 9
+          }
+        ],
+        [
+          {
+            "a": 1,
+            "x": 10
+          }
+        ],
+        [
+          {
+            "a": 1,
+            "x": 11
+          }
+        ],
+        [
+          {
+            "a": 1,
+            "x": 12
+          }
+        ],
+        [
+          {
+            "a": 1,
+            "x": 13
+          }
+        ],
+        [
+          {
+            "a": 1,
+            "x": 14
+          }
+        ],
+        [
+          {
+            "a": 1,
+            "x": 15
+          }
+        ],
+        [
+          {
+            "a": 1,
+            "x": 16
+          }
+        ],
+        [
+          {
+            "a": 1,
+            "x": 17
+          }
+        ],
+        [
+          {
+            "a": 1,
+            "x": 18
+          }
+        ],
+        [
+          {
+            "a": 1,
+            "x": 19
+          }
+        ]
+      ],
+      "selector": "$.*[?(@.a==1)]..x",
+      "before": "[]",
+      "after": "[0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19]",
+      "redisjson": "[0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19]",
+      "redisjson_8": "[0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19]"
+    },
+    {
+      "name": "rooted-comparison[*]",
+      "document": {
+        "limit": 1,
+        "groups": [
+          [
+            {
+              "a": 1
+            }
+          ],
+          [
+            {
+              "a": 2
+            }
+          ]
+        ]
+      },
+      "selector": "$.groups[*][ ?(@.a==$.limit)]",
+      "before": "[{\"a\":1}]",
+      "after": "[{\"a\":1}]",
+      "redisjson": "[{\"a\":1}]",
+      "redisjson_8": "[{\"a\":1}]"
+    },
+    {
+      "name": "recursive-suffix[*]",
+      "document": [
+        [
+          {
+            "a": 1,
+            "x": 0
+          }
+        ],
+        [
+          {
+            "a": 1,
+            "x": 1
+          }
+        ],
+        [
+          {
+            "a": 1,
+            "x": 2
+          }
+        ],
+        [
+          {
+            "a": 1,
+            "x": 3
+          }
+        ],
+        [
+          {
+            "a": 1,
+            "x": 4
+          }
+        ],
+        [
+          {
+            "a": 1,
+            "x": 5
+          }
+        ],
+        [
+          {
+            "a": 1,
+            "x": 6
+          }
+        ],
+        [
+          {
+            "a": 1,
+            "x": 7
+          }
+        ],
+        [
+          {
+            "a": 1,
+            "x": 8
+          }
+        ],
+        [
+          {
+            "a": 1,
+            "x": 9
+          }
+        ],
+        [
+          {
+            "a": 1,
+            "x": 10
+          }
+        ],
+        [
+          {
+            "a": 1,
+            "x": 11
+          }
+        ],
+        [
+          {
+            "a": 1,
+            "x": 12
+          }
+        ],
+        [
+          {
+            "a": 1,
+            "x": 13
+          }
+        ],
+        [
+          {
+            "a": 1,
+            "x": 14
+          }
+        ],
+        [
+          {
+            "a": 1,
+            "x": 15
+          }
+        ],
+        [
+          {
+            "a": 1,
+            "x": 16
+          }
+        ],
+        [
+          {
+            "a": 1,
+            "x": 17
+          }
+        ],
+        [
+          {
+            "a": 1,
+            "x": 18
+          }
+        ],
+        [
+          {
+            "a": 1,
+            "x": 19
+          }
+        ]
+      ],
+      "selector": "$[*][?(@.a==1)]..x",
+      "before": "[]",
+      "after": "[0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19]",
+      "redisjson": "[0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19]",
+      "redisjson_8": "[0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19]"
+    },
+    {
+      "name": "direct-scalar-attribute",
+      "document": 1,
+      "selector": "$[?(@.a)]",
+      "before": "SYNTAXERR Invalid JSON path",
+      "after": "[]",
+      "redisjson": "[]",
+      "redisjson_8": "[]"
+    }
+  ],
+  "mutations": [
+    {
+      "name": "array.*",
+      "document": [
+        {
+          "group": {
+            "a/b~c": {
+              "a": 1,
+              "n": 2
+            },
+            "keep": {
+              "a": 2,
+              "n": 3
+            }
+          }
+        }
+      ],
+      "selector": "$.*.*[?(@.a==1)]",
+      "before": [
+        {
+          "command": ["JSON.GET", "verify:mutations", "$.*.*[?(@.a==1)]"],
+          "reply": "[]"
+        },
+        {
+          "command": ["JSON.NUMINCRBY", "verify:mutations", "$.*.*[?(@.a==1)].n", "5"],
+          "reply": "[]"
+        },
+        {
+          "command": ["JSON.GET", "verify:mutations", "$"],
+          "reply": "[[{\"group\":{\"a/b~c\":{\"a\":1,\"n\":2},\"keep\":{\"a\":2,\"n\":3}}}]]"
+        },
+        {
+          "command": ["JSON.SET", "verify:mutations", "$.*.*[?(@.a==1)].n", "9"],
+          "reply": "OK"
+        },
+        {
+          "command": ["JSON.GET", "verify:mutations", "$"],
+          "reply": "[[{\"group\":{\"a/b~c\":{\"a\":1,\"n\":2},\"keep\":{\"a\":2,\"n\":3}}}]]"
+        },
+        {
+          "command": ["JSON.SET", "verify:mutations", "$.*.*[?(@.a==1)]", "{\"a\":1,\"n\":11}"],
+          "reply": "OK"
+        },
+        {
+          "command": ["JSON.GET", "verify:mutations", "$"],
+          "reply": "[[{\"group\":{\"a/b~c\":{\"a\":1,\"n\":2},\"keep\":{\"a\":2,\"n\":3}}}]]"
+        },
+        {
+          "command": ["JSON.DEL", "verify:mutations", "$.*.*[?(@.a==1)]"],
+          "reply": "0"
+        },
+        {
+          "command": ["JSON.GET", "verify:mutations", "$"],
+          "reply": "[[{\"group\":{\"a/b~c\":{\"a\":1,\"n\":2},\"keep\":{\"a\":2,\"n\":3}}}]]"
+        }
+      ],
+      "after": [
+        {
+          "command": ["JSON.GET", "verify:mutations", "$.*.*[?(@.a==1)]"],
+          "reply": "[{\"a\":1,\"n\":2}]"
+        },
+        {
+          "command": ["JSON.NUMINCRBY", "verify:mutations", "$.*.*[?(@.a==1)].n", "5"],
+          "reply": "[7]"
+        },
+        {
+          "command": ["JSON.GET", "verify:mutations", "$"],
+          "reply": "[[{\"group\":{\"a/b~c\":{\"a\":1,\"n\":7},\"keep\":{\"a\":2,\"n\":3}}}]]"
+        },
+        {
+          "command": ["JSON.SET", "verify:mutations", "$.*.*[?(@.a==1)].n", "9"],
+          "reply": "OK"
+        },
+        {
+          "command": ["JSON.GET", "verify:mutations", "$"],
+          "reply": "[[{\"group\":{\"a/b~c\":{\"a\":1,\"n\":9},\"keep\":{\"a\":2,\"n\":3}}}]]"
+        },
+        {
+          "command": ["JSON.SET", "verify:mutations", "$.*.*[?(@.a==1)]", "{\"a\":1,\"n\":11}"],
+          "reply": "OK"
+        },
+        {
+          "command": ["JSON.GET", "verify:mutations", "$"],
+          "reply": "[[{\"group\":{\"a/b~c\":{\"a\":1,\"n\":11},\"keep\":{\"a\":2,\"n\":3}}}]]"
+        },
+        {
+          "command": ["JSON.DEL", "verify:mutations", "$.*.*[?(@.a==1)]"],
+          "reply": "1"
+        },
+        {
+          "command": ["JSON.GET", "verify:mutations", "$"],
+          "reply": "[[{\"group\":{\"keep\":{\"a\":2,\"n\":3}}}]]"
+        }
+      ],
+      "redisjson": [
+        {
+          "command": ["JSON.GET", "verify:mutations", "$.*.*[?(@.a==1)]"],
+          "reply": "[{\"a\":1,\"n\":2}]"
+        },
+        {
+          "command": ["JSON.NUMINCRBY", "verify:mutations", "$.*.*[?(@.a==1)].n", "5"],
+          "reply": "ERR Path does not exist"
+        },
+        {
+          "command": ["JSON.GET", "verify:mutations", "$"],
+          "reply": "[[{\"group\":{\"a/b~c\":{\"a\":1,\"n\":2},\"keep\":{\"a\":2,\"n\":3}}}]]"
+        },
+        {
+          "command": ["JSON.SET", "verify:mutations", "$.*.*[?(@.a==1)].n", "9"],
+          "reply": ""
+        },
+        {
+          "command": ["JSON.GET", "verify:mutations", "$"],
+          "reply": "[[{\"group\":{\"a/b~c\":{\"a\":1,\"n\":2},\"keep\":{\"a\":2,\"n\":3}}}]]"
+        },
+        {
+          "command": ["JSON.SET", "verify:mutations", "$.*.*[?(@.a==1)]", "{\"a\":1,\"n\":11}"],
+          "reply": ""
+        },
+        {
+          "command": ["JSON.GET", "verify:mutations", "$"],
+          "reply": "[[{\"group\":{\"a/b~c\":{\"a\":1,\"n\":2},\"keep\":{\"a\":2,\"n\":3}}}]]"
+        },
+        {
+          "command": ["JSON.DEL", "verify:mutations", "$.*.*[?(@.a==1)]"],
+          "reply": "0"
+        },
+        {
+          "command": ["JSON.GET", "verify:mutations", "$"],
+          "reply": "[[{\"group\":{\"a/b~c\":{\"a\":1,\"n\":2},\"keep\":{\"a\":2,\"n\":3}}}]]"
+        }
+      ],
+      "redisjson_8": [
+        {
+          "command": ["JSON.GET", "verify:mutations", "$.*.*[?(@.a==1)]"],
+          "reply": "[{\"a\":1,\"n\":2}]"
+        },
+        {
+          "command": ["JSON.NUMINCRBY", "verify:mutations", "$.*.*[?(@.a==1)].n", "5"],
+          "reply": "[7]"
+        },
+        {
+          "command": ["JSON.GET", "verify:mutations", "$"],
+          "reply": "[[{\"group\":{\"a/b~c\":{\"a\":1,\"n\":7},\"keep\":{\"a\":2,\"n\":3}}}]]"
+        },
+        {
+          "command": ["JSON.SET", "verify:mutations", "$.*.*[?(@.a==1)].n", "9"],
+          "reply": "OK"
+        },
+        {
+          "command": ["JSON.GET", "verify:mutations", "$"],
+          "reply": "[[{\"group\":{\"a/b~c\":{\"a\":1,\"n\":9},\"keep\":{\"a\":2,\"n\":3}}}]]"
+        },
+        {
+          "command": ["JSON.SET", "verify:mutations", "$.*.*[?(@.a==1)]", "{\"a\":1,\"n\":11}"],
+          "reply": "OK"
+        },
+        {
+          "command": ["JSON.GET", "verify:mutations", "$"],
+          "reply": "[[{\"group\":{\"a/b~c\":{\"a\":1,\"n\":11},\"keep\":{\"a\":2,\"n\":3}}}]]"
+        },
+        {
+          "command": ["JSON.DEL", "verify:mutations", "$.*.*[?(@.a==1)]"],
+          "reply": "1"
+        },
+        {
+          "command": ["JSON.GET", "verify:mutations", "$"],
+          "reply": "[[{\"group\":{\"keep\":{\"a\":2,\"n\":3}}}]]"
+        }
+      ]
+    },
+    {
+      "name": "object.*",
+      "document": {
+        "outer": {
+          "group": {
+            "a/b~c": {
+              "a": 1,
+              "n": 2
+            },
+            "keep": {
+              "a": 2,
+              "n": 3
+            }
+          }
+        }
+      },
+      "selector": "$.*.*[?(@.a==1)]",
+      "before": [
+        {
+          "command": ["JSON.GET", "verify:mutations", "$.*.*[?(@.a==1)]"],
+          "reply": "[]"
+        },
+        {
+          "command": ["JSON.NUMINCRBY", "verify:mutations", "$.*.*[?(@.a==1)].n", "5"],
+          "reply": "[]"
+        },
+        {
+          "command": ["JSON.GET", "verify:mutations", "$"],
+          "reply": "[{\"outer\":{\"group\":{\"a/b~c\":{\"a\":1,\"n\":2},\"keep\":{\"a\":2,\"n\":3}}}}]"
+        },
+        {
+          "command": ["JSON.SET", "verify:mutations", "$.*.*[?(@.a==1)].n", "9"],
+          "reply": "OK"
+        },
+        {
+          "command": ["JSON.GET", "verify:mutations", "$"],
+          "reply": "[{\"outer\":{\"group\":{\"a/b~c\":{\"a\":1,\"n\":2},\"keep\":{\"a\":2,\"n\":3}}}}]"
+        },
+        {
+          "command": ["JSON.SET", "verify:mutations", "$.*.*[?(@.a==1)]", "{\"a\":1,\"n\":11}"],
+          "reply": "OK"
+        },
+        {
+          "command": ["JSON.GET", "verify:mutations", "$"],
+          "reply": "[{\"outer\":{\"group\":{\"a/b~c\":{\"a\":1,\"n\":2},\"keep\":{\"a\":2,\"n\":3}}}}]"
+        },
+        {
+          "command": ["JSON.DEL", "verify:mutations", "$.*.*[?(@.a==1)]"],
+          "reply": "0"
+        },
+        {
+          "command": ["JSON.GET", "verify:mutations", "$"],
+          "reply": "[{\"outer\":{\"group\":{\"a/b~c\":{\"a\":1,\"n\":2},\"keep\":{\"a\":2,\"n\":3}}}}]"
+        }
+      ],
+      "after": [
+        {
+          "command": ["JSON.GET", "verify:mutations", "$.*.*[?(@.a==1)]"],
+          "reply": "[{\"a\":1,\"n\":2}]"
+        },
+        {
+          "command": ["JSON.NUMINCRBY", "verify:mutations", "$.*.*[?(@.a==1)].n", "5"],
+          "reply": "[7]"
+        },
+        {
+          "command": ["JSON.GET", "verify:mutations", "$"],
+          "reply": "[{\"outer\":{\"group\":{\"a/b~c\":{\"a\":1,\"n\":7},\"keep\":{\"a\":2,\"n\":3}}}}]"
+        },
+        {
+          "command": ["JSON.SET", "verify:mutations", "$.*.*[?(@.a==1)].n", "9"],
+          "reply": "OK"
+        },
+        {
+          "command": ["JSON.GET", "verify:mutations", "$"],
+          "reply": "[{\"outer\":{\"group\":{\"a/b~c\":{\"a\":1,\"n\":9},\"keep\":{\"a\":2,\"n\":3}}}}]"
+        },
+        {
+          "command": ["JSON.SET", "verify:mutations", "$.*.*[?(@.a==1)]", "{\"a\":1,\"n\":11}"],
+          "reply": "OK"
+        },
+        {
+          "command": ["JSON.GET", "verify:mutations", "$"],
+          "reply": "[{\"outer\":{\"group\":{\"a/b~c\":{\"a\":1,\"n\":11},\"keep\":{\"a\":2,\"n\":3}}}}]"
+        },
+        {
+          "command": ["JSON.DEL", "verify:mutations", "$.*.*[?(@.a==1)]"],
+          "reply": "1"
+        },
+        {
+          "command": ["JSON.GET", "verify:mutations", "$"],
+          "reply": "[{\"outer\":{\"group\":{\"keep\":{\"a\":2,\"n\":3}}}}]"
+        }
+      ],
+      "redisjson": [
+        {
+          "command": ["JSON.GET", "verify:mutations", "$.*.*[?(@.a==1)]"],
+          "reply": "[{\"a\":1,\"n\":2}]"
+        },
+        {
+          "command": ["JSON.NUMINCRBY", "verify:mutations", "$.*.*[?(@.a==1)].n", "5"],
+          "reply": "ERR Path does not exist"
+        },
+        {
+          "command": ["JSON.GET", "verify:mutations", "$"],
+          "reply": "[{\"outer\":{\"group\":{\"a/b~c\":{\"a\":1,\"n\":2},\"keep\":{\"a\":2,\"n\":3}}}}]"
+        },
+        {
+          "command": ["JSON.SET", "verify:mutations", "$.*.*[?(@.a==1)].n", "9"],
+          "reply": ""
+        },
+        {
+          "command": ["JSON.GET", "verify:mutations", "$"],
+          "reply": "[{\"outer\":{\"group\":{\"a/b~c\":{\"a\":1,\"n\":2},\"keep\":{\"a\":2,\"n\":3}}}}]"
+        },
+        {
+          "command": ["JSON.SET", "verify:mutations", "$.*.*[?(@.a==1)]", "{\"a\":1,\"n\":11}"],
+          "reply": ""
+        },
+        {
+          "command": ["JSON.GET", "verify:mutations", "$"],
+          "reply": "[{\"outer\":{\"group\":{\"a/b~c\":{\"a\":1,\"n\":2},\"keep\":{\"a\":2,\"n\":3}}}}]"
+        },
+        {
+          "command": ["JSON.DEL", "verify:mutations", "$.*.*[?(@.a==1)]"],
+          "reply": "0"
+        },
+        {
+          "command": ["JSON.GET", "verify:mutations", "$"],
+          "reply": "[{\"outer\":{\"group\":{\"a/b~c\":{\"a\":1,\"n\":2},\"keep\":{\"a\":2,\"n\":3}}}}]"
+        }
+      ],
+      "redisjson_8": [
+        {
+          "command": ["JSON.GET", "verify:mutations", "$.*.*[?(@.a==1)]"],
+          "reply": "[{\"a\":1,\"n\":2}]"
+        },
+        {
+          "command": ["JSON.NUMINCRBY", "verify:mutations", "$.*.*[?(@.a==1)].n", "5"],
+          "reply": "[7]"
+        },
+        {
+          "command": ["JSON.GET", "verify:mutations", "$"],
+          "reply": "[{\"outer\":{\"group\":{\"a/b~c\":{\"a\":1,\"n\":7},\"keep\":{\"a\":2,\"n\":3}}}}]"
+        },
+        {
+          "command": ["JSON.SET", "verify:mutations", "$.*.*[?(@.a==1)].n", "9"],
+          "reply": "OK"
+        },
+        {
+          "command": ["JSON.GET", "verify:mutations", "$"],
+          "reply": "[{\"outer\":{\"group\":{\"a/b~c\":{\"a\":1,\"n\":9},\"keep\":{\"a\":2,\"n\":3}}}}]"
+        },
+        {
+          "command": ["JSON.SET", "verify:mutations", "$.*.*[?(@.a==1)]", "{\"a\":1,\"n\":11}"],
+          "reply": "OK"
+        },
+        {
+          "command": ["JSON.GET", "verify:mutations", "$"],
+          "reply": "[{\"outer\":{\"group\":{\"a/b~c\":{\"a\":1,\"n\":11},\"keep\":{\"a\":2,\"n\":3}}}}]"
+        },
+        {
+          "command": ["JSON.DEL", "verify:mutations", "$.*.*[?(@.a==1)]"],
+          "reply": "1"
+        },
+        {
+          "command": ["JSON.GET", "verify:mutations", "$"],
+          "reply": "[{\"outer\":{\"group\":{\"keep\":{\"a\":2,\"n\":3}}}}]"
+        }
+      ]
+    },
+    {
+      "name": "no-match.*",
+      "document": [
+        {
+          "a": 1,
+          "n": 2
+        }
+      ],
+      "selector": "$.*[?(@.a==1)]",
+      "before": [
+        {
+          "command": ["JSON.GET", "verify:mutations", "$.*[?(@.a==1)]"],
+          "reply": "[{\"a\":1,\"n\":2}]"
+        },
+        {
+          "command": ["JSON.NUMINCRBY", "verify:mutations", "$.*[?(@.a==1)].n", "5"],
+          "reply": "[7]"
+        },
+        {
+          "command": ["JSON.GET", "verify:mutations", "$"],
+          "reply": "[[{\"a\":1,\"n\":7}]]"
+        },
+        {
+          "command": ["JSON.SET", "verify:mutations", "$.*[?(@.a==1)].n", "9"],
+          "reply": "OK"
+        },
+        {
+          "command": ["JSON.GET", "verify:mutations", "$"],
+          "reply": "[[{\"a\":1,\"n\":9}]]"
+        },
+        {
+          "command": ["JSON.SET", "verify:mutations", "$.*[?(@.a==1)]", "{\"a\":1,\"n\":11}"],
+          "reply": "OK"
+        },
+        {
+          "command": ["JSON.GET", "verify:mutations", "$"],
+          "reply": "[[{\"a\":1,\"n\":11}]]"
+        },
+        {
+          "command": ["JSON.DEL", "verify:mutations", "$.*[?(@.a==1)]"],
+          "reply": "1"
+        },
+        {
+          "command": ["JSON.GET", "verify:mutations", "$"],
+          "reply": "[[]]"
+        }
+      ],
+      "after": [
+        {
+          "command": ["JSON.GET", "verify:mutations", "$.*[?(@.a==1)]"],
+          "reply": "[]"
+        },
+        {
+          "command": ["JSON.NUMINCRBY", "verify:mutations", "$.*[?(@.a==1)].n", "5"],
+          "reply": "[]"
+        },
+        {
+          "command": ["JSON.GET", "verify:mutations", "$"],
+          "reply": "[[{\"a\":1,\"n\":2}]]"
+        },
+        {
+          "command": ["JSON.SET", "verify:mutations", "$.*[?(@.a==1)].n", "9"],
+          "reply": "OK"
+        },
+        {
+          "command": ["JSON.GET", "verify:mutations", "$"],
+          "reply": "[[{\"a\":1,\"n\":2}]]"
+        },
+        {
+          "command": ["JSON.SET", "verify:mutations", "$.*[?(@.a==1)]", "{\"a\":1,\"n\":11}"],
+          "reply": "OK"
+        },
+        {
+          "command": ["JSON.GET", "verify:mutations", "$"],
+          "reply": "[[{\"a\":1,\"n\":2}]]"
+        },
+        {
+          "command": ["JSON.DEL", "verify:mutations", "$.*[?(@.a==1)]"],
+          "reply": "0"
+        },
+        {
+          "command": ["JSON.GET", "verify:mutations", "$"],
+          "reply": "[[{\"a\":1,\"n\":2}]]"
+        }
+      ],
+      "redisjson": [
+        {
+          "command": ["JSON.GET", "verify:mutations", "$.*[?(@.a==1)]"],
+          "reply": "[]"
+        },
+        {
+          "command": ["JSON.NUMINCRBY", "verify:mutations", "$.*[?(@.a==1)].n", "5"],
+          "reply": "[]"
+        },
+        {
+          "command": ["JSON.GET", "verify:mutations", "$"],
+          "reply": "[[{\"a\":1,\"n\":2}]]"
+        },
+        {
+          "command": ["JSON.SET", "verify:mutations", "$.*[?(@.a==1)].n", "9"],
+          "reply": "Err wrong static path"
+        },
+        {
+          "command": ["JSON.GET", "verify:mutations", "$"],
+          "reply": "[[{\"a\":1,\"n\":2}]]"
+        },
+        {
+          "command": ["JSON.SET", "verify:mutations", "$.*[?(@.a==1)]", "{\"a\":1,\"n\":11}"],
+          "reply": "Err wrong static path"
+        },
+        {
+          "command": ["JSON.GET", "verify:mutations", "$"],
+          "reply": "[[{\"a\":1,\"n\":2}]]"
+        },
+        {
+          "command": ["JSON.DEL", "verify:mutations", "$.*[?(@.a==1)]"],
+          "reply": "0"
+        },
+        {
+          "command": ["JSON.GET", "verify:mutations", "$"],
+          "reply": "[[{\"a\":1,\"n\":2}]]"
+        }
+      ],
+      "redisjson_8": [
+        {
+          "command": ["JSON.GET", "verify:mutations", "$.*[?(@.a==1)]"],
+          "reply": "[]"
+        },
+        {
+          "command": ["JSON.NUMINCRBY", "verify:mutations", "$.*[?(@.a==1)].n", "5"],
+          "reply": "[]"
+        },
+        {
+          "command": ["JSON.GET", "verify:mutations", "$"],
+          "reply": "[[{\"a\":1,\"n\":2}]]"
+        },
+        {
+          "command": ["JSON.SET", "verify:mutations", "$.*[?(@.a==1)].n", "9"],
+          "reply": "Err wrong static path"
+        },
+        {
+          "command": ["JSON.GET", "verify:mutations", "$"],
+          "reply": "[[{\"a\":1,\"n\":2}]]"
+        },
+        {
+          "command": ["JSON.SET", "verify:mutations", "$.*[?(@.a==1)]", "{\"a\":1,\"n\":11}"],
+          "reply": "Err wrong static path"
+        },
+        {
+          "command": ["JSON.GET", "verify:mutations", "$"],
+          "reply": "[[{\"a\":1,\"n\":2}]]"
+        },
+        {
+          "command": ["JSON.DEL", "verify:mutations", "$.*[?(@.a==1)]"],
+          "reply": "0"
+        },
+        {
+          "command": ["JSON.GET", "verify:mutations", "$"],
+          "reply": "[[{\"a\":1,\"n\":2}]]"
+        }
+      ]
+    },
+    {
+      "name": "mixed-attribute.*",
+      "document": [
+        1,
+        {
+          "pick": {
+            "a": 1,
+            "n": 2
+          },
+          "keep": 2
+        }
+      ],
+      "selector": "$.*[?(@.a)]",
+      "before": [
+        {
+          "command": ["JSON.GET", "verify:mutations", "$.*[?(@.a)]"],
+          "reply": "[]"
+        },
+        {
+          "command": ["JSON.NUMINCRBY", "verify:mutations", "$.*[?(@.a)].n", "5"],
+          "reply": "[]"
+        },
+        {
+          "command": ["JSON.GET", "verify:mutations", "$"],
+          "reply": "[[1,{\"pick\":{\"a\":1,\"n\":2},\"keep\":2}]]"
+        },
+        {
+          "command": ["JSON.SET", "verify:mutations", "$.*[?(@.a)].n", "9"],
+          "reply": "OK"
+        },
+        {
+          "command": ["JSON.GET", "verify:mutations", "$"],
+          "reply": "[[1,{\"pick\":{\"a\":1,\"n\":2},\"keep\":2}]]"
+        },
+        {
+          "command": ["JSON.SET", "verify:mutations", "$.*[?(@.a)]", "{\"a\":1,\"n\":11}"],
+          "reply": "OK"
+        },
+        {
+          "command": ["JSON.GET", "verify:mutations", "$"],
+          "reply": "[[1,{\"pick\":{\"a\":1,\"n\":2},\"keep\":2}]]"
+        },
+        {
+          "command": ["JSON.DEL", "verify:mutations", "$.*[?(@.a)]"],
+          "reply": "0"
+        },
+        {
+          "command": ["JSON.GET", "verify:mutations", "$"],
+          "reply": "[[1,{\"pick\":{\"a\":1,\"n\":2},\"keep\":2}]]"
+        }
+      ],
+      "after": [
+        {
+          "command": ["JSON.GET", "verify:mutations", "$.*[?(@.a)]"],
+          "reply": "[{\"a\":1,\"n\":2}]"
+        },
+        {
+          "command": ["JSON.NUMINCRBY", "verify:mutations", "$.*[?(@.a)].n", "5"],
+          "reply": "[7]"
+        },
+        {
+          "command": ["JSON.GET", "verify:mutations", "$"],
+          "reply": "[[1,{\"pick\":{\"a\":1,\"n\":7},\"keep\":2}]]"
+        },
+        {
+          "command": ["JSON.SET", "verify:mutations", "$.*[?(@.a)].n", "9"],
+          "reply": "OK"
+        },
+        {
+          "command": ["JSON.GET", "verify:mutations", "$"],
+          "reply": "[[1,{\"pick\":{\"a\":1,\"n\":9},\"keep\":2}]]"
+        },
+        {
+          "command": ["JSON.SET", "verify:mutations", "$.*[?(@.a)]", "{\"a\":1,\"n\":11}"],
+          "reply": "OK"
+        },
+        {
+          "command": ["JSON.GET", "verify:mutations", "$"],
+          "reply": "[[1,{\"pick\":{\"a\":1,\"n\":11},\"keep\":2}]]"
+        },
+        {
+          "command": ["JSON.DEL", "verify:mutations", "$.*[?(@.a)]"],
+          "reply": "1"
+        },
+        {
+          "command": ["JSON.GET", "verify:mutations", "$"],
+          "reply": "[[1,{\"keep\":2}]]"
+        }
+      ],
+      "redisjson": [
+        {
+          "command": ["JSON.GET", "verify:mutations", "$.*[?(@.a)]"],
+          "reply": "[{\"a\":1,\"n\":2}]"
+        },
+        {
+          "command": ["JSON.NUMINCRBY", "verify:mutations", "$.*[?(@.a)].n", "5"],
+          "reply": "ERR Path does not exist"
+        },
+        {
+          "command": ["JSON.GET", "verify:mutations", "$"],
+          "reply": "[[1,{\"pick\":{\"a\":1,\"n\":2},\"keep\":2}]]"
+        },
+        {
+          "command": ["JSON.SET", "verify:mutations", "$.*[?(@.a)].n", "9"],
+          "reply": ""
+        },
+        {
+          "command": ["JSON.GET", "verify:mutations", "$"],
+          "reply": "[[1,{\"pick\":{\"a\":1,\"n\":2},\"keep\":2}]]"
+        },
+        {
+          "command": ["JSON.SET", "verify:mutations", "$.*[?(@.a)]", "{\"a\":1,\"n\":11}"],
+          "reply": ""
+        },
+        {
+          "command": ["JSON.GET", "verify:mutations", "$"],
+          "reply": "[[1,{\"pick\":{\"a\":1,\"n\":2},\"keep\":2}]]"
+        },
+        {
+          "command": ["JSON.DEL", "verify:mutations", "$.*[?(@.a)]"],
+          "reply": "0"
+        },
+        {
+          "command": ["JSON.GET", "verify:mutations", "$"],
+          "reply": "[[1,{\"pick\":{\"a\":1,\"n\":2},\"keep\":2}]]"
+        }
+      ],
+      "redisjson_8": [
+        {
+          "command": ["JSON.GET", "verify:mutations", "$.*[?(@.a)]"],
+          "reply": "[{\"a\":1,\"n\":2}]"
+        },
+        {
+          "command": ["JSON.NUMINCRBY", "verify:mutations", "$.*[?(@.a)].n", "5"],
+          "reply": "[7]"
+        },
+        {
+          "command": ["JSON.GET", "verify:mutations", "$"],
+          "reply": "[[1,{\"pick\":{\"a\":1,\"n\":7},\"keep\":2}]]"
+        },
+        {
+          "command": ["JSON.SET", "verify:mutations", "$.*[?(@.a)].n", "9"],
+          "reply": "OK"
+        },
+        {
+          "command": ["JSON.GET", "verify:mutations", "$"],
+          "reply": "[[1,{\"pick\":{\"a\":1,\"n\":9},\"keep\":2}]]"
+        },
+        {
+          "command": ["JSON.SET", "verify:mutations", "$.*[?(@.a)]", "{\"a\":1,\"n\":11}"],
+          "reply": "OK"
+        },
+        {
+          "command": ["JSON.GET", "verify:mutations", "$"],
+          "reply": "[[1,{\"pick\":{\"a\":1,\"n\":11},\"keep\":2}]]"
+        },
+        {
+          "command": ["JSON.DEL", "verify:mutations", "$.*[?(@.a)]"],
+          "reply": "1"
+        },
+        {
+          "command": ["JSON.GET", "verify:mutations", "$"],
+          "reply": "[[1,{\"keep\":2}]]"
+        }
+      ]
+    },
+    {
+      "name": "array[*]",
+      "document": [
+        {
+          "group": {
+            "a/b~c": {
+              "a": 1,
+              "n": 2
+            },
+            "keep": {
+              "a": 2,
+              "n": 3
+            }
+          }
+        }
+      ],
+      "selector": "$[*][*][?(@.a==1)]",
+      "before": [
+        {
+          "command": ["JSON.GET", "verify:mutations", "$[*][*][?(@.a==1)]"],
+          "reply": "[]"
+        },
+        {
+          "command": ["JSON.NUMINCRBY", "verify:mutations", "$[*][*][?(@.a==1)].n", "5"],
+          "reply": "[]"
+        },
+        {
+          "command": ["JSON.GET", "verify:mutations", "$"],
+          "reply": "[[{\"group\":{\"a/b~c\":{\"a\":1,\"n\":2},\"keep\":{\"a\":2,\"n\":3}}}]]"
+        },
+        {
+          "command": ["JSON.SET", "verify:mutations", "$[*][*][?(@.a==1)].n", "9"],
+          "reply": "OK"
+        },
+        {
+          "command": ["JSON.GET", "verify:mutations", "$"],
+          "reply": "[[{\"group\":{\"a/b~c\":{\"a\":1,\"n\":2},\"keep\":{\"a\":2,\"n\":3}}}]]"
+        },
+        {
+          "command": ["JSON.SET", "verify:mutations", "$[*][*][?(@.a==1)]", "{\"a\":1,\"n\":11}"],
+          "reply": "OK"
+        },
+        {
+          "command": ["JSON.GET", "verify:mutations", "$"],
+          "reply": "[[{\"group\":{\"a/b~c\":{\"a\":1,\"n\":2},\"keep\":{\"a\":2,\"n\":3}}}]]"
+        },
+        {
+          "command": ["JSON.DEL", "verify:mutations", "$[*][*][?(@.a==1)]"],
+          "reply": "0"
+        },
+        {
+          "command": ["JSON.GET", "verify:mutations", "$"],
+          "reply": "[[{\"group\":{\"a/b~c\":{\"a\":1,\"n\":2},\"keep\":{\"a\":2,\"n\":3}}}]]"
+        }
+      ],
+      "after": [
+        {
+          "command": ["JSON.GET", "verify:mutations", "$[*][*][?(@.a==1)]"],
+          "reply": "[{\"a\":1,\"n\":2}]"
+        },
+        {
+          "command": ["JSON.NUMINCRBY", "verify:mutations", "$[*][*][?(@.a==1)].n", "5"],
+          "reply": "[7]"
+        },
+        {
+          "command": ["JSON.GET", "verify:mutations", "$"],
+          "reply": "[[{\"group\":{\"a/b~c\":{\"a\":1,\"n\":7},\"keep\":{\"a\":2,\"n\":3}}}]]"
+        },
+        {
+          "command": ["JSON.SET", "verify:mutations", "$[*][*][?(@.a==1)].n", "9"],
+          "reply": "OK"
+        },
+        {
+          "command": ["JSON.GET", "verify:mutations", "$"],
+          "reply": "[[{\"group\":{\"a/b~c\":{\"a\":1,\"n\":9},\"keep\":{\"a\":2,\"n\":3}}}]]"
+        },
+        {
+          "command": ["JSON.SET", "verify:mutations", "$[*][*][?(@.a==1)]", "{\"a\":1,\"n\":11}"],
+          "reply": "OK"
+        },
+        {
+          "command": ["JSON.GET", "verify:mutations", "$"],
+          "reply": "[[{\"group\":{\"a/b~c\":{\"a\":1,\"n\":11},\"keep\":{\"a\":2,\"n\":3}}}]]"
+        },
+        {
+          "command": ["JSON.DEL", "verify:mutations", "$[*][*][?(@.a==1)]"],
+          "reply": "1"
+        },
+        {
+          "command": ["JSON.GET", "verify:mutations", "$"],
+          "reply": "[[{\"group\":{\"keep\":{\"a\":2,\"n\":3}}}]]"
+        }
+      ],
+      "redisjson": [
+        {
+          "command": ["JSON.GET", "verify:mutations", "$[*][*][?(@.a==1)]"],
+          "reply": "[{\"a\":1,\"n\":2}]"
+        },
+        {
+          "command": ["JSON.NUMINCRBY", "verify:mutations", "$[*][*][?(@.a==1)].n", "5"],
+          "reply": "ERR Path does not exist"
+        },
+        {
+          "command": ["JSON.GET", "verify:mutations", "$"],
+          "reply": "[[{\"group\":{\"a/b~c\":{\"a\":1,\"n\":2},\"keep\":{\"a\":2,\"n\":3}}}]]"
+        },
+        {
+          "command": ["JSON.SET", "verify:mutations", "$[*][*][?(@.a==1)].n", "9"],
+          "reply": ""
+        },
+        {
+          "command": ["JSON.GET", "verify:mutations", "$"],
+          "reply": "[[{\"group\":{\"a/b~c\":{\"a\":1,\"n\":2},\"keep\":{\"a\":2,\"n\":3}}}]]"
+        },
+        {
+          "command": ["JSON.SET", "verify:mutations", "$[*][*][?(@.a==1)]", "{\"a\":1,\"n\":11}"],
+          "reply": ""
+        },
+        {
+          "command": ["JSON.GET", "verify:mutations", "$"],
+          "reply": "[[{\"group\":{\"a/b~c\":{\"a\":1,\"n\":2},\"keep\":{\"a\":2,\"n\":3}}}]]"
+        },
+        {
+          "command": ["JSON.DEL", "verify:mutations", "$[*][*][?(@.a==1)]"],
+          "reply": "0"
+        },
+        {
+          "command": ["JSON.GET", "verify:mutations", "$"],
+          "reply": "[[{\"group\":{\"a/b~c\":{\"a\":1,\"n\":2},\"keep\":{\"a\":2,\"n\":3}}}]]"
+        }
+      ],
+      "redisjson_8": [
+        {
+          "command": ["JSON.GET", "verify:mutations", "$[*][*][?(@.a==1)]"],
+          "reply": "[{\"a\":1,\"n\":2}]"
+        },
+        {
+          "command": ["JSON.NUMINCRBY", "verify:mutations", "$[*][*][?(@.a==1)].n", "5"],
+          "reply": "[7]"
+        },
+        {
+          "command": ["JSON.GET", "verify:mutations", "$"],
+          "reply": "[[{\"group\":{\"a/b~c\":{\"a\":1,\"n\":7},\"keep\":{\"a\":2,\"n\":3}}}]]"
+        },
+        {
+          "command": ["JSON.SET", "verify:mutations", "$[*][*][?(@.a==1)].n", "9"],
+          "reply": "OK"
+        },
+        {
+          "command": ["JSON.GET", "verify:mutations", "$"],
+          "reply": "[[{\"group\":{\"a/b~c\":{\"a\":1,\"n\":9},\"keep\":{\"a\":2,\"n\":3}}}]]"
+        },
+        {
+          "command": ["JSON.SET", "verify:mutations", "$[*][*][?(@.a==1)]", "{\"a\":1,\"n\":11}"],
+          "reply": "OK"
+        },
+        {
+          "command": ["JSON.GET", "verify:mutations", "$"],
+          "reply": "[[{\"group\":{\"a/b~c\":{\"a\":1,\"n\":11},\"keep\":{\"a\":2,\"n\":3}}}]]"
+        },
+        {
+          "command": ["JSON.DEL", "verify:mutations", "$[*][*][?(@.a==1)]"],
+          "reply": "1"
+        },
+        {
+          "command": ["JSON.GET", "verify:mutations", "$"],
+          "reply": "[[{\"group\":{\"keep\":{\"a\":2,\"n\":3}}}]]"
+        }
+      ]
+    },
+    {
+      "name": "object[*]",
+      "document": {
+        "outer": {
+          "group": {
+            "a/b~c": {
+              "a": 1,
+              "n": 2
+            },
+            "keep": {
+              "a": 2,
+              "n": 3
+            }
+          }
+        }
+      },
+      "selector": "$[*][*][?(@.a==1)]",
+      "before": [
+        {
+          "command": ["JSON.GET", "verify:mutations", "$[*][*][?(@.a==1)]"],
+          "reply": "[]"
+        },
+        {
+          "command": ["JSON.NUMINCRBY", "verify:mutations", "$[*][*][?(@.a==1)].n", "5"],
+          "reply": "[]"
+        },
+        {
+          "command": ["JSON.GET", "verify:mutations", "$"],
+          "reply": "[{\"outer\":{\"group\":{\"a/b~c\":{\"a\":1,\"n\":2},\"keep\":{\"a\":2,\"n\":3}}}}]"
+        },
+        {
+          "command": ["JSON.SET", "verify:mutations", "$[*][*][?(@.a==1)].n", "9"],
+          "reply": "OK"
+        },
+        {
+          "command": ["JSON.GET", "verify:mutations", "$"],
+          "reply": "[{\"outer\":{\"group\":{\"a/b~c\":{\"a\":1,\"n\":2},\"keep\":{\"a\":2,\"n\":3}}}}]"
+        },
+        {
+          "command": ["JSON.SET", "verify:mutations", "$[*][*][?(@.a==1)]", "{\"a\":1,\"n\":11}"],
+          "reply": "OK"
+        },
+        {
+          "command": ["JSON.GET", "verify:mutations", "$"],
+          "reply": "[{\"outer\":{\"group\":{\"a/b~c\":{\"a\":1,\"n\":2},\"keep\":{\"a\":2,\"n\":3}}}}]"
+        },
+        {
+          "command": ["JSON.DEL", "verify:mutations", "$[*][*][?(@.a==1)]"],
+          "reply": "0"
+        },
+        {
+          "command": ["JSON.GET", "verify:mutations", "$"],
+          "reply": "[{\"outer\":{\"group\":{\"a/b~c\":{\"a\":1,\"n\":2},\"keep\":{\"a\":2,\"n\":3}}}}]"
+        }
+      ],
+      "after": [
+        {
+          "command": ["JSON.GET", "verify:mutations", "$[*][*][?(@.a==1)]"],
+          "reply": "[{\"a\":1,\"n\":2}]"
+        },
+        {
+          "command": ["JSON.NUMINCRBY", "verify:mutations", "$[*][*][?(@.a==1)].n", "5"],
+          "reply": "[7]"
+        },
+        {
+          "command": ["JSON.GET", "verify:mutations", "$"],
+          "reply": "[{\"outer\":{\"group\":{\"a/b~c\":{\"a\":1,\"n\":7},\"keep\":{\"a\":2,\"n\":3}}}}]"
+        },
+        {
+          "command": ["JSON.SET", "verify:mutations", "$[*][*][?(@.a==1)].n", "9"],
+          "reply": "OK"
+        },
+        {
+          "command": ["JSON.GET", "verify:mutations", "$"],
+          "reply": "[{\"outer\":{\"group\":{\"a/b~c\":{\"a\":1,\"n\":9},\"keep\":{\"a\":2,\"n\":3}}}}]"
+        },
+        {
+          "command": ["JSON.SET", "verify:mutations", "$[*][*][?(@.a==1)]", "{\"a\":1,\"n\":11}"],
+          "reply": "OK"
+        },
+        {
+          "command": ["JSON.GET", "verify:mutations", "$"],
+          "reply": "[{\"outer\":{\"group\":{\"a/b~c\":{\"a\":1,\"n\":11},\"keep\":{\"a\":2,\"n\":3}}}}]"
+        },
+        {
+          "command": ["JSON.DEL", "verify:mutations", "$[*][*][?(@.a==1)]"],
+          "reply": "1"
+        },
+        {
+          "command": ["JSON.GET", "verify:mutations", "$"],
+          "reply": "[{\"outer\":{\"group\":{\"keep\":{\"a\":2,\"n\":3}}}}]"
+        }
+      ],
+      "redisjson": [
+        {
+          "command": ["JSON.GET", "verify:mutations", "$[*][*][?(@.a==1)]"],
+          "reply": "[{\"a\":1,\"n\":2}]"
+        },
+        {
+          "command": ["JSON.NUMINCRBY", "verify:mutations", "$[*][*][?(@.a==1)].n", "5"],
+          "reply": "ERR Path does not exist"
+        },
+        {
+          "command": ["JSON.GET", "verify:mutations", "$"],
+          "reply": "[{\"outer\":{\"group\":{\"a/b~c\":{\"a\":1,\"n\":2},\"keep\":{\"a\":2,\"n\":3}}}}]"
+        },
+        {
+          "command": ["JSON.SET", "verify:mutations", "$[*][*][?(@.a==1)].n", "9"],
+          "reply": ""
+        },
+        {
+          "command": ["JSON.GET", "verify:mutations", "$"],
+          "reply": "[{\"outer\":{\"group\":{\"a/b~c\":{\"a\":1,\"n\":2},\"keep\":{\"a\":2,\"n\":3}}}}]"
+        },
+        {
+          "command": ["JSON.SET", "verify:mutations", "$[*][*][?(@.a==1)]", "{\"a\":1,\"n\":11}"],
+          "reply": ""
+        },
+        {
+          "command": ["JSON.GET", "verify:mutations", "$"],
+          "reply": "[{\"outer\":{\"group\":{\"a/b~c\":{\"a\":1,\"n\":2},\"keep\":{\"a\":2,\"n\":3}}}}]"
+        },
+        {
+          "command": ["JSON.DEL", "verify:mutations", "$[*][*][?(@.a==1)]"],
+          "reply": "0"
+        },
+        {
+          "command": ["JSON.GET", "verify:mutations", "$"],
+          "reply": "[{\"outer\":{\"group\":{\"a/b~c\":{\"a\":1,\"n\":2},\"keep\":{\"a\":2,\"n\":3}}}}]"
+        }
+      ],
+      "redisjson_8": [
+        {
+          "command": ["JSON.GET", "verify:mutations", "$[*][*][?(@.a==1)]"],
+          "reply": "[{\"a\":1,\"n\":2}]"
+        },
+        {
+          "command": ["JSON.NUMINCRBY", "verify:mutations", "$[*][*][?(@.a==1)].n", "5"],
+          "reply": "[7]"
+        },
+        {
+          "command": ["JSON.GET", "verify:mutations", "$"],
+          "reply": "[{\"outer\":{\"group\":{\"a/b~c\":{\"a\":1,\"n\":7},\"keep\":{\"a\":2,\"n\":3}}}}]"
+        },
+        {
+          "command": ["JSON.SET", "verify:mutations", "$[*][*][?(@.a==1)].n", "9"],
+          "reply": "OK"
+        },
+        {
+          "command": ["JSON.GET", "verify:mutations", "$"],
+          "reply": "[{\"outer\":{\"group\":{\"a/b~c\":{\"a\":1,\"n\":9},\"keep\":{\"a\":2,\"n\":3}}}}]"
+        },
+        {
+          "command": ["JSON.SET", "verify:mutations", "$[*][*][?(@.a==1)]", "{\"a\":1,\"n\":11}"],
+          "reply": "OK"
+        },
+        {
+          "command": ["JSON.GET", "verify:mutations", "$"],
+          "reply": "[{\"outer\":{\"group\":{\"a/b~c\":{\"a\":1,\"n\":11},\"keep\":{\"a\":2,\"n\":3}}}}]"
+        },
+        {
+          "command": ["JSON.DEL", "verify:mutations", "$[*][*][?(@.a==1)]"],
+          "reply": "1"
+        },
+        {
+          "command": ["JSON.GET", "verify:mutations", "$"],
+          "reply": "[{\"outer\":{\"group\":{\"keep\":{\"a\":2,\"n\":3}}}}]"
+        }
+      ]
+    },
+    {
+      "name": "no-match[*]",
+      "document": [
+        {
+          "a": 1,
+          "n": 2
+        }
+      ],
+      "selector": "$[*][?(@.a==1)]",
+      "before": [
+        {
+          "command": ["JSON.GET", "verify:mutations", "$[*][?(@.a==1)]"],
+          "reply": "[{\"a\":1,\"n\":2}]"
+        },
+        {
+          "command": ["JSON.NUMINCRBY", "verify:mutations", "$[*][?(@.a==1)].n", "5"],
+          "reply": "[7]"
+        },
+        {
+          "command": ["JSON.GET", "verify:mutations", "$"],
+          "reply": "[[{\"a\":1,\"n\":7}]]"
+        },
+        {
+          "command": ["JSON.SET", "verify:mutations", "$[*][?(@.a==1)].n", "9"],
+          "reply": "OK"
+        },
+        {
+          "command": ["JSON.GET", "verify:mutations", "$"],
+          "reply": "[[{\"a\":1,\"n\":9}]]"
+        },
+        {
+          "command": ["JSON.SET", "verify:mutations", "$[*][?(@.a==1)]", "{\"a\":1,\"n\":11}"],
+          "reply": "OK"
+        },
+        {
+          "command": ["JSON.GET", "verify:mutations", "$"],
+          "reply": "[[{\"a\":1,\"n\":11}]]"
+        },
+        {
+          "command": ["JSON.DEL", "verify:mutations", "$[*][?(@.a==1)]"],
+          "reply": "1"
+        },
+        {
+          "command": ["JSON.GET", "verify:mutations", "$"],
+          "reply": "[[]]"
+        }
+      ],
+      "after": [
+        {
+          "command": ["JSON.GET", "verify:mutations", "$[*][?(@.a==1)]"],
+          "reply": "[]"
+        },
+        {
+          "command": ["JSON.NUMINCRBY", "verify:mutations", "$[*][?(@.a==1)].n", "5"],
+          "reply": "[]"
+        },
+        {
+          "command": ["JSON.GET", "verify:mutations", "$"],
+          "reply": "[[{\"a\":1,\"n\":2}]]"
+        },
+        {
+          "command": ["JSON.SET", "verify:mutations", "$[*][?(@.a==1)].n", "9"],
+          "reply": "OK"
+        },
+        {
+          "command": ["JSON.GET", "verify:mutations", "$"],
+          "reply": "[[{\"a\":1,\"n\":2}]]"
+        },
+        {
+          "command": ["JSON.SET", "verify:mutations", "$[*][?(@.a==1)]", "{\"a\":1,\"n\":11}"],
+          "reply": "OK"
+        },
+        {
+          "command": ["JSON.GET", "verify:mutations", "$"],
+          "reply": "[[{\"a\":1,\"n\":2}]]"
+        },
+        {
+          "command": ["JSON.DEL", "verify:mutations", "$[*][?(@.a==1)]"],
+          "reply": "0"
+        },
+        {
+          "command": ["JSON.GET", "verify:mutations", "$"],
+          "reply": "[[{\"a\":1,\"n\":2}]]"
+        }
+      ],
+      "redisjson": [
+        {
+          "command": ["JSON.GET", "verify:mutations", "$[*][?(@.a==1)]"],
+          "reply": "[]"
+        },
+        {
+          "command": ["JSON.NUMINCRBY", "verify:mutations", "$[*][?(@.a==1)].n", "5"],
+          "reply": "[]"
+        },
+        {
+          "command": ["JSON.GET", "verify:mutations", "$"],
+          "reply": "[[{\"a\":1,\"n\":2}]]"
+        },
+        {
+          "command": ["JSON.SET", "verify:mutations", "$[*][?(@.a==1)].n", "9"],
+          "reply": "Err wrong static path"
+        },
+        {
+          "command": ["JSON.GET", "verify:mutations", "$"],
+          "reply": "[[{\"a\":1,\"n\":2}]]"
+        },
+        {
+          "command": ["JSON.SET", "verify:mutations", "$[*][?(@.a==1)]", "{\"a\":1,\"n\":11}"],
+          "reply": "Err wrong static path"
+        },
+        {
+          "command": ["JSON.GET", "verify:mutations", "$"],
+          "reply": "[[{\"a\":1,\"n\":2}]]"
+        },
+        {
+          "command": ["JSON.DEL", "verify:mutations", "$[*][?(@.a==1)]"],
+          "reply": "0"
+        },
+        {
+          "command": ["JSON.GET", "verify:mutations", "$"],
+          "reply": "[[{\"a\":1,\"n\":2}]]"
+        }
+      ],
+      "redisjson_8": [
+        {
+          "command": ["JSON.GET", "verify:mutations", "$[*][?(@.a==1)]"],
+          "reply": "[]"
+        },
+        {
+          "command": ["JSON.NUMINCRBY", "verify:mutations", "$[*][?(@.a==1)].n", "5"],
+          "reply": "[]"
+        },
+        {
+          "command": ["JSON.GET", "verify:mutations", "$"],
+          "reply": "[[{\"a\":1,\"n\":2}]]"
+        },
+        {
+          "command": ["JSON.SET", "verify:mutations", "$[*][?(@.a==1)].n", "9"],
+          "reply": "Err wrong static path"
+        },
+        {
+          "command": ["JSON.GET", "verify:mutations", "$"],
+          "reply": "[[{\"a\":1,\"n\":2}]]"
+        },
+        {
+          "command": ["JSON.SET", "verify:mutations", "$[*][?(@.a==1)]", "{\"a\":1,\"n\":11}"],
+          "reply": "Err wrong static path"
+        },
+        {
+          "command": ["JSON.GET", "verify:mutations", "$"],
+          "reply": "[[{\"a\":1,\"n\":2}]]"
+        },
+        {
+          "command": ["JSON.DEL", "verify:mutations", "$[*][?(@.a==1)]"],
+          "reply": "0"
+        },
+        {
+          "command": ["JSON.GET", "verify:mutations", "$"],
+          "reply": "[[{\"a\":1,\"n\":2}]]"
+        }
+      ]
+    },
+    {
+      "name": "mixed-attribute[*]",
+      "document": [
+        1,
+        {
+          "pick": {
+            "a": 1,
+            "n": 2
+          },
+          "keep": 2
+        }
+      ],
+      "selector": "$[*][?(@.a)]",
+      "before": [
+        {
+          "command": ["JSON.GET", "verify:mutations", "$[*][?(@.a)]"],
+          "reply": "[]"
+        },
+        {
+          "command": ["JSON.NUMINCRBY", "verify:mutations", "$[*][?(@.a)].n", "5"],
+          "reply": "[]"
+        },
+        {
+          "command": ["JSON.GET", "verify:mutations", "$"],
+          "reply": "[[1,{\"pick\":{\"a\":1,\"n\":2},\"keep\":2}]]"
+        },
+        {
+          "command": ["JSON.SET", "verify:mutations", "$[*][?(@.a)].n", "9"],
+          "reply": "OK"
+        },
+        {
+          "command": ["JSON.GET", "verify:mutations", "$"],
+          "reply": "[[1,{\"pick\":{\"a\":1,\"n\":2},\"keep\":2}]]"
+        },
+        {
+          "command": ["JSON.SET", "verify:mutations", "$[*][?(@.a)]", "{\"a\":1,\"n\":11}"],
+          "reply": "OK"
+        },
+        {
+          "command": ["JSON.GET", "verify:mutations", "$"],
+          "reply": "[[1,{\"pick\":{\"a\":1,\"n\":2},\"keep\":2}]]"
+        },
+        {
+          "command": ["JSON.DEL", "verify:mutations", "$[*][?(@.a)]"],
+          "reply": "0"
+        },
+        {
+          "command": ["JSON.GET", "verify:mutations", "$"],
+          "reply": "[[1,{\"pick\":{\"a\":1,\"n\":2},\"keep\":2}]]"
+        }
+      ],
+      "after": [
+        {
+          "command": ["JSON.GET", "verify:mutations", "$[*][?(@.a)]"],
+          "reply": "[{\"a\":1,\"n\":2}]"
+        },
+        {
+          "command": ["JSON.NUMINCRBY", "verify:mutations", "$[*][?(@.a)].n", "5"],
+          "reply": "[7]"
+        },
+        {
+          "command": ["JSON.GET", "verify:mutations", "$"],
+          "reply": "[[1,{\"pick\":{\"a\":1,\"n\":7},\"keep\":2}]]"
+        },
+        {
+          "command": ["JSON.SET", "verify:mutations", "$[*][?(@.a)].n", "9"],
+          "reply": "OK"
+        },
+        {
+          "command": ["JSON.GET", "verify:mutations", "$"],
+          "reply": "[[1,{\"pick\":{\"a\":1,\"n\":9},\"keep\":2}]]"
+        },
+        {
+          "command": ["JSON.SET", "verify:mutations", "$[*][?(@.a)]", "{\"a\":1,\"n\":11}"],
+          "reply": "OK"
+        },
+        {
+          "command": ["JSON.GET", "verify:mutations", "$"],
+          "reply": "[[1,{\"pick\":{\"a\":1,\"n\":11},\"keep\":2}]]"
+        },
+        {
+          "command": ["JSON.DEL", "verify:mutations", "$[*][?(@.a)]"],
+          "reply": "1"
+        },
+        {
+          "command": ["JSON.GET", "verify:mutations", "$"],
+          "reply": "[[1,{\"keep\":2}]]"
+        }
+      ],
+      "redisjson": [
+        {
+          "command": ["JSON.GET", "verify:mutations", "$[*][?(@.a)]"],
+          "reply": "[{\"a\":1,\"n\":2}]"
+        },
+        {
+          "command": ["JSON.NUMINCRBY", "verify:mutations", "$[*][?(@.a)].n", "5"],
+          "reply": "ERR Path does not exist"
+        },
+        {
+          "command": ["JSON.GET", "verify:mutations", "$"],
+          "reply": "[[1,{\"pick\":{\"a\":1,\"n\":2},\"keep\":2}]]"
+        },
+        {
+          "command": ["JSON.SET", "verify:mutations", "$[*][?(@.a)].n", "9"],
+          "reply": ""
+        },
+        {
+          "command": ["JSON.GET", "verify:mutations", "$"],
+          "reply": "[[1,{\"pick\":{\"a\":1,\"n\":2},\"keep\":2}]]"
+        },
+        {
+          "command": ["JSON.SET", "verify:mutations", "$[*][?(@.a)]", "{\"a\":1,\"n\":11}"],
+          "reply": ""
+        },
+        {
+          "command": ["JSON.GET", "verify:mutations", "$"],
+          "reply": "[[1,{\"pick\":{\"a\":1,\"n\":2},\"keep\":2}]]"
+        },
+        {
+          "command": ["JSON.DEL", "verify:mutations", "$[*][?(@.a)]"],
+          "reply": "0"
+        },
+        {
+          "command": ["JSON.GET", "verify:mutations", "$"],
+          "reply": "[[1,{\"pick\":{\"a\":1,\"n\":2},\"keep\":2}]]"
+        }
+      ],
+      "redisjson_8": [
+        {
+          "command": ["JSON.GET", "verify:mutations", "$[*][?(@.a)]"],
+          "reply": "[{\"a\":1,\"n\":2}]"
+        },
+        {
+          "command": ["JSON.NUMINCRBY", "verify:mutations", "$[*][?(@.a)].n", "5"],
+          "reply": "[7]"
+        },
+        {
+          "command": ["JSON.GET", "verify:mutations", "$"],
+          "reply": "[[1,{\"pick\":{\"a\":1,\"n\":7},\"keep\":2}]]"
+        },
+        {
+          "command": ["JSON.SET", "verify:mutations", "$[*][?(@.a)].n", "9"],
+          "reply": "OK"
+        },
+        {
+          "command": ["JSON.GET", "verify:mutations", "$"],
+          "reply": "[[1,{\"pick\":{\"a\":1,\"n\":9},\"keep\":2}]]"
+        },
+        {
+          "command": ["JSON.SET", "verify:mutations", "$[*][?(@.a)]", "{\"a\":1,\"n\":11}"],
+          "reply": "OK"
+        },
+        {
+          "command": ["JSON.GET", "verify:mutations", "$"],
+          "reply": "[[1,{\"pick\":{\"a\":1,\"n\":11},\"keep\":2}]]"
+        },
+        {
+          "command": ["JSON.DEL", "verify:mutations", "$[*][?(@.a)]"],
+          "reply": "1"
+        },
+        {
+          "command": ["JSON.GET", "verify:mutations", "$"],
+          "reply": "[[1,{\"keep\":2}]]"
+        }
+      ]
+    }
+  ]
+}
