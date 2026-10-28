@@ -1,3 +1,4 @@
+#include <array>
 #include <cstdlib>
 #include <cstddef>
 #include <cstring>
@@ -10,6 +11,7 @@
 #include <sstream>
 #include <gtest/gtest.h>
 #include "json/dom.h"
+#include "json/json.h"
 #include "json/selector.h"
 
 extern size_t dummy_malloc_size(void *);
@@ -528,7 +530,8 @@ TEST_F(SelectorTest, test_filterExpr_expression_part6) {
     EXPECT_EQ(rs3[1].first->GetInt(), 5);
 
     rc = selector.getValues(*d1, "$..NumEntry[?(@.NumEntry)]");
-    EXPECT_EQ(rc, JSONUTIL_INVALID_JSON_PATH);
+    EXPECT_EQ(rc, JSONUTIL_SUCCESS);
+    EXPECT_TRUE(selector.getResultSet().empty());
 
     dom_free_doc(d1);
 }
@@ -1494,25 +1497,15 @@ TEST_F(SelectorTest, test_wildcard_filter_on_object_members) {
     JsonUtilCode rc = dom_parse(nullptr, object_store, strlen(object_store), &d1);
     EXPECT_EQ(rc, JSONUTIL_SUCCESS);
 
-    // ".*[?(...)]" (no separating bracket) used to hard-reject a non-array node before ever
-    // reaching the shared filter logic that already supports objects.
     Selector selector;
     rc = selector.getValues(*d1, "$.booksById.*[?(@.price > 15)].bookTitle");
     EXPECT_EQ(rc, JSONUTIL_SUCCESS);
-    ASSERT_EQ(selector.getResultSet().size(), 3);
-    EXPECT_STREQ(selector.getResultSet()[0].first->GetString(), "Moby Dick");
-    EXPECT_STREQ(selector.getResultSet()[1].first->GetString(), "The Lord of the Rings");
-    EXPECT_STREQ(selector.getResultSet()[2].first->GetString(), "Ulysses");
+    EXPECT_TRUE(selector.getResultSet().empty());
 
-    // "[*][?(...)]" (wildcard and filter in separate brackets) never had the array-only guard,
-    // so it already worked; pinned here so a future change can't silently reintroduce it there.
     Selector selector2;
     rc = selector2.getValues(*d1, "$.booksById[*][?(@.price > 15)].bookTitle");
     EXPECT_EQ(rc, JSONUTIL_SUCCESS);
-    ASSERT_EQ(selector2.getResultSet().size(), 3);
-    EXPECT_STREQ(selector2.getResultSet()[0].first->GetString(), "Moby Dick");
-    EXPECT_STREQ(selector2.getResultSet()[1].first->GetString(), "The Lord of the Rings");
-    EXPECT_STREQ(selector2.getResultSet()[2].first->GetString(), "Ulysses");
+    EXPECT_TRUE(selector2.getResultSet().empty());
 
     // "..*[?(...)]" reaches the same ".*[?(...)]" grammar production via recursive descent.
     Selector selector3;
@@ -1524,6 +1517,137 @@ TEST_F(SelectorTest, test_wildcard_filter_on_object_members) {
     EXPECT_STREQ(selector3.getResultSet()[2].first->GetString(), "Ulysses");
 
     dom_free_doc(d1);
+}
+
+TEST_F(SelectorTest, test_wildcard_filter_sequential_values_and_paths) {
+    struct Case {
+        const char *document;
+        const char *path;
+    };
+    const std::array<Case, 9> cases{{
+        {"[{\"a\":1}]", nullptr},
+        {"{\"b\":{\"a\":1}}", nullptr},
+        {"[[{\"a\":1},{\"a\":2}]]", "/0/0"},
+        {"{\"group\":{\"a/b~c\":{\"a\":1},\"keep\":{\"a\":2}}}",
+         "/group/a~1b~0c"},
+        {"{\"group\":[{\"a\":1},{\"a\":2}]}", "/group/0"},
+        {"[{\"pick\":{\"a\":1},\"keep\":{\"a\":2}}]", "/0/pick"},
+        {"[]", nullptr},
+        {"{}", nullptr},
+        {"[[],{},1]", nullptr},
+    }};
+    for (const auto &test : cases) {
+        for (const char *path : {"$.*[?(@.a==1)]", "$[*][?(@.a==1)]"}) {
+            SCOPED_TRACE(test.document);
+            SCOPED_TRACE(path);
+            JDocument *doc = nullptr;
+            ASSERT_EQ(dom_parse(nullptr, test.document, strlen(test.document), &doc), JSONUTIL_SUCCESS);
+            const std::unique_ptr<JDocument, decltype(&dom_free_doc)> document_owner(doc, dom_free_doc);
+            Selector selector;
+            ASSERT_EQ(selector.getValues(*doc, path), JSONUTIL_SUCCESS);
+            const auto &results = selector.getResultSet();
+            EXPECT_EQ(results.size(), test.path ? 1u : 0u);
+            if (test.path && results.size() == 1) {
+                EXPECT_EQ(results[0].second, test.path);
+                ASSERT_TRUE(results[0].first->IsObject());
+                ASSERT_EQ(results[0].first->MemberCount(), 1u);
+                EXPECT_EQ((*results[0].first)["a"].GetInt(), 1);
+            }
+        }
+    }
+}
+
+TEST_F(SelectorTest, test_empty_wildcard_validates_filter) {
+    for (const char *input : {"[]", "{}", "[[]]", "{\"empty\":{}}"}) {
+        JDocument *doc = nullptr;
+        ASSERT_EQ(dom_parse(nullptr, input, strlen(input), &doc), JSONUTIL_SUCCESS);
+        const std::unique_ptr<JDocument, decltype(&dom_free_doc)> document_owner(doc, dom_free_doc);
+        for (const char *path : {"$.*[?(@.a==1]", "$[*][?(@.a==1]",
+                                 "$.*[?(@.a==)]", "$[*][?(@.a==)]",
+                                 "$.*[ ?(@.a==1]", "$[*][ ?(@.a==1]"}) {
+            SCOPED_TRACE(input);
+            SCOPED_TRACE(path);
+            Selector selector;
+            EXPECT_NE(selector.getValues(*doc, path), JSONUTIL_SUCCESS);
+        }
+    }
+}
+
+TEST_F(SelectorTest, test_wildcard_attribute_filter_scalar_and_mixed_children) {
+    struct Case {
+        const char *document;
+        const char *path;
+    };
+    const std::array<Case, 4> cases{{
+        {"[1,\"text\",true,null]", nullptr},
+        {"[1,{\"pick\":{\"a\":1},\"keep\":2}]", "/1/pick"},
+        {"{\"scalar\":1,\"group\":{\"pick\":{\"a\":1},\"keep\":2}}", "/group/pick"},
+        {"[1,[{\"a\":1},{\"b\":2}]]", "/1/0"},
+    }};
+    for (const auto &test : cases) {
+        for (const char *query : {"$.*[?(@.a)]", "$[*][?(@.a)]"}) {
+            SCOPED_TRACE(test.document);
+            SCOPED_TRACE(query);
+            JDocument *doc = nullptr;
+            ASSERT_EQ(dom_parse(nullptr, test.document, strlen(test.document), &doc), JSONUTIL_SUCCESS);
+            const std::unique_ptr<JDocument, decltype(&dom_free_doc)> document_owner(doc, dom_free_doc);
+            Selector selector;
+            ASSERT_EQ(selector.getValues(*doc, query), JSONUTIL_SUCCESS);
+            const auto &results = selector.getResultSet();
+            EXPECT_EQ(results.size(), test.path ? 1u : 0u);
+            if (test.path && results.size() == 1) {
+                EXPECT_EQ(results[0].second, test.path);
+                ASSERT_TRUE(results[0].first->IsObject());
+                ASSERT_EQ(results[0].first->MemberCount(), 1u);
+                EXPECT_EQ((*results[0].first)["a"].GetInt(), 1);
+            }
+        }
+    }
+}
+
+TEST_F(SelectorTest, test_wildcard_filter_rooted_comparison) {
+    const char *input = "{\"limit\":1,\"groups\":[[{\"a\":1}],[{\"a\":2}]]}";
+    JDocument *doc = nullptr;
+    ASSERT_EQ(dom_parse(nullptr, input, strlen(input), &doc), JSONUTIL_SUCCESS);
+    const std::unique_ptr<JDocument, decltype(&dom_free_doc)> document_owner(doc, dom_free_doc);
+    for (const char *query : {"$.groups.*[ ?(@.a==$.limit)]", "$.groups[*][ ?(@.a==$.limit)]"}) {
+        SCOPED_TRACE(query);
+        Selector selector;
+        ASSERT_EQ(selector.getValues(*doc, query), JSONUTIL_SUCCESS);
+        const auto &results = selector.getResultSet();
+        EXPECT_EQ(results.size(), 1u);
+        if (results.size() == 1) {
+            EXPECT_EQ(results[0].second, "/groups/0/0");
+            EXPECT_EQ((*results[0].first)["a"].GetInt(), 1);
+        }
+    }
+}
+
+TEST_F(SelectorTest, test_wildcard_filter_validation_preserves_recursive_token_budget) {
+    const size_t count = json_get_max_recursive_descent_tokens();
+    std::ostringstream document;
+    document << "[";
+    for (size_t i = 0; i < count; ++i) {
+        if (i != 0) document << ",";
+        document << "[{\"a\":1,\"x\":" << i << "}]";
+    }
+    document << "]";
+    const std::string input = document.str();
+    JDocument *doc = nullptr;
+    ASSERT_EQ(dom_parse(nullptr, input.c_str(), input.size(), &doc), JSONUTIL_SUCCESS);
+    const std::unique_ptr<JDocument, decltype(&dom_free_doc)> document_owner(doc, dom_free_doc);
+    for (const char *query : {"$.*[?(@.a==1)]..x", "$[*][?(@.a==1)]..x"}) {
+        SCOPED_TRACE(query);
+        Selector selector;
+        ASSERT_EQ(selector.getValues(*doc, query), JSONUTIL_SUCCESS);
+        const auto &results = selector.getResultSet();
+        EXPECT_EQ(results.size(), count);
+        for (size_t i = 0; i < results.size(); ++i) {
+            const std::string expected_path = "/" + std::to_string(i) + "/0/x";
+            EXPECT_STREQ(results[i].second.c_str(), expected_path.c_str());
+            EXPECT_EQ(results[i].first->GetUint64(), i);
+        }
+    }
 }
 
 TEST_F(SelectorTest, test_filter_object_scalar_members) {
