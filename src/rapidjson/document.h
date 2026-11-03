@@ -2779,7 +2779,9 @@ private:
         m[remove_entry.prev].next = remove_entry.next;
         m[remove_entry.next].prev = remove_entry.prev;
         data_.o.size--;
-        remove_entry.~MemberHT();
+        // Empty the slot but keep it alive, since it is reused below.
+        keyTable->destroyHandle(remove_entry.name);
+        remove_entry.value.SetNull();
         //
         // Now, we need to scan from this ix until the next empty slot in case some other entries
         // need to be moved down (see Linear Probing)
