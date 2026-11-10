@@ -3015,6 +3015,45 @@ TEST_F(DomTest, testSelector_get_array_slice_v2path_wildcard) {
     EXPECT_EQ(rs6[0].first->GetInt(), 5);
 }
 
+struct LargeSliceStepCase {
+    const char *name;
+    const char *path;
+    int expected;
+};
+
+class DomLargeSliceStepTest : public DomTest, public ::testing::WithParamInterface<LargeSliceStepCase> {};
+
+TEST_P(DomLargeSliceStepTest, selects_expected_element) {
+    const LargeSliceStepCase &test_case = GetParam();
+    Selector selector;
+
+    ASSERT_EQ(selector.getValues(*doc4, test_case.path), JSONUTIL_SUCCESS);
+
+    const auto &results = selector.getResultSet();
+    ASSERT_EQ(results.size(), 1);
+    EXPECT_EQ(results[0].first->GetInt(), test_case.expected);
+}
+
+INSTANTIATE_TEST_SUITE_P(
+    BoundarySteps, DomLargeSliceStepTest,
+    ::testing::Values(
+        LargeSliceStepCase{"PositiveUint32Boundary", "$.e[0:5:4294967296]", 1},
+        LargeSliceStepCase{"NegativeUint32Boundary", "$.e[4:0:-4294967296]", 5},
+        LargeSliceStepCase{"Int64Max", "$.e[1:5:9223372036854775807]", 2},
+        LargeSliceStepCase{"NegativeInt64Max", "$.e[4:0:-9223372036854775807]", 5},
+        LargeSliceStepCase{"Int64Min", "$.e[4:0:-9223372036854775808]", 5}),
+    [](const ::testing::TestParamInfo<LargeSliceStepCase> &info) {
+        return info.param.name;
+    });
+
+TEST_F(DomTest, testSelector_rejects_out_of_range_slice_steps) {
+    Selector selector;
+
+    EXPECT_EQ(selector.getValues(*doc4, "$.e[0:5:9223372036854775808]"), JSONUTIL_INVALID_NUMBER);
+    EXPECT_EQ(selector.getValues(*doc4, "$.e[4:0:-9223372036854775809]"), JSONUTIL_INVALID_NUMBER);
+    EXPECT_EQ(selector.getValues(*doc4, "$.e[0:5:18446744073709551616]"), JSONUTIL_INVALID_NUMBER);
+}
+
 // Test array union
 TEST_F(DomTest, testSelector_get_array_union_v2path) {
     const char *path = "$.e[0,2]";

@@ -7,6 +7,7 @@
 #include <cstring>
 #include <algorithm>
 #include <iterator>
+#include <limits>
 
 #ifdef INSTRUMENT_V2PATH
 #define TRACE(level, msg) \
@@ -267,27 +268,41 @@ JsonUtilCode Lexer::scanInteger(int64_t &val) {
     if (next.type != Token::DIGIT && next.type != Token::PLUS && next.type != Token::MINUS)
         return JSONUTIL_VALUE_NOT_NUMBER;
 
-    if (next.type == Token::DIGIT) {
-        val = scanUnsignedInteger();
-    } else {
-        int sign = (next.type == Token::PLUS? 1 : -1);
+    bool negative = false;
+    if (next.type == Token::PLUS || next.type == Token::MINUS) {
+        negative = next.type == Token::MINUS;
         nextToken();  // skip the PLUS/MINUS sign symbol
         if (next.type != Token::DIGIT) return JSONUTIL_VALUE_NOT_NUMBER;
-        val = sign * scanUnsignedInteger();
     }
+
+    constexpr uint64_t max_positive = static_cast<uint64_t>(std::numeric_limits<int64_t>::max());
+    constexpr uint64_t max_negative_magnitude = max_positive + 1;
+    uint64_t magnitude;
+    JsonUtilCode rc = scanUnsignedInteger(negative ? max_negative_magnitude : max_positive, magnitude);
+    if (rc != JSONUTIL_SUCCESS) return rc;
+
+    if (negative && magnitude == max_negative_magnitude)
+        val = std::numeric_limits<int64_t>::min();
+    else if (negative)
+        val = -static_cast<int64_t>(magnitude);
+    else
+        val = static_cast<int64_t>(magnitude);
+
     nextToken();  // advance to the next token
     return JSONUTIL_SUCCESS;
 }
 
-int64_t Lexer::scanUnsignedInteger() {
+JsonUtilCode Lexer::scanUnsignedInteger(const uint64_t limit, uint64_t &val) {
     ValkeyModule_Assert(next.type == Token::DIGIT);
-    int64_t val = *next.strVal.data() - '0';
-    while (*p != '\0' && std::isdigit(*p)) {
-        val = val * 10 + (*p - '0');
+    val = *next.strVal.data() - '0';
+    while (std::isdigit(static_cast<unsigned char>(*p))) {
+        const uint64_t digit = *p - '0';
+        if (val > (limit - digit) / 10) return JSONUTIL_INVALID_NUMBER;
+        val = val * 10 + digit;
         p++;
     }
     TRACE("DEBUG", "scanUnsignedInteger(): " << val)
-    return val;
+    return JSONUTIL_SUCCESS;
 }
 
 /**
@@ -1643,12 +1658,12 @@ JsonUtilCode Selector::processSlice(int64_t start, int64_t end, const int64_t st
 
     JsonUtilCode rc = JSONUTIL_SUCCESS;
     if (step > 0) {
-        for (int i = start; i < end; i += step) {
+        for (int64_t i = start; i < end; i += std::min(step, end - i)) {
             rc = evalArrayMember(i);
             if (isSyntaxError(rc)) return rc;
         }
     } else {
-        for (int i = start; i > end; i += step) {
+        for (int64_t i = start; i > end; i += std::max(step, end - i)) {
             rc = evalArrayMember(i);
             if (isSyntaxError(rc)) return rc;
         }
