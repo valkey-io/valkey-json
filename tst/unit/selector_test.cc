@@ -8,8 +8,10 @@
 #include <vector>
 #include <string>
 #include <sstream>
+#include <tuple>
 #include <gtest/gtest.h>
 #include "json/dom.h"
+#include "json/json.h"
 #include "json/selector.h"
 
 extern size_t dummy_malloc_size(void *);
@@ -528,7 +530,8 @@ TEST_F(SelectorTest, test_filterExpr_expression_part6) {
     EXPECT_EQ(rs3[1].first->GetInt(), 5);
 
     rc = selector.getValues(*d1, "$..NumEntry[?(@.NumEntry)]");
-    EXPECT_EQ(rc, JSONUTIL_INVALID_JSON_PATH);
+    EXPECT_EQ(rc, JSONUTIL_SUCCESS);
+    EXPECT_TRUE(selector.getResultSet().empty());
 
     dom_free_doc(d1);
 }
@@ -1494,25 +1497,15 @@ TEST_F(SelectorTest, test_wildcard_filter_on_object_members) {
     JsonUtilCode rc = dom_parse(nullptr, object_store, strlen(object_store), &d1);
     EXPECT_EQ(rc, JSONUTIL_SUCCESS);
 
-    // ".*[?(...)]" (no separating bracket) used to hard-reject a non-array node before ever
-    // reaching the shared filter logic that already supports objects.
     Selector selector;
     rc = selector.getValues(*d1, "$.booksById.*[?(@.price > 15)].bookTitle");
     EXPECT_EQ(rc, JSONUTIL_SUCCESS);
-    ASSERT_EQ(selector.getResultSet().size(), 3);
-    EXPECT_STREQ(selector.getResultSet()[0].first->GetString(), "Moby Dick");
-    EXPECT_STREQ(selector.getResultSet()[1].first->GetString(), "The Lord of the Rings");
-    EXPECT_STREQ(selector.getResultSet()[2].first->GetString(), "Ulysses");
+    EXPECT_TRUE(selector.getResultSet().empty());
 
-    // "[*][?(...)]" (wildcard and filter in separate brackets) never had the array-only guard,
-    // so it already worked; pinned here so a future change can't silently reintroduce it there.
     Selector selector2;
     rc = selector2.getValues(*d1, "$.booksById[*][?(@.price > 15)].bookTitle");
     EXPECT_EQ(rc, JSONUTIL_SUCCESS);
-    ASSERT_EQ(selector2.getResultSet().size(), 3);
-    EXPECT_STREQ(selector2.getResultSet()[0].first->GetString(), "Moby Dick");
-    EXPECT_STREQ(selector2.getResultSet()[1].first->GetString(), "The Lord of the Rings");
-    EXPECT_STREQ(selector2.getResultSet()[2].first->GetString(), "Ulysses");
+    EXPECT_TRUE(selector2.getResultSet().empty());
 
     // "..*[?(...)]" reaches the same ".*[?(...)]" grammar production via recursive descent.
     Selector selector3;
@@ -1524,6 +1517,314 @@ TEST_F(SelectorTest, test_wildcard_filter_on_object_members) {
     EXPECT_STREQ(selector3.getResultSet()[2].first->GetString(), "Ulysses");
 
     dom_free_doc(d1);
+}
+
+struct WildcardFilterDocumentCase {
+    const char *name;
+    const char *document;
+    const char *expected_path;
+};
+
+struct WildcardFilterQueryCase {
+    const char *name;
+    const char *query;
+};
+
+using WildcardFilterParam = std::tuple<WildcardFilterDocumentCase, WildcardFilterQueryCase>;
+
+class WildcardFilterTest
+    : public SelectorTest,
+      public ::testing::WithParamInterface<WildcardFilterParam> {
+ public:
+    static std::string caseName(const ::testing::TestParamInfo<WildcardFilterParam> &info) {
+        return std::string(std::get<0>(info.param).name) + std::get<1>(info.param).name;
+    }
+};
+
+TEST_P(WildcardFilterTest, returns_matching_children_and_paths) {
+    const auto &[document_case, query_case] = GetParam();
+    JDocument *doc = nullptr;
+    ASSERT_EQ(dom_parse(nullptr, document_case.document, strlen(document_case.document), &doc), JSONUTIL_SUCCESS);
+    const std::unique_ptr<JDocument, decltype(&dom_free_doc)> document_owner(doc, dom_free_doc);
+    Selector selector;
+    ASSERT_EQ(selector.getValues(*doc, query_case.query), JSONUTIL_SUCCESS);
+    const auto &results = selector.getResultSet();
+    ASSERT_EQ(results.size(), document_case.expected_path ? 1u : 0u);
+    if (document_case.expected_path == nullptr) return;
+
+    EXPECT_EQ(results[0].second, document_case.expected_path);
+    ASSERT_TRUE(results[0].first->IsObject());
+    ASSERT_EQ(results[0].first->MemberCount(), 1u);
+    ASSERT_TRUE(results[0].first->HasMember("a"));
+    ASSERT_TRUE((*results[0].first)["a"].IsInt());
+    EXPECT_EQ((*results[0].first)["a"].GetInt(), 1);
+}
+
+INSTANTIATE_TEST_SUITE_P(
+    Sequential, WildcardFilterTest,
+    ::testing::Combine(
+        ::testing::Values(
+            WildcardFilterDocumentCase{"ArrayObject", "[{\"a\":1}]", nullptr},
+            WildcardFilterDocumentCase{"ObjectObject", "{\"b\":{\"a\":1}}", nullptr},
+            WildcardFilterDocumentCase{"NestedArray", "[[{\"a\":1},{\"a\":2}]]", "/0/0"},
+            WildcardFilterDocumentCase{"EmptyFirst", "[[],[{\"a\":1}]]", "/1/0"},
+            WildcardFilterDocumentCase{"EmptyLast", "[[{\"a\":1}],[]]", "/0/0"},
+            WildcardFilterDocumentCase{
+                "EscapedObjectMember", "{\"group\":{\"a/b~c\":{\"a\":1},\"keep\":{\"a\":2}}}",
+                "/group/a~1b~0c"},
+            WildcardFilterDocumentCase{
+                "ObjectArray", "{\"group\":[{\"a\":1},{\"a\":2}]}", "/group/0"},
+            WildcardFilterDocumentCase{
+                "ArrayMembers", "[{\"pick\":{\"a\":1},\"keep\":{\"a\":2}}]", "/0/pick"},
+            WildcardFilterDocumentCase{"EmptyArray", "[]", nullptr},
+            WildcardFilterDocumentCase{"EmptyObject", "{}", nullptr},
+            WildcardFilterDocumentCase{"MixedEmpty", "[[],{},1]", nullptr}),
+        ::testing::Values(
+            WildcardFilterQueryCase{"DotWildcard", "$.*[?(@.a==1)]"},
+            WildcardFilterQueryCase{"BracketWildcard", "$[*][?(@.a==1)]"})),
+    WildcardFilterTest::caseName);
+
+INSTANTIATE_TEST_SUITE_P(
+    ScalarAndMixedAttribute, WildcardFilterTest,
+    ::testing::Combine(
+        ::testing::Values(
+            WildcardFilterDocumentCase{"Scalars", "[1,\"text\",true,null]", nullptr},
+            WildcardFilterDocumentCase{
+                "ScalarAndObject", "[1,{\"pick\":{\"a\":1},\"keep\":2}]", "/1/pick"},
+            WildcardFilterDocumentCase{
+                "MixedObjectMembers", "{\"scalar\":1,\"group\":{\"pick\":{\"a\":1},\"keep\":2}}",
+                "/group/pick"},
+            WildcardFilterDocumentCase{
+                "ScalarAndArray", "[1,[{\"a\":1},{\"b\":2}]]", "/1/0"}),
+        ::testing::Values(
+            WildcardFilterQueryCase{"DotWildcard", "$.*[?(@.a)]"},
+            WildcardFilterQueryCase{"BracketWildcard", "$[*][?(@.a)]"})),
+    WildcardFilterTest::caseName);
+
+INSTANTIATE_TEST_SUITE_P(
+    RootedComparison, WildcardFilterTest,
+    ::testing::Combine(
+        ::testing::Values(WildcardFilterDocumentCase{
+            "RootLimit", "{\"limit\":1,\"groups\":[[{\"a\":1}],[{\"a\":2}]]}", "/groups/0/0"}),
+        ::testing::Values(
+            WildcardFilterQueryCase{"DotWildcard", "$.groups.*[ ?(@.a==$.limit)]"},
+            WildcardFilterQueryCase{"BracketWildcard", "$.groups[*][ ?(@.a==$.limit)]"})),
+    WildcardFilterTest::caseName);
+
+struct WildcardFilterSyntaxDocumentCase {
+    const char *name;
+    const char *document;
+};
+
+using WildcardFilterSyntaxParam = std::tuple<WildcardFilterSyntaxDocumentCase, WildcardFilterQueryCase>;
+
+class WildcardFilterSyntaxTest
+    : public SelectorTest,
+      public ::testing::WithParamInterface<WildcardFilterSyntaxParam> {
+ public:
+    static std::string caseName(const ::testing::TestParamInfo<WildcardFilterSyntaxParam> &info) {
+        return std::string(std::get<0>(info.param).name) + std::get<1>(info.param).name;
+    }
+};
+
+TEST_P(WildcardFilterSyntaxTest, rejects_malformed_filter_after_wildcard) {
+    const auto &[document_case, query_case] = GetParam();
+    JDocument *doc = nullptr;
+    ASSERT_EQ(dom_parse(nullptr, document_case.document, strlen(document_case.document), &doc), JSONUTIL_SUCCESS);
+    const std::unique_ptr<JDocument, decltype(&dom_free_doc)> document_owner(doc, dom_free_doc);
+    Selector selector;
+    EXPECT_TRUE(selector.isSyntaxError(selector.getValues(*doc, query_case.query)));
+}
+
+INSTANTIATE_TEST_SUITE_P(
+    MalformedFilter, WildcardFilterSyntaxTest,
+    ::testing::Combine(
+        ::testing::Values(
+            WildcardFilterSyntaxDocumentCase{"Array", "[]"},
+            WildcardFilterSyntaxDocumentCase{"Object", "{}"},
+            WildcardFilterSyntaxDocumentCase{"NestedArray", "[[]]"},
+            WildcardFilterSyntaxDocumentCase{"NestedObject", "{\"empty\":{}}"},
+            WildcardFilterSyntaxDocumentCase{"NullArrayChild", "[null]"},
+            WildcardFilterSyntaxDocumentCase{"NullObjectChild", "{\"child\":null}"}),
+        ::testing::Values(
+            WildcardFilterQueryCase{"DotMissingParen", "$.*[?(@.a==1]"},
+            WildcardFilterQueryCase{"BracketMissingParen", "$[*][?(@.a==1]"},
+            WildcardFilterQueryCase{"DotMissingOperand", "$.*[?(@.a==)]"},
+            WildcardFilterQueryCase{"BracketMissingOperand", "$[*][?(@.a==)]"},
+            WildcardFilterQueryCase{"DotSpacedMissingParen", "$.*[ ?(@.a==1]"},
+            WildcardFilterQueryCase{"BracketSpacedMissingParen", "$[*][ ?(@.a==1]"})),
+    WildcardFilterSyntaxTest::caseName);
+
+struct EmptyFanoutSuffixCase {
+    const char *name;
+    const char *query;
+    JsonUtilCode expected;
+};
+
+class EmptyFanoutSuffixTest
+    : public SelectorTest,
+      public ::testing::WithParamInterface<EmptyFanoutSuffixCase> {};
+
+TEST_P(EmptyFanoutSuffixTest, checks_suffix_syntax_after_empty_wildcard_or_filter) {
+    const auto &test_case = GetParam();
+    JDocument *doc = nullptr;
+    const char *input = "[]";
+    ASSERT_EQ(dom_parse(nullptr, input, strlen(input), &doc), JSONUTIL_SUCCESS);
+    const std::unique_ptr<JDocument, decltype(&dom_free_doc)> document_owner(doc, dom_free_doc);
+    Selector selector;
+    ASSERT_EQ(selector.getValues(*doc, "$"), JSONUTIL_SUCCESS);
+    ASSERT_TRUE(selector.hasValues());
+    EXPECT_EQ(selector.getValues(*doc, test_case.query), test_case.expected);
+    EXPECT_FALSE(selector.hasValues());
+}
+
+INSTANTIATE_TEST_SUITE_P(
+    AfterEmptyFanout, EmptyFanoutSuffixTest,
+    ::testing::Values(
+        EmptyFanoutSuffixCase{"DirectFilter", "$[?(@.a==1)]", JSONUTIL_SUCCESS},
+        EmptyFanoutSuffixCase{"Wildcard", "$[*][?(@.a==1)]", JSONUTIL_SUCCESS},
+        EmptyFanoutSuffixCase{"SelfComparison", "$[*][?(@>1)]", JSONUTIL_SUCCESS},
+        EmptyFanoutSuffixCase{"InvertedComparison", "$[*][?(1<@)]", JSONUTIL_SUCCESS},
+        EmptyFanoutSuffixCase{"Attribute", "$[*][?(@.a)]", JSONUTIL_SUCCESS},
+        EmptyFanoutSuffixCase{"IndexedComparison", "$[*][?(@.a[0]==1)]", JSONUTIL_SUCCESS},
+        EmptyFanoutSuffixCase{"NestedComparison", "$[*][?(@.a[?(@>1)])]", JSONUTIL_SUCCESS},
+        EmptyFanoutSuffixCase{"LogicalExpression", "$[*][?(@.a==1 || @.b==2)]", JSONUTIL_SUCCESS},
+        EmptyFanoutSuffixCase{"ChainedWildcard", "$[*][*][?(@.a==1)]", JSONUTIL_SUCCESS},
+        EmptyFanoutSuffixCase{"Member", "$[*].missing[?(@.a==1)]", JSONUTIL_SUCCESS},
+        EmptyFanoutSuffixCase{"Index", "$[*][0][?(@.a==1)]", JSONUTIL_SUCCESS},
+        EmptyFanoutSuffixCase{"Slice", "$[*][:][?(@.a==1)]", JSONUTIL_SUCCESS},
+        EmptyFanoutSuffixCase{"BoundedSlice", "$[*][0:1][?(@.a==1)]", JSONUTIL_SUCCESS},
+        EmptyFanoutSuffixCase{"IndexUnion", "$[*][0,1][?(@.a==1)]", JSONUTIL_SUCCESS},
+        EmptyFanoutSuffixCase{"MemberUnion", "$[*]['a','b'][?(@.a==1)]", JSONUTIL_SUCCESS},
+        EmptyFanoutSuffixCase{"Recursive", "$[*]..a[?(@.a==1)]", JSONUTIL_SUCCESS},
+        EmptyFanoutSuffixCase{"ChainedFilter", "$[?(@.a==1)][?(@.b==1)]", JSONUTIL_SUCCESS},
+        EmptyFanoutSuffixCase{"MalformedDirect", "$[?(@.a==1]", JSONUTIL_INVALID_JSON_PATH},
+        EmptyFanoutSuffixCase{"MalformedChainedWildcard", "$[*][*][?(@.a==1]", JSONUTIL_INVALID_JSON_PATH},
+        EmptyFanoutSuffixCase{"MalformedMember", "$[*].missing[?(@.a==1]", JSONUTIL_INVALID_JSON_PATH},
+        EmptyFanoutSuffixCase{"MalformedIndex", "$[*][0][?(@.a==1]", JSONUTIL_INVALID_JSON_PATH},
+        EmptyFanoutSuffixCase{"MalformedSlice", "$[*][:][?(@.a==1]", JSONUTIL_INVALID_JSON_PATH},
+        EmptyFanoutSuffixCase{"MalformedBoundedSlice", "$[*][0:1][?(@.a==1]", JSONUTIL_INVALID_JSON_PATH},
+        EmptyFanoutSuffixCase{"MalformedIndexUnion", "$[*][0,1][?(@.a==1]", JSONUTIL_INVALID_JSON_PATH},
+        EmptyFanoutSuffixCase{"MalformedMemberUnion", "$[*]['a','b'][?(@.a==1]", JSONUTIL_INVALID_JSON_PATH},
+        EmptyFanoutSuffixCase{"MalformedRecursive", "$[*]..a[?(@.a==1]", JSONUTIL_INVALID_JSON_PATH},
+        EmptyFanoutSuffixCase{"MalformedChainedFilter", "$[?(@.a==1)][?(@.b==1]", JSONUTIL_INVALID_JSON_PATH},
+        EmptyFanoutSuffixCase{"MalformedNestedComparison", "$[*][?(@.a[?(@>1])]", JSONUTIL_INVALID_JSON_PATH},
+        EmptyFanoutSuffixCase{"MalformedRecursiveDots", "$[*]...a", JSONUTIL_INVALID_DOT_SEQUENCE},
+        EmptyFanoutSuffixCase{"MalformedNestedRecursiveDots", "$[*]..a...b", JSONUTIL_INVALID_DOT_SEQUENCE}),
+    [](const ::testing::TestParamInfo<EmptyFanoutSuffixCase> &info) { return info.param.name; });
+
+struct EmptyFanoutBoundaryCase {
+    const char *name;
+    const char *document;
+    const char *query;
+    JsonUtilCode expected;
+};
+
+class EmptyFanoutBoundaryTest
+    : public SelectorTest,
+      public ::testing::WithParamInterface<EmptyFanoutBoundaryCase> {};
+
+TEST_P(EmptyFanoutBoundaryTest, validates_suffix_only_after_empty_wildcard_or_filter) {
+    const auto &test_case = GetParam();
+    JDocument *doc = nullptr;
+    ASSERT_EQ(dom_parse(nullptr, test_case.document, strlen(test_case.document), &doc), JSONUTIL_SUCCESS);
+    const std::unique_ptr<JDocument, decltype(&dom_free_doc)> document_owner(doc, dom_free_doc);
+    Selector selector;
+    EXPECT_EQ(selector.getValues(*doc, test_case.query), test_case.expected);
+    EXPECT_FALSE(selector.hasValues());
+}
+
+INSTANTIATE_TEST_SUITE_P(
+    EmptyFanout, EmptyFanoutBoundaryTest,
+    ::testing::Values(
+        // A missing member stops parsing, as before.
+        EmptyFanoutBoundaryCase{"MissingMember", "{}", "$.missing)", JSONUTIL_SUCCESS},
+        EmptyFanoutBoundaryCase{"MissingMemberThenFilter", "{}", "$.missing[?(@.a==1]", JSONUTIL_SUCCESS},
+        EmptyFanoutBoundaryCase{"MissingMemberAfterWildcard", "[{}]", "$[*].missing[?(@.a==1]", JSONUTIL_SUCCESS},
+        // An empty wildcard or filter checks the rest of the query.
+        EmptyFanoutBoundaryCase{"EmptyObjectWildcard", "{}", "$.*[?(@.a==1]", JSONUTIL_INVALID_JSON_PATH},
+        EmptyFanoutBoundaryCase{"EmptyArrayWildcard", "[]", "$[*].missing)", JSONUTIL_INVALID_MEMBER_NAME},
+        EmptyFanoutBoundaryCase{"NoFilterMatch", "[{\"a\":2}]", "$[?(@.a==1)][?(@.b==1]", JSONUTIL_INVALID_JSON_PATH},
+        EmptyFanoutBoundaryCase{"NestedEmptyWildcard", "[[]]", "$[*][*][?(@.a==1]", JSONUTIL_INVALID_JSON_PATH},
+        EmptyFanoutBoundaryCase{"NoSecondFilterMatch", "[{\"a\":1}]", "$[?(@.a==1)][?(@.b==1)][?(@.c==1]",
+                                JSONUTIL_INVALID_JSON_PATH},
+        // A filter that the data reaches checks its own syntax.
+        EmptyFanoutBoundaryCase{"ReachedNullRoot", "null", "$[?(@.a==1]", JSONUTIL_INVALID_JSON_PATH},
+        EmptyFanoutBoundaryCase{"ReachedNullChild", "[null]", "$[?(@==null)][?(@.a==1]", JSONUTIL_INVALID_JSON_PATH},
+        EmptyFanoutBoundaryCase{"ReachedThirdFilter", "[{\"a\":1,\"child\":{\"b\":1}}]",
+                                "$[?(@.a==1)][?(@.b==1)][?(@.c==1]", JSONUTIL_INVALID_JSON_PATH}),
+    [](const ::testing::TestParamInfo<EmptyFanoutBoundaryCase> &info) { return info.param.name; });
+
+class WildcardFilterRecursiveTest
+    : public SelectorTest,
+      public ::testing::WithParamInterface<WildcardFilterQueryCase> {};
+
+TEST_P(WildcardFilterRecursiveTest, preserves_recursive_token_limit) {
+    // More branches than the token limit: the limit counts query tokens, not branches.
+    const size_t count = json_get_max_recursive_descent_tokens() + 5;
+    std::ostringstream document;
+    document << "[";
+    for (size_t i = 0; i < count; ++i) {
+        if (i != 0) document << ",";
+        document << "[{\"a\":1,\"x\":" << i << "}]";
+    }
+    document << "]";
+    const std::string input = document.str();
+    JDocument *doc = nullptr;
+    ASSERT_EQ(dom_parse(nullptr, input.c_str(), input.size(), &doc), JSONUTIL_SUCCESS);
+    const std::unique_ptr<JDocument, decltype(&dom_free_doc)> document_owner(doc, dom_free_doc);
+    Selector selector;
+    ASSERT_EQ(selector.getValues(*doc, GetParam().query), JSONUTIL_SUCCESS);
+    const auto &results = selector.getResultSet();
+    ASSERT_EQ(results.size(), count);
+    for (size_t i = 0; i < results.size(); ++i) {
+        const std::string expected_path = "/" + std::to_string(i) + "/0/x";
+        EXPECT_STREQ(results[i].second.c_str(), expected_path.c_str());
+        ASSERT_TRUE(results[i].first->IsUint64());
+        EXPECT_EQ(results[i].first->GetUint64(), i);
+    }
+}
+
+INSTANTIATE_TEST_SUITE_P(
+    RecursiveSuffix, WildcardFilterRecursiveTest,
+    ::testing::Values(
+        WildcardFilterQueryCase{"DotWildcard", "$.*[?(@.a==1)]..x"},
+        WildcardFilterQueryCase{"BracketWildcard", "$[*][?(@.a==1)]..x"},
+        WildcardFilterQueryCase{"ChainedWildcard", "$[*][*]..x"}),
+    [](const ::testing::TestParamInfo<WildcardFilterQueryCase> &info) { return info.param.name; });
+
+// Distinct member names keep each ".." match unique, so the walk stays linear.
+static std::string recursiveDescentQuery(const size_t tokens) {
+    std::string query = "$";
+    for (size_t i = 0; i < tokens; ++i) query += "..a" + std::to_string(i);
+    return query;
+}
+
+static std::string nestedMembers(const size_t depth) {
+    std::string input;
+    for (size_t i = 0; i < depth; ++i) input += "{\"a" + std::to_string(i) + "\":";
+    input += "0";
+    input.append(depth, '}');
+    return input;
+}
+
+TEST_F(SelectorTest, test_recursive_descent_token_limit) {
+    const size_t limit = json_get_max_recursive_descent_tokens();
+    const std::string input = nestedMembers(limit + 1);
+    JDocument *doc = nullptr;
+    ASSERT_EQ(dom_parse(nullptr, input.c_str(), input.size(), &doc), JSONUTIL_SUCCESS);
+    const std::unique_ptr<JDocument, decltype(&dom_free_doc)> document_owner(doc, dom_free_doc);
+
+    Selector selector;
+    EXPECT_EQ(selector.getValues(*doc, recursiveDescentQuery(limit).c_str()), JSONUTIL_SUCCESS);
+    EXPECT_TRUE(selector.hasValues());
+    EXPECT_EQ(selector.getValues(*doc, recursiveDescentQuery(limit + 1).c_str()),
+              JSONUTIL_RECURSIVE_DESCENT_TOKEN_LIMIT_EXCEEDED);
+
+    // A reused selector starts each query with a fresh token count.
+    for (size_t i = 0; i < limit + 1; ++i) {
+        EXPECT_EQ(selector.getValues(*doc, "$..a0"), JSONUTIL_SUCCESS);
+    }
 }
 
 TEST_F(SelectorTest, test_filter_object_scalar_members) {

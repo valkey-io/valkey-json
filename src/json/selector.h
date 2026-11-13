@@ -88,6 +88,7 @@ class Lexer {
     void skipSpaces();
     void unescape(const std::string_view &input, jsn::stringstream &ss);
     size_t getRecursiveDescentTokens() { return rdTokens; }
+    void setRecursiveDescentTokens(const size_t count) { rdTokens = count; }
     const char *p;  // current position in path
     Token next;
 
@@ -158,6 +159,8 @@ class Selector {
             , uniqueResultSet()
             , mode(READ)
             , isRecursiveSearch(false)
+            , querySyntaxParsed(false)
+            , emptyFanout(false)
             , error(JSONUTIL_SUCCESS)
     {}
 
@@ -242,12 +245,14 @@ class Selector {
                 , currPathPtr(nullptr)
                 , currToken()
                 , currPathDepth(0)
+                , rdTokens(0)
         {}
         JValue *currNode;
         jsn::string nodePath;
         const char *currPathPtr;
         Token currToken;
         size_t currPathDepth;
+        size_t rdTokens;  // recursive descent tokens scanned on this traversal branch
     };
     void snapshotState(State &state) {
         state.currNode = node;
@@ -255,6 +260,7 @@ class Selector {
         state.currPathPtr = lex.p;
         state.currToken = lex.next;
         state.currPathDepth = currPathDepth;
+        state.rdTokens = lex.getRecursiveDescentTokens();
     }
     void restoreState(const State &state) {
         node = state.currNode;
@@ -262,6 +268,7 @@ class Selector {
         lex.p = state.currPathPtr;
         lex.next = state.currToken;
         currPathDepth = state.currPathDepth;
+        lex.setRecursiveDescentTokens(state.rdTokens);
     }
 
     /***
@@ -327,7 +334,6 @@ class Selector {
     JsonUtilCode processWildcard();
     JsonUtilCode processWildcardKey();
     JsonUtilCode processWildcardIndex();
-    JsonUtilCode parseWildcardFilter();
     JsonUtilCode processSubscript(const int64_t idx);
     JsonUtilCode processSlice(int64_t start, int64_t end, const int64_t step = 1);
     JsonUtilCode processUnion(jsn::vector<int64_t> union_indices);
@@ -356,6 +362,7 @@ class Selector {
     void setError(const JsonUtilCode error_code) { error = error_code; }
     JsonUtilCode getError() const { return error; }
     void escape_member_name_for_json_pointer(const std::string_view &member_name, std::ostringstream &oss);
+    bool validateRemainingPathSyntax() const { return isV2Path && emptyFanout && !querySyntaxParsed; }
 
     JValue *root;          // the root value, aka the document
     JValue *node;          // current node (value) in the JSON tree
@@ -377,6 +384,8 @@ class Selector {
 
     Mode mode;
     bool isRecursiveSearch;  // if we are doing a recursive search we do not wish to add new fields
+    bool querySyntaxParsed;  // a branch parsed the path to END, so the remaining syntax is valid
+    bool emptyFanout;  // a wildcard or filter selected nothing; check the rest of the query
     JsonUtilCode error;  // JSONUTIL_SUCCESS indicates no error
 };
 

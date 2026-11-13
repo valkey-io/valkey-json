@@ -70,46 +70,55 @@ class RecursionDepthTracker {
  *   DotPath             ::= "." QualifiedPath
  *   QualifiedPath       ::= QualifiedPathElement RelativePath
  *   QualifiedPathElement ::= Key | BracketPathElement
- *   Key                 ::= "*" [ [ "." ] WildcardFilter ] | UnquotedMemberName
- *   WildcardFilter      ::=  "[" "?" "(" FilterExpr ")" "]"
+ *   Key                 ::= "*" ["."] | UnquotedMemberName
  *   UnquotedMemberName  ::= char { char }
  *   BracketPath         ::= BracketPathElement [ RelativePath ]
- *   BracketPathElement  ::= "[" {SPACE} ( WildcardInBrackets | ((NameInBrackets | IndexExpr) ) {SPACE} "]")
- *   WildcardInBrackets  ::= "*" {SPACE} "]" [ "[" {SPACE} "?" "(" FilterExpr ")" {SPACE} "]" ]
- *   NameInBrackets      ::= QuotedMemberName [ ({SPACE} "," {SPACE} QuotedMemberName)+ ]
+ *   BracketPathElement  ::= WildcardInBrackets | NameInBrackets | IndexExpr
+ *   WildcardInBrackets  ::= "[" {SPACE} "*" {SPACE} "]"
+ *   NameInBrackets      ::= "[" {SPACE} QuotedMemberName [ ({SPACE} "," {SPACE} QuotedMemberName)+ ] {SPACE} "]"
  *   QuotedMemberName    ::= "\"" {char} "\"" | "'" {char} "'"
  *   IndexExpr           ::= Filter | SliceStartsWithColon | SliceOrUnionOrIndex
- *   SliceStartsWithColon ::= {SPACE} ":" {SPACE} [ ":" {SPACE} [Step] | EndAndStep ] ]
- *   EndAndStep          ::= End [{SPACE} ":" {SPACE} [Step]] ]
+ *   SliceStartsWithColon ::= "[" {SPACE} ":" {SPACE} [EndAndStep | ":" {SPACE} [Step]] {SPACE} "]"
+ *   EndAndStep          ::= End {SPACE} [":" {SPACE} [Step]]
  *   SliceOrUnionOrIndex ::= SliceStartsWithInteger | Index | UnionOfIndexes
- *   SliceStartsWithInteger ::= Start {SPACE} ":" {SPACE} [ ":" {SPACE} [Step] | EndAndStep
- *   Index               ::= Integer
+ *   SliceStartsWithInteger ::= "[" {SPACE} Start {SPACE} ":" {SPACE} [EndAndStep | ":" {SPACE} [Step]] {SPACE} "]"
+ *   Index               ::= "[" {SPACE} Integer {SPACE} "]"
  *   Integer             ::= ["+" | "-"] digit {digit}
  *   Start               ::= Integer
  *   End                 ::= Integer
  *   Step                ::= Integer
- *   UnionOfIndexes      ::= Integer ({SPACE} "," {SPACE} Integer)+
- *   Filter              ::= "?" "(" FilterExpr ")"
- *   FilterExpr          ::= {SPACE} Term { {SPACE} "||" {SPACE} Term {SPACE} }
+ *   UnionOfIndexes      ::= "[" {SPACE} Integer ({SPACE} "," {SPACE} Integer)+ {SPACE} "]"
+ *   Filter              ::= "[" {SPACE} "?" "(" FilterExpr ")" {SPACE} "]"
+ *   FilterExpr          ::= {SPACE} Term { {SPACE} "||" {SPACE} Term } {SPACE}
  *   Term                ::= Factor { {SPACE} "&&" {SPACE} Factor }
- *   Factor              ::= ( "@" ( MemberName | ( [ MemberName ] ComparisonOp ComparisonValue) ) ) |
- *                           ( ComparisonValue ComparisonOp "@" ( MemberName | ( [ MemberName ]) ) ) |
+ *   Factor              ::= ( "@" ( MemberName {SPACE} [MemberIndex ComparisonOp ComparisonValue |
+ *                           ComparisonOp ComparisonValue | NestedAnyMatch] | ComparisonOp ComparisonValue ) ) |
+ *                           ( ComparisonValue ComparisonOp "@" {SPACE} [MemberName [MemberIndex]] ) |
  *                           ( {SPACE} "(" FilterExpr ")" {SPACE} )
+ *   MemberIndex         ::= "[" {SPACE} Integer "]"
+ *   NestedAnyMatch      ::= "[" {SPACE} "?" {SPACE} "(" SelfComparison {SPACE} ")" {SPACE} "]"
+ *   SelfComparison      ::= "@" ComparisonOp ComparisonValue | ComparisonValue ComparisonOp "@"
  *   MemberName          ::= ("." (UnquotedMemberName | BracketedMemberName)) | BracketedMemberName
  *   BracketedMemberName ::= "[" {SPACE} QuotedMemberName {SPACE} "]"
- *   ComparisonOp        ::= {SPACE} "<" | "<="] | ">" | ">=" | "==" | "!=" {SPACE}
+ *   ComparisonOp        ::= {SPACE} ("<" | "<=" | ">" | ">=" | "==" | "!=") {SPACE}
  *   ComparisonValue     ::= "null" | Bool | Number | QuotedString | PartialPath
  *   Bool                ::= "true" | "false"
- *   Number              ::= Integer | MemberNameInFilter | ScientificNumber
- *   QuotedString        ::= "\"" {char} "\""
+ *   Number              ::= ["-"] ("0" | NonZeroDigit {digit}) ["." digit {digit}]
+ *                           [("e" | "E") ["+" | "-"] digit {digit}]
+ *   NonZeroDigit        ::= "1" | "2" | "3" | "4" | "5" | "6" | "7" | "8" | "9"
+ *   digit               ::= "0" | NonZeroDigit
+ *   QuotedString        ::= QuotedMemberName
  *   PartialPath         ::= "$" RelativePath
  *   SPACE               ::= ' '
+ *
+ * PartialPath brackets accept one quoted name or signed index without spaces.
  */
 
 void Lexer::init(const char *path) {
     p = path;
     this->path = path;
     next.type = Token::UNKNOWN;
+    rdTokens = 0;
 }
 
 Token::TokenType Lexer::peekToken() const {
@@ -932,6 +941,8 @@ JsonUtilCode Selector::init(JValue &root, const char *path, const Mode mode) {
     maxPathDepth = 0;
     currPathDepth = 0;
     error = JSONUTIL_SUCCESS;
+    querySyntaxParsed = false;
+    emptyFanout = false;
 
     lex.nextToken();  // initial pull
     return JSONUTIL_SUCCESS;
@@ -962,6 +973,7 @@ bool Selector::isSyntaxError(JsonUtilCode code) const {
             code == JSONUTIL_INVALID_MEMBER_NAME ||
             code == JSONUTIL_INVALID_NUMBER ||
             code == JSONUTIL_INVALID_IDENTIFIER ||
+            code == JSONUTIL_INVALID_DOT_SEQUENCE ||
             code == JSONUTIL_EMPTY_EXPR_TOKEN ||
             code == JSONUTIL_ARRAY_INDEX_NOT_NUMBER ||
             code == JSONUTIL_STEP_CANNOT_NOT_BE_ZERO ||
@@ -975,7 +987,11 @@ bool Selector::isSyntaxError(JsonUtilCode code) const {
  * SupportedPath       ::= ["$" | "."] RelativePath
  */
 JsonUtilCode Selector::parseSupportedPath() {
-    if (node == nullptr || lex.matchToken(Token::END)) return JSONUTIL_SUCCESS;
+    if (node == nullptr && !validateRemainingPathSyntax()) return JSONUTIL_SUCCESS;
+    if (lex.matchToken(Token::END)) {
+        querySyntaxParsed = true;
+        return JSONUTIL_SUCCESS;
+    }
 
     if (lex.matchToken(Token::DOLLAR)) {
         if (!ENABLE_V2_SYNTAX) return JSONUTIL_INVALID_JSON_PATH;
@@ -988,9 +1004,16 @@ JsonUtilCode Selector::parseSupportedPath() {
 
 /**
  *  RelativePath        ::= empty | RecursivePath | DotPath | BracketPath | QualifiedPath
+ *
+ * After an empty wildcard or filter, a branch with no node still parses the remaining path once,
+ * so syntax errors are reported.
  */
 JsonUtilCode Selector::parseRelativePath() {
-    if (node == nullptr || lex.matchToken(Token::END)) return JSONUTIL_SUCCESS;
+    if (node == nullptr && !validateRemainingPathSyntax()) return JSONUTIL_SUCCESS;
+    if (lex.matchToken(Token::END)) {
+        querySyntaxParsed = true;
+        return JSONUTIL_SUCCESS;
+    }
 
     switch (lex.currToken().type) {
         case Token::END: return JSONUTIL_SUCCESS;
@@ -1009,10 +1032,18 @@ JsonUtilCode Selector::parseRecursivePath() {
     if (!lex.matchToken(Token::DOTDOT)) ValkeyModule_Assert(false);
     CHECK_RECURSIVE_DESCENT_TOKENS();
 
-    JsonUtilCode rc = recursiveSearch(*node, lex.p);
-    if (rc != JSONUTIL_SUCCESS) return rc;
-    dedupe();
-    return JSONUTIL_SUCCESS;
+    // 3+ dots are ambiguous and therefore invalid
+    if (lex.currToken().type == Token::DOTDOT || lex.currToken().type == Token::DOT) {
+        return JSONUTIL_INVALID_DOT_SEQUENCE;
+    }
+    if (node != nullptr) {
+        JsonUtilCode rc = recursiveSearch(*node, lex.p);
+        if (rc != JSONUTIL_SUCCESS) return rc;
+        dedupe();
+    }
+    // Check the syntax of the remaining path when no node was searched
+    const JsonUtilCode rc = parseSupportedPath();
+    return isSyntaxError(rc) ? rc : JSONUTIL_SUCCESS;
 }
 
 /**
@@ -1024,10 +1055,6 @@ JsonUtilCode Selector::parseRecursivePath() {
 JsonUtilCode Selector::recursiveSearch(JValue &v, const char *p) {
     TRACE("DEBUG", "recursiveSearch curr token " << lex.currToken().type << ", curr path: "<< lex.p
         << ", nodePath: " << nodePath << ", currPathDepth: " << currPathDepth << ", maxPathDepth: " << maxPathDepth)
-    if (lex.currToken().type == Token::DOTDOT || lex.currToken().type == Token::DOT) {
-        TRACE("DEBUG", "We have an ambiguous (and therefore invalid) sequence of 3+ dots")
-        return JSONUTIL_INVALID_DOT_SEQUENCE;
-    }
     if (!v.IsObject() && !v.IsArray()) {
         // Null out the current node to signal termination of the current path search.
         node = nullptr;
@@ -1091,15 +1118,14 @@ JsonUtilCode Selector::parseDotPath() {
 JsonUtilCode Selector::parseBracketPath() {
     JsonUtilCode rc = parseBracketPathElement();
     if (rc != JSONUTIL_SUCCESS) return rc;
-    if (lex.currToken().type == Token::END) return JSONUTIL_SUCCESS;
     return parseRelativePath();
 }
 
 /**
- *   BracketPathElement  ::= "[" {SPACE} ( WildcardInBrackets | ((NameInBrackets | IndexExpr) ) {SPACE} "]")
- *   WildcardInBrackets  ::= "*" {SPACE} "]" [ "[" {SPACE} "?" "(" FilterExpr ")" {SPACE} "]" ]
- *   NameInBrackets      ::= QuotedMemberName [ ({SPACE} "," {SPACE} QuotedMemberName)+ ]
- *   QuotedMemberName    ::= """ {char} """ | "'" {char} "'"
+ *   BracketPathElement  ::= WildcardInBrackets | NameInBrackets | IndexExpr
+ *   WildcardInBrackets  ::= "[" {SPACE} "*" {SPACE} "]"
+ *   NameInBrackets      ::= "[" {SPACE} QuotedMemberName [ ({SPACE} "," {SPACE} QuotedMemberName)+ ] {SPACE} "]"
+ *   QuotedMemberName    ::= "\"" {char} "\"" | "'" {char} "'"
  *   IndexExpr           ::= Filter | SliceStartsWithColon | SliceOrUnionOrIndex
  */
 JsonUtilCode Selector::parseBracketPathElement() {
@@ -1128,33 +1154,18 @@ JsonUtilCode Selector::parseBracketPathElement() {
 }
 
 /**
- *   WildcardInBrackets  ::= "*" {SPACE} "]" [ "[" {SPACE} "?" "(" FilterExpr ")" {SPACE} "]" ]
+ *   WildcardInBrackets  ::= "[" {SPACE} "*" {SPACE} "]"
  */
 JsonUtilCode Selector::parseWildcardInBrackets() {
     if (!lex.matchToken(Token::WILDCARD, true)) return JSONUTIL_INVALID_JSON_PATH;
     if (!lex.matchToken(Token::RBRACKET, true)) return JSONUTIL_INVALID_JSON_PATH;
 
-    if (lex.currToken().type == Token::LBRACKET && lex.peekToken() == Token::QUESTION_MARK) {
-        if (!lex.matchToken(Token::LBRACKET, true)) return JSONUTIL_INVALID_JSON_PATH;
-        lex.skipSpaces();
-        if (!lex.matchToken(Token::QUESTION_MARK)) return JSONUTIL_INVALID_JSON_PATH;
-        if (!lex.matchToken(Token::LPAREN)) return JSONUTIL_INVALID_JSON_PATH;
-
-        jsn::vector<int64_t> result;  // candidate indexes/ordinals for the current container
-        JsonUtilCode rc = parseFilterExpr(result);
-        if (rc != JSONUTIL_SUCCESS) return rc;
-
-        if (!lex.matchToken(Token::RPAREN, true)) return JSONUTIL_INVALID_JSON_PATH;
-        if (!lex.matchToken(Token::RBRACKET, true)) return JSONUTIL_INVALID_JSON_PATH;
-        return processFilterResult(result);
-    } else {
-        return processWildcard();
-    }
+    return processWildcard();
 }
 
 /**
- *   NameInBrackets      ::= QuotedMemberName { {SPACE} "," {SPACE} QuotedMemberName }
- *   QuotedMemberName    ::= """ {char} """ | "'" {char} "'"
+ *   NameInBrackets      ::= "[" {SPACE} QuotedMemberName { {SPACE} "," {SPACE} QuotedMemberName } {SPACE} "]"
+ *   QuotedMemberName    ::= "\"" {char} "\"" | "'" {char} "'"
  */
 JsonUtilCode Selector::parseNameInBrackets() {
     jsn::vector<jsn::string> member_names;
@@ -1178,6 +1189,7 @@ JsonUtilCode Selector::parseNameInBrackets() {
 }
 
 JsonUtilCode Selector::processUnionOfMembers(const jsn::vector<jsn::string> &member_names) {
+    if (node == nullptr) return JSONUTIL_SUCCESS;
     if (member_names.size() == 1) {
         StringViewHelper member_name;
         member_name.setInternalString(member_names[0]);
@@ -1209,7 +1221,7 @@ JsonUtilCode Selector::processUnionOfMembers(const jsn::vector<jsn::string> &mem
 }
 
 /**
- *   QuotedMemberName   ::= """ {char} """ | "'" {char} "'"
+ *   QuotedMemberName   ::= "\"" {char} "\"" | "'" {char} "'"
  */
 JsonUtilCode Selector::parseQuotedMemberName(jsn::stringstream &ss) {
     const Token &token = lex.currToken();
@@ -1247,17 +1259,12 @@ JsonUtilCode Selector::parseQualifiedPathElement() {
 }
 
 /**
- *   Key                 ::= "*" [ [ "." ] WildcardFilter ] | UnquotedMemberName
- *   WildcardFilter  ::=  "[" "?" "(" FilterExpr ")" "]"
+ *   Key                 ::= "*" ["."] | UnquotedMemberName
  */
 JsonUtilCode Selector::parseKey() {
     if (lex.matchToken(Token::WILDCARD)) {
         if (lex.currToken().type == Token::DOT) lex.nextToken();  // skip DOT
-        if (lex.currToken().type == Token::LBRACKET && lex.peekToken() == Token::QUESTION_MARK) {
-            return parseWildcardFilter();
-        } else {
-            return processWildcard();
-        }
+        return processWildcard();
     } else {
         StringViewHelper name;
         JsonUtilCode rc = parseUnquotedMemberName(name);
@@ -1276,27 +1283,8 @@ JsonUtilCode Selector::parseUnquotedMemberName(StringViewHelper &name) {
     return JSONUTIL_SUCCESS;
 }
 
-/**
- *   WildcardFilter  ::= "[" "?" "(" FilterExpr ")" "]"
- */
-JsonUtilCode Selector::parseWildcardFilter() {
-    if (!node->IsArray() && !node->IsObject()) return JSONUTIL_INVALID_JSON_PATH;
-
-    if (!lex.matchToken(Token::LBRACKET)) return JSONUTIL_INVALID_JSON_PATH;
-    if (!lex.matchToken(Token::QUESTION_MARK)) return JSONUTIL_INVALID_JSON_PATH;
-    if (!lex.matchToken(Token::LPAREN, true)) return JSONUTIL_INVALID_JSON_PATH;
-
-    jsn::vector<int64_t> result;  // subset of indexes of the current array
-    JsonUtilCode rc = parseFilterExpr(result);
-    if (rc != JSONUTIL_SUCCESS) return rc;
-
-    if (!lex.matchToken(Token::RPAREN, true)) return JSONUTIL_INVALID_JSON_PATH;
-    if (!lex.matchToken(Token::RBRACKET)) return JSONUTIL_INVALID_JSON_PATH;
-
-    return processFilterResult(result);
-}
-
 JsonUtilCode Selector::processWildcard() {
+    if (node == nullptr) return JSONUTIL_SUCCESS;
     if (node->IsObject()) {
         return processWildcardKey();
     } else if (node->IsArray()) {
@@ -1311,6 +1299,7 @@ JsonUtilCode Selector::processWildcard() {
 
 JsonUtilCode Selector::processWildcardKey() {
     JsonUtilCode rc;
+    if (node->MemberCount() == 0) emptyFanout = true;
     for (auto &m : node->GetObject()) {
         TRACE("DEBUG", "processWildcardKey continue parsing object member "
             << m.name.GetStringView() << ", curr token: " << lex.currToken().type << ", remaining path: " << lex.p)
@@ -1329,6 +1318,7 @@ JsonUtilCode Selector::processWildcardKey() {
 
 JsonUtilCode Selector::processWildcardIndex() {
     JsonUtilCode rc;
+    if (node->Size() == 0) emptyFanout = true;
     for (int64_t i=0; i < node->Size(); i++) {
         TRACE("DEBUG", "processWildcardIndex continue parsing array index " << i
             << ", curr token: " << lex.currToken().type << ", remaining path: " << lex.p << ", nodePath: " << nodePath)
@@ -1344,12 +1334,12 @@ JsonUtilCode Selector::processWildcardIndex() {
  * Recursively call eval to evaluate the member and continue parsing the remaining path.
  * Multiple wildcards/filter expressions are handled through recursion. e.g.,
  *
- * $.a[?(@.price < $.expensive)].[*].[?(@.x > 15]
+ * $.a[?(@.price < $.expensive)].[*].[?(@.x > 15)]
  *
  * 1. The first filter expression is evaluated, resulting in a slice of the current array ($.a).
  * 2. The search path forks out, one per element of the slice. We'll explore each path.
  * 3. For each path, continue parsing the remaining json path. When the wildcard is processed, each
- *    path forks out n subpaths, where n is the length of the current array.
+ *    path forks out n subpaths, where n is the number of children of the current value.
  * 4. For each subpath, the 2nd filter expression is evaluated, which results in a slice of the current array.
  * 5. Again, each subpath continues to fork out, one per element of the slice.
  */
@@ -1401,6 +1391,7 @@ JsonUtilCode Selector::evalArrayMember(int64_t idx) {
 }
 
 JsonUtilCode Selector::traverseToObjectMember(const StringViewHelper &member_name) {
+    if (node == nullptr) return JSONUTIL_SUCCESS;
     if (!node->IsObject()) {
         // We should not assert node must be an object, because this could just be a user error.
         // e.g., path: $.phoneNumbers.city, where phoneNumbers is actually an array not object. An assertion would
@@ -1461,6 +1452,7 @@ JsonUtilCode Selector::traverseToObjectMember(const StringViewHelper &member_nam
 }
 
 JsonUtilCode Selector::traverseToArrayIndex(int64_t idx) {
+    if (node == nullptr) return JSONUTIL_SUCCESS;
     if (!node->IsArray()) {
         // We should not assert node must be an array, because this could just be a user error.
         // e.g., path: $.address[0], where address is actually an object not array. An assertion would
@@ -1494,21 +1486,21 @@ JsonUtilCode Selector::traverseToArrayIndex(int64_t idx) {
 /**
  *   parseIndexExpr() is called from parseBracketPathElement().
  *
- *   BracketPathElement  ::= "[" {SPACE} ( WildcardInBrackets | ((NameInBrackets | IndexExpr) {SPACE} ) "]")
- *   WildcardInBrackets  ::= "*" {SPACE} "]" [ "[" {SPACE} "?" "(" FilterExpr ")" {SPACE} "]" ]
+ *   BracketPathElement  ::= WildcardInBrackets | NameInBrackets | IndexExpr
+ *   WildcardInBrackets  ::= "[" {SPACE} "*" {SPACE} "]"
  *   IndexExpr           ::= Filter | SliceStartsWithColon | SliceOrUnionOrIndex
- *   Filter              ::= "?" "(" "@" "." FilterExpr ")"
- *   SliceStartsWithColon ::= {SPACE} ":" {SPACE} [ ":" {SPACE} [Step] | EndAndStep ] ]
- *   EndAndStep          ::= End [{SPACE} ":" {SPACE} [Step]] ]
+ *   Filter              ::= "[" {SPACE} "?" "(" FilterExpr ")" {SPACE} "]"
+ *   SliceStartsWithColon ::= "[" {SPACE} ":" {SPACE} [EndAndStep | ":" {SPACE} [Step]] {SPACE} "]"
+ *   EndAndStep          ::= End {SPACE} [":" {SPACE} [Step]]
  *   SliceOrUnionOrIndex ::= SliceStartsWithInteger | Index | UnionOfIndexes
- *   SliceStartsWithInteger ::= Start {SPACE} ":" {SPACE} [ ":" {SPACE} [Step] | EndAndStep
- *   EndAndStep          ::= End [{SPACE} ":" {SPACE} [Step]] ]
- *   Index               ::= Integer
+ *   SliceStartsWithInteger ::= "[" {SPACE} Start {SPACE} ":" {SPACE} [EndAndStep | ":" {SPACE} [Step]] {SPACE} "]"
+ *   EndAndStep          ::= End {SPACE} [":" {SPACE} [Step]]
+ *   Index               ::= "[" {SPACE} Integer {SPACE} "]"
  *   Integer             ::= ["+" | "-"] digit {digit}
  *   Start               ::= Integer
  *   End                 ::= Integer
  *   Step                ::= Integer
- *   UnionOfIndexes      ::= Integer ({SPACE} "," {SPACE} Integer)+
+ *   UnionOfIndexes      ::= "[" {SPACE} Integer ({SPACE} "," {SPACE} Integer)+ {SPACE} "]"
  */
 JsonUtilCode Selector::parseIndexExpr() {
     switch (lex.currToken().type) {
@@ -1526,22 +1518,23 @@ JsonUtilCode Selector::parseIndexExpr() {
 }
 
 /**
- *   SliceStartsWithColon ::= {SPACE} ":" [ {SPACE} ":" [Step] | {SPACE} EndAndStep ] ]
- *   EndAndStep           ::= End [{SPACE} ":" {SPACE} [Step]] ]
+ *   SliceStartsWithColon ::= "[" {SPACE} ":" {SPACE} [EndAndStep | ":" {SPACE} [Step]] {SPACE} "]"
+ *   EndAndStep           ::= End {SPACE} [":" {SPACE} [Step]]
  *   End                  ::= Integer
  *   Step                 ::= Integer
  *   Integer              ::= ["+" | "-"] digit {digit}
  */
 JsonUtilCode Selector::parseSliceStartsWithColon() {
-    if (!node->IsArray()) return JSONUTIL_JSON_ELEMENT_NOT_ARRAY;
+    if (node != nullptr && !node->IsArray()) return JSONUTIL_JSON_ELEMENT_NOT_ARRAY;
+    const int64_t size = node == nullptr ? 0 : node->Size();
 
     lex.nextToken(true);  // skip COLON
     switch (lex.currToken().type) {
         case Token::RBRACKET:
-            return processSlice(0, node->Size());
+            return processSlice(0, size);
         case Token::COLON: {
             lex.nextToken(true);  // skip COLON
-            return parseStep(0, node->Size());
+            return parseStep(0, size);
         }
         default:
             return parseEndAndStep(0);
@@ -1550,10 +1543,10 @@ JsonUtilCode Selector::parseSliceStartsWithColon() {
 
 /**
  *   SliceOrUnionOrIndex    ::= SliceStartsWithInteger | UnionOfIndexes | Index
- *   SliceStartsWithInteger ::= Start {SPACE} ":" {SPACE} [ ":" {SPACE} [Step] | EndAndStep
- *   EndAndStep             ::= End [{SPACE} ":" {SPACE} [Step]] ]
- *   UnionOfIndexes         ::= Integer ({SPACE} "," {SPACE} Integer)+
- *   Index                  ::= Integer
+ *   SliceStartsWithInteger ::= "[" {SPACE} Start {SPACE} ":" {SPACE} [EndAndStep | ":" {SPACE} [Step]] {SPACE} "]"
+ *   EndAndStep             ::= End {SPACE} [":" {SPACE} [Step]]
+ *   UnionOfIndexes         ::= "[" {SPACE} Integer ({SPACE} "," {SPACE} Integer)+ {SPACE} "]"
+ *   Index                  ::= "[" {SPACE} Integer {SPACE} "]"
  */
 JsonUtilCode Selector::parseSliceOrUnionOrIndex() {
     int64_t start;
@@ -1572,20 +1565,21 @@ JsonUtilCode Selector::parseSliceOrUnionOrIndex() {
 }
 
 /**
- *   SliceStartsWithInteger ::= Start {SPACE} ":" {SPACE} [ ":" {SPACE} [Step] | EndAndStep
- *   EndAndStep             ::= End [{SPACE} ":" {SPACE} [Step]] ]
+ *   SliceStartsWithInteger ::= "[" {SPACE} Start {SPACE} ":" {SPACE} [EndAndStep | ":" {SPACE} [Step]] {SPACE} "]"
+ *   EndAndStep             ::= End {SPACE} [":" {SPACE} [Step]]
  */
 JsonUtilCode Selector::parseSliceStartsWithInteger(const int64_t start) {
-    if (!node->IsArray()) return JSONUTIL_JSON_ELEMENT_NOT_ARRAY;
+    if (node != nullptr && !node->IsArray()) return JSONUTIL_JSON_ELEMENT_NOT_ARRAY;
+    const int64_t size = node == nullptr ? 0 : node->Size();
     lex.nextToken(true);  // skip COLON
 
     lex.skipSpaces();
     switch (lex.currToken().type) {
         case Token::RBRACKET:
-            return processSlice(start, node->Size());
+            return processSlice(start, size);
         case Token::COLON: {
             lex.nextToken();  // skip COLON
-            return parseStep(start, node->Size());
+            return parseStep(start, size);
         }
         default:
             return parseEndAndStep(start);
@@ -1593,7 +1587,7 @@ JsonUtilCode Selector::parseSliceStartsWithInteger(const int64_t start) {
 }
 
 /**
- *   EndAndStep ::= End [{SPACE} ":" {SPACE} [Step]] ]
+ *   EndAndStep ::= End {SPACE} [":" {SPACE} [Step]]
  */
 JsonUtilCode Selector::parseEndAndStep(const int64_t start) {
     int64_t end;
@@ -1629,22 +1623,24 @@ JsonUtilCode Selector::parseIndex(int64_t &val) {
 
 JsonUtilCode Selector::processSubscript(const int64_t idx) {
     if (!lex.matchToken(Token::RBRACKET, true)) return JSONUTIL_INVALID_JSON_PATH;
+    if (node == nullptr) return JSONUTIL_SUCCESS;
     if (!node->IsArray()) return JSONUTIL_JSON_ELEMENT_NOT_ARRAY;
     return traverseToArrayIndex(idx);
 }
 
 JsonUtilCode Selector::processSlice(int64_t start, int64_t end, const int64_t step) {
-    if (!node->IsArray()) return JSONUTIL_JSON_ELEMENT_NOT_ARRAY;
+    if (node != nullptr && !node->IsArray()) return JSONUTIL_JSON_ELEMENT_NOT_ARRAY;
     if (!lex.matchToken(Token::RBRACKET, true)) return JSONUTIL_INVALID_JSON_PATH;
     TRACE("DEBUG", "processSlice start: " << start << " end: " << end << " step: "
             << step << ", p: " << lex.p << ", nodePath: " << nodePath)
-    // handle negative index
-    if (start < 0) start += node->Size();
-    if (end < 0) end += node->Size();
     // Verify step cannot be 0.
     if (step == 0) {
         return JSONUTIL_STEP_CANNOT_NOT_BE_ZERO;
     }
+    if (node == nullptr) return JSONUTIL_SUCCESS;
+    // handle negative index
+    if (start < 0) start += node->Size();
+    if (end < 0) end += node->Size();
 
     // if the index is out of bounds, round it to the respective bound.
     if (start < 0)
@@ -1675,19 +1671,21 @@ JsonUtilCode Selector::processSlice(int64_t start, int64_t end, const int64_t st
 }
 
 /**
- *   Filter              ::= "?" "(" FilterExpr ")"
- *   FilterExpr          ::= {SPACE} Term { {SPACE} "||" {SPACE} Term {SPACE} }
+ *   Filter              ::= "[" {SPACE} "?" "(" FilterExpr ")" {SPACE} "]"
+ *   FilterExpr          ::= {SPACE} Term { {SPACE} "||" {SPACE} Term } {SPACE}
  *   Term                ::= Factor { {SPACE} "&&" {SPACE} Factor }
- *   Factor              ::= ( "@" ( MemberName | ( [ MemberName ] ComparisonOp ComparisonValue) ) ) |
- *                           ( ComparisonValue ComparisonOp "@" ( MemberName | ( [ MemberName ]) ) ) |
+ *   Factor              ::= ( "@" ( MemberName {SPACE} [MemberIndex ComparisonOp ComparisonValue |
+ *                           ComparisonOp ComparisonValue | NestedAnyMatch] | ComparisonOp ComparisonValue ) ) |
+ *                           ( ComparisonValue ComparisonOp "@" {SPACE} [MemberName [MemberIndex]] ) |
  *                           ( {SPACE} "(" FilterExpr ")" {SPACE} )
  *   MemberName          ::= ("." (UnquotedMemberName | BracketedMemberName)) | BracketedMemberName
  *   BracketedMemberName ::= "[" {SPACE} QuotedMemberName {SPACE} "]"
- *   ComparisonOp        ::= {SPACE} "<" | "<="] | ">" | ">=" | "==" | "!=" {SPACE}
+ *   ComparisonOp        ::= {SPACE} ("<" | "<=" | ">" | ">=" | "==" | "!=") {SPACE}
  *   ComparisonValue     ::= "null" | Bool | Number | QuotedString | PartialPath
  *   Bool                ::= "true" | "false"
- *   Number              ::= Integer | MemberNameInFilter | ScientificNumber
- *   QuotedString        ::= "\"" {char} "\""
+ *   Number              ::= ["-"] ("0" | NonZeroDigit {digit}) ["." digit {digit}]
+ *                           [("e" | "E") ["+" | "-"] digit {digit}]
+ *   QuotedString        ::= QuotedMemberName
  *   PartialPath         ::= "$" RelativePath
  */
 JsonUtilCode Selector::parseFilter() {
@@ -1703,7 +1701,9 @@ JsonUtilCode Selector::parseFilter() {
 }
 
 JsonUtilCode Selector::processFilterResult(jsn::vector<int64_t> &result) {
+    if (node == nullptr) return JSONUTIL_SUCCESS;
     JsonUtilCode rc;
+    if (result.empty()) emptyFanout = true;
     // Sort results first before processing it. This applies to both object and array filters
     std::sort(result.begin(), result.end());
     if (node->IsArray()) {
@@ -1747,7 +1747,7 @@ JsonUtilCode Selector::processFilterResult(jsn::vector<int64_t> &result) {
 }
 
 /**
- *   FilterExpr          ::= {SPACE} Term { {SPACE} "||" {SPACE} Term {SPACE} }
+ *   FilterExpr          ::= {SPACE} Term { {SPACE} "||" {SPACE} Term } {SPACE}
  */
 JsonUtilCode Selector::parseFilterExpr(jsn::vector<int64_t> &result) {
     CHECK_RECURSION_DEPTH();
@@ -1798,16 +1798,18 @@ JsonUtilCode Selector::parseTerm(jsn::vector<int64_t> &result) {
 }
 
 /**
- *   Factor              ::= ( "@" ( MemberName | ( [ MemberName ] ComparisonOp ComparisonValue) ) ) |
- *                           ( ComparisonValue ComparisonOp "@" ( MemberName | ( [ MemberName ]) ) ) |
+ *   Factor              ::= ( "@" ( MemberName {SPACE} [MemberIndex ComparisonOp ComparisonValue |
+ *                           ComparisonOp ComparisonValue | NestedAnyMatch] | ComparisonOp ComparisonValue ) ) |
+ *                           ( ComparisonValue ComparisonOp "@" {SPACE} [MemberName [MemberIndex]] ) |
  *                           ( {SPACE} "(" FilterExpr ")" {SPACE} )
  *   MemberName          ::= ("." (UnquotedMemberName | BracketedMemberName)) | BracketedMemberName
  *   BracketedMemberName ::= "[" {SPACE} QuotedMemberName {SPACE} "]"
- *   ComparisonOp        ::= {SPACE} "<" | "<="] | ">" | ">=" | "==" | "!=" {SPACE}
+ *   ComparisonOp        ::= {SPACE} ("<" | "<=" | ">" | ">=" | "==" | "!=") {SPACE}
  *   ComparisonValue     ::= "null" | Bool | Number | QuotedString | PartialPath
  *   Bool                ::= "true" | "false"
- *   Number              ::= Integer | MemberNameInFilter | ScientificNumber
- *   QuotedString        ::= "\"" {char} "\""
+ *   Number              ::= ["-"] ("0" | NonZeroDigit {digit}) ["." digit {digit}]
+ *                           [("e" | "E") ["+" | "-"] digit {digit}]
+ *   QuotedString        ::= QuotedMemberName
  *   PartialPath         ::= "$" RelativePath
 */
 JsonUtilCode Selector::parseFactor(jsn::vector<int64_t> &result) {
@@ -1976,8 +1978,9 @@ JsonUtilCode Selector::parseBracketedMemberName(StringViewHelper &member_name) {
 /**
  *   ComparisonValue     ::= "null" | Bool | Number | QuotedString | PartialPath
  *   Bool                ::= "true" | "false"
- *   Number              ::= Integer | MemberNameInFilter | ScientificNumber
- *   QuotedString        ::= "\"" {char} "\""
+ *   Number              ::= ["-"] ("0" | NonZeroDigit {digit}) ["." digit {digit}]
+ *                           [("e" | "E") ["+" | "-"] digit {digit}]
+ *   QuotedString        ::= QuotedMemberName
  *   PartialPath         ::= "$" RelativePath
  */
 JsonUtilCode Selector::parseComparisonValue(JValue &v) {
@@ -2038,7 +2041,7 @@ JsonUtilCode Selector::parseComparisonValue(JValue &v) {
 }
 
 /**
- *   ComparisonOp        := {SPACE} "<" | "<="] | ">" | ">=" | "==" | "!=" {SPACE}
+ *   ComparisonOp        ::= {SPACE} ("<" | "<=" | ">" | ">=" | "==" | "!=") {SPACE}
  */
 JsonUtilCode Selector::parseComparisonOp(Token::TokenType &op) {
     lex.skipSpaces();
@@ -2082,18 +2085,21 @@ JsonUtilCode Selector::swapComparisonOpSide(Token::TokenType &op) {
 // Further recursion can be investigated in the future.
 JsonUtilCode Selector::processNestedAnyMatch(const StringViewHelper &member_name, const Token::TokenType op,
                                             const JValue &comparison_value, jsn::vector<int64_t> &result) {
-    if (node->IsArray()) {
-        for (int64_t i = 0; i < node->Size(); i++) {
-            // note that here we push back parent array element
-            if (anyMemberElementMatches(node->GetArray()[i], member_name, op, comparison_value))
-                result.push_back(i);
-        }
-    } else if (node->IsObject()) {
-        int64_t ordinal = 0;
-        for (const auto &member : node->GetObject()) {
-            if (anyMemberElementMatches(member.value, member_name, op, comparison_value))
-                result.push_back(ordinal);
-            ++ordinal;
+    // With no node, skip matching but still consume ")]"
+    if (node != nullptr) {
+        if (node->IsArray()) {
+            for (int64_t i = 0; i < node->Size(); i++) {
+                // note that here we push back parent array element
+                if (anyMemberElementMatches(node->GetArray()[i], member_name, op, comparison_value))
+                    result.push_back(i);
+            }
+        } else if (node->IsObject()) {
+            int64_t ordinal = 0;
+            for (const auto &member : node->GetObject()) {
+                if (anyMemberElementMatches(member.value, member_name, op, comparison_value))
+                    result.push_back(ordinal);
+                ++ordinal;
+            }
         }
     }
 
@@ -2105,6 +2111,7 @@ JsonUtilCode Selector::processNestedAnyMatch(const StringViewHelper &member_name
 JsonUtilCode Selector::processComparisonExprAtIndex(const int64_t idx, const StringViewHelper &member_name,
                                                     const Token::TokenType op, const JValue &comparison_value,
                                                     jsn::vector<int64_t> &result) {
+    if (node == nullptr) return JSONUTIL_SUCCESS;
     if (node->IsArray()) {
         for (int64_t i = 0; i < node->Size(); i++) {
             const JValue *v = resolveMemberElementAtIndex(node->GetArray()[i], member_name, idx);
@@ -2126,6 +2133,7 @@ JsonUtilCode Selector::processComparisonExprAtIndex(const int64_t idx, const Str
 JsonUtilCode Selector::processComparisonExpr(const bool is_self, const StringViewHelper &member_name,
                                              const Token::TokenType op, const JValue &comparison_value,
                                              jsn::vector<int64_t> &result) {
+    if (node == nullptr) return JSONUTIL_SUCCESS;
     if (node->IsArray()) {
         for (int64_t i = 0; i < node->Size(); i++) {
             JValue &candidate = node->GetArray()[i];
@@ -2351,6 +2359,7 @@ bool Selector::evalOp(const JValue *v, const Token::TokenType op, const JValue &
 }
 
 JsonUtilCode Selector::processAttributeFilter(const StringViewHelper &member_name, jsn::vector<int64_t> &result) {
+    if (node == nullptr) return JSONUTIL_SUCCESS;
     if (node->IsArray()) {
         for (int64_t i = 0; i < node->Size(); i++) {
             if (resolveMember(node->GetArray()[i], member_name) != nullptr) result.push_back(i);
@@ -2361,8 +2370,6 @@ JsonUtilCode Selector::processAttributeFilter(const StringViewHelper &member_nam
             if (resolveMember(member.value, member_name) != nullptr) result.push_back(ordinal);
             ++ordinal;
         }
-    } else {
-        return JSONUTIL_INVALID_JSON_PATH;
     }
     return JSONUTIL_SUCCESS;
 }
@@ -2396,10 +2403,10 @@ void Selector::vectorIntersection(const jsn::vector<int64_t> &v1, const jsn::vec
 }
 
 /**
- *   UnionOfIndexes      ::= Integer ({SPACE} "," {SPACE} Integer)+
+ *   UnionOfIndexes      ::= "[" {SPACE} Integer ({SPACE} "," {SPACE} Integer)+ {SPACE} "]"
  */
 JsonUtilCode Selector::parseUnionOfIndexes(const int64_t start) {
-    if (!node->IsArray()) return JSONUTIL_JSON_ELEMENT_NOT_ARRAY;
+    if (node != nullptr && !node->IsArray()) return JSONUTIL_JSON_ELEMENT_NOT_ARRAY;
     jsn::vector<int64_t> union_indices = {start};
     bool comma = false;
     int64_t index;
@@ -2439,6 +2446,7 @@ JsonUtilCode Selector::parseUnionOfIndexes(const int64_t start) {
 }
 
 JsonUtilCode Selector::processUnion(jsn::vector<int64_t> union_indices) {
+    if (node == nullptr) return JSONUTIL_SUCCESS;
     JsonUtilCode rc;
     for (int64_t i : union_indices) {
         // handle negative index
