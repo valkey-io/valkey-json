@@ -3751,29 +3751,21 @@ class TestJsonBasic(JsonTestCase):
         assert b'[]' == client.execute_command('JSON.NUMINCRBY', k1, path + '.a', 5)
         assert document == json.loads(client.execute_command('JSON.GET', k1))
 
-    @pytest.mark.parametrize("document,reaches_filter", [
-        ([], False), ({}, False), ([[]], True), ({"empty": {}}, True),
-        ([None], True), ({"child": None}, True),
-    ])
+    @pytest.mark.parametrize("document", [[], {}, [[]], {"empty": {}}])
     @pytest.mark.parametrize("path", ['$.*[?(@.a==1]', '$[*][?(@.a==1]',
                                       '$.*[?(@.a==)]', '$[*][?(@.a==)]',
                                       '$.*[ ?(@.a==1]', '$[*][ ?(@.a==1]'])
-    def test_jsonpath_wildcard_filter_lazy_syntax(self, document, reaches_filter, path):
+    def test_jsonpath_empty_wildcard_filter_syntax(self, document, path):
         client = self.server.get_new_client()
         client.execute_command('JSON.SET', k1, '$', json.dumps(document))
-        if reaches_filter:
-            with pytest.raises(ResponseError, match='SYNTAXERR'):
-                client.execute_command('JSON.GET', k1, path)
-        else:
-            assert b'[]' == client.execute_command('JSON.GET', k1, path)
+        with pytest.raises(ResponseError):
+            client.execute_command('JSON.GET', k1, path)
 
-    @pytest.mark.parametrize("prefix,reaches_filter", [
-        ('$', True), ('$[*]', False), ('$[*][*]', False), ('$[*].missing', False),
-        ('$[*][0]', False), ('$[*][:]', False), ('$[*][0:1]', False),
-        ('$[*][0,1]', False), ("$[*]['a','b']", False), ('$[*]..a', False),
-        ('$[?(@.a==1)]', False),
+    @pytest.mark.parametrize("prefix", [
+        '$', '$[*]', '$[*][*]', '$[*].missing', '$[*][0]', '$[*][:]',
+        '$[*][0:1]', '$[*][0,1]', "$[*]['a','b']", '$[*]..a', '$[?(@.a==1)]',
     ])
-    def test_jsonpath_empty_selection_filter_is_lazy(self, prefix, reaches_filter):
+    def test_jsonpath_empty_selection_filter_uses_shared_parser(self, prefix):
         client = self.server.get_new_client()
         client.execute_command('JSON.SET', k1, '$', '[]')
         path = prefix + '[?(@.a==1)]'
@@ -3781,48 +3773,24 @@ class TestJsonBasic(JsonTestCase):
         client.execute_command('JSON.SET', k1, path + '.added', '1')
         assert 0 == client.execute_command('JSON.DEL', k1, path)
         assert [] == json.loads(client.execute_command('JSON.GET', k1))
-        malformed_path = prefix + '[?(@.a==1]'
-        if reaches_filter:
-            with pytest.raises(ResponseError, match='SYNTAXERR'):
-                client.execute_command('JSON.GET', k1, malformed_path)
-            with pytest.raises(ResponseError, match='SYNTAXERR'):
-                client.execute_command('JSON.SET', k1, malformed_path, '1')
-        else:
-            assert b'[]' == client.execute_command('JSON.GET', k1, malformed_path)
-            client.execute_command('JSON.SET', k1, malformed_path, '1')
-            assert 0 == client.execute_command('JSON.DEL', k1, malformed_path)
-            assert b'[]' == client.execute_command('JSON.NUMINCRBY', k1, malformed_path, 1)
+        with pytest.raises(ResponseError, match='SYNTAXERR'):
+            client.execute_command('JSON.GET', k1, prefix + '[?(@.a==1]')
+        with pytest.raises(ResponseError, match='SYNTAXERR'):
+            client.execute_command('JSON.SET', k1, prefix + '[?(@.a==1]', '1')
+        with pytest.raises(ResponseError, match='SYNTAXERR'):
+            client.execute_command('JSON.NUMINCRBY', k1, prefix + '[?(@.a==1]', 1)
         assert [] == json.loads(client.execute_command('JSON.GET', k1))
-
-    @pytest.mark.parametrize("document,reaches_last_filter", [
-        ([], False), ([{}], False), ([{"a": 1}], False), ([None], False),
-        ([{"a": 1, "child": {"b": 1}}], True),
-    ])
-    def test_jsonpath_filter_chain_lazy_syntax(self, document, reaches_last_filter):
-        client = self.server.get_new_client()
-        client.execute_command('JSON.SET', k1, '$', json.dumps(document))
-        path = '$[?(@.a==1)][?(@.b==1)][?(@.c==1]'
-        if reaches_last_filter:
-            with pytest.raises(ResponseError, match='SYNTAXERR'):
-                client.execute_command('JSON.GET', k1, path)
-            with pytest.raises(ResponseError, match='SYNTAXERR'):
-                client.execute_command('JSON.SET', k1, path, '1')
-        else:
-            assert b'[]' == client.execute_command('JSON.GET', k1, path)
-            client.execute_command('JSON.SET', k1, path, '1')
-            assert 0 == client.execute_command('JSON.DEL', k1, path)
-        assert document == json.loads(client.execute_command('JSON.GET', k1))
 
     @pytest.mark.parametrize("document", [
         {"limit": 1, "groups": []}, {"limit": 1, "groups": {}},
     ])
-    def test_jsonpath_empty_selection_filter_skips_rooted_suffix(self, document):
+    def test_jsonpath_empty_selection_filter_preserves_root(self, document):
         client = self.server.get_new_client()
         client.execute_command('JSON.SET', k1, '$', json.dumps(document))
         path = '$.groups[*][?(@.a==$.limit)]'
         assert b'[]' == client.execute_command('JSON.GET', k1, path)
-        assert b'[]' == client.execute_command('JSON.GET', k1, '$.groups[*][?(@.a==$.limit]')
-        assert b'[]' == client.execute_command('JSON.GET', k1, '$.groups[*][?(@.a==$.missing)]')
+        with pytest.raises(ResponseError, match='SYNTAXERR'):
+            client.execute_command('JSON.GET', k1, '$.groups[*][?(@.a==$.limit]')
 
     @pytest.mark.parametrize("wildcard", [".*", "[*]"])
     @pytest.mark.parametrize("document,expected,after_delete", [

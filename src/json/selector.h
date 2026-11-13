@@ -159,6 +159,8 @@ class Selector {
             , uniqueResultSet()
             , mode(READ)
             , isRecursiveSearch(false)
+            , querySyntaxParsed(false)
+            , emptyFanout(false)
             , error(JSONUTIL_SUCCESS)
     {}
 
@@ -381,6 +383,8 @@ class Selector {
 
     Mode mode;
     bool isRecursiveSearch;  // if we are doing a recursive search we do not wish to add new fields
+    bool querySyntaxParsed;  // a branch parsed the full query without a syntax error
+    bool emptyFanout;  // a wildcard or filter selected nothing; check the rest of the query
     JsonUtilCode error;  // JSONUTIL_SUCCESS indicates no error
 };
 
