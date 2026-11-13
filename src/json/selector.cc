@@ -973,6 +973,7 @@ bool Selector::isSyntaxError(JsonUtilCode code) const {
             code == JSONUTIL_INVALID_MEMBER_NAME ||
             code == JSONUTIL_INVALID_NUMBER ||
             code == JSONUTIL_INVALID_IDENTIFIER ||
+            code == JSONUTIL_INVALID_DOT_SEQUENCE ||
             code == JSONUTIL_EMPTY_EXPR_TOKEN ||
             code == JSONUTIL_ARRAY_INDEX_NOT_NUMBER ||
             code == JSONUTIL_STEP_CANNOT_NOT_BE_ZERO ||
@@ -1037,7 +1038,7 @@ JsonUtilCode Selector::parseRecursivePath() {
         dedupe();
     }
     const JsonUtilCode rc = parseSupportedPath();
-    return isSyntaxError(rc) || rc == JSONUTIL_INVALID_DOT_SEQUENCE ? rc : JSONUTIL_SUCCESS;
+    return isSyntaxError(rc) ? rc : JSONUTIL_SUCCESS;
 }
 
 /**

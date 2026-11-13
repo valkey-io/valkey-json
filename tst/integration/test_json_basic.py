@@ -3781,6 +3781,24 @@ class TestJsonBasic(JsonTestCase):
             client.execute_command('JSON.NUMINCRBY', k1, prefix + '[?(@.a==1]', 1)
         assert [] == json.loads(client.execute_command('JSON.GET', k1))
 
+    @pytest.mark.parametrize("document,path", [
+        ({"x": 1}, '$...x'),
+        ([[{"a": 1, "x": 1}]], '$[0][0]...x'),
+        ([[{"a": 1, "x": 1}]], '$[*][?(@.a==1)]...x'),
+        ([[{"a": 1, "x": 1}]], '$..a...x'),
+        ([], '$[*]...a'),
+    ])
+    def test_jsonpath_reached_dot_sequence_is_syntax_error(self, document, path):
+        client = self.server.get_new_client()
+        client.execute_command('JSON.SET', k1, '$', json.dumps(document))
+        with pytest.raises(ResponseError, match='SYNTAXERR Invalid dot sequence'):
+            client.execute_command('JSON.GET', k1, path)
+        with pytest.raises(ResponseError, match='SYNTAXERR Invalid dot sequence'):
+            client.execute_command('JSON.SET', k1, path, '2')
+        with pytest.raises(ResponseError, match='SYNTAXERR Invalid dot sequence'):
+            client.execute_command('JSON.DEL', k1, path)
+        assert document == json.loads(client.execute_command('JSON.GET', k1))
+
     @pytest.mark.parametrize("document", [
         {"limit": 1, "groups": []}, {"limit": 1, "groups": {}},
     ])
