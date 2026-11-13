@@ -1,13 +1,29 @@
-Hello! This file is just a placeholder, since this is the "unstable" branch
-of Valkey-json, the place where all the development happens.
+Valkey JSON 1.1 release notes
+========================
 
-There is no release notes for this branch, it gets forked into another branch
-every time there is a partial feature freeze in order to eventually create
-a new stable release.
+Upgrade urgency levels:
 
-Usually "unstable" is stable enough for you to use it in development environments
-however you should never use it in production environments.
+| Level    | Meaning                                                             |
+|----------|---------------------------------------------------------------------|
+| LOW      | No need to upgrade unless there are new features you want to use.   |
+| MODERATE | Program an upgrade of the server, but it's not urgent.              |
+| HIGH     | There is a critical bug that may affect a subset of users. Upgrade! |
+| CRITICAL | There is a critical bug affecting MOST USERS. Upgrade ASAP.         |
+| SECURITY | There are security fixes in the release.                            |
 
-More information is available at https://valkey.io
+================================================================================
+Valkey JSON 1.1.0  -  Released Fri 13 November 2026
+================================================================================
 
-Happy hacking!
+Upgrade urgency LOW: This release adds the `JSON.MERGE` command and fixes
+several JSONPath bugs.
+
+New features
+============
+* Add the `JSON.MERGE` command, which merges a JSON value into an existing document following RFC 7396 (JSON Merge Patch) semantics by @patrickn2 (#95)
+
+Bug fixes
+=========
+* Fix overflow in JSONPath array slice iteration by @roshkhatri (#124)
+* Fix JSONPath filter expressions evaluated over object children by @mohanrajendran (#123)
+* Apply JSONPath wildcard and filter segments sequentially by @mohanrajendran (#126)

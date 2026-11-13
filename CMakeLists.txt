@@ -24,7 +24,7 @@ else()
 endif()
 
 # Project definition
-project(ValkeyJSONModule VERSION 99.99.99 LANGUAGES C CXX) # Version is 99.99.99 for unstable branch
+project(ValkeyJSONModule VERSION 1.1.0 LANGUAGES C CXX)
 
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-mismatched-tags -Wno-format")
 
