@@ -1730,7 +1730,8 @@ class WildcardFilterRecursiveTest
       public ::testing::WithParamInterface<WildcardFilterQueryCase> {};
 
 TEST_P(WildcardFilterRecursiveTest, preserves_recursive_token_budget) {
-    const size_t count = json_get_max_recursive_descent_tokens();
+    // More branches than the token limit: the budget counts query tokens, not branches.
+    const size_t count = json_get_max_recursive_descent_tokens() + 5;
     std::ostringstream document;
     document << "[";
     for (size_t i = 0; i < count; ++i) {
@@ -1758,8 +1759,43 @@ INSTANTIATE_TEST_SUITE_P(
     RecursiveSuffix, WildcardFilterRecursiveTest,
     ::testing::Values(
         WildcardFilterQueryCase{"DotWildcard", "$.*[?(@.a==1)]..x"},
-        WildcardFilterQueryCase{"BracketWildcard", "$[*][?(@.a==1)]..x"}),
+        WildcardFilterQueryCase{"BracketWildcard", "$[*][?(@.a==1)]..x"},
+        WildcardFilterQueryCase{"ChainedWildcard", "$[*][*]..x"}),
     [](const ::testing::TestParamInfo<WildcardFilterQueryCase> &info) { return info.param.name; });
+
+// Distinct member names keep each ".." match unique, so the walk stays linear.
+static std::string recursiveDescentQuery(const size_t tokens) {
+    std::string query = "$";
+    for (size_t i = 0; i < tokens; ++i) query += "..a" + std::to_string(i);
+    return query;
+}
+
+static std::string nestedMembers(const size_t depth) {
+    std::string input;
+    for (size_t i = 0; i < depth; ++i) input += "{\"a" + std::to_string(i) + "\":";
+    input += "0";
+    input.append(depth, '}');
+    return input;
+}
+
+TEST_F(SelectorTest, test_recursive_descent_token_limit) {
+    const size_t limit = json_get_max_recursive_descent_tokens();
+    const std::string input = nestedMembers(limit + 1);
+    JDocument *doc = nullptr;
+    ASSERT_EQ(dom_parse(nullptr, input.c_str(), input.size(), &doc), JSONUTIL_SUCCESS);
+    const std::unique_ptr<JDocument, decltype(&dom_free_doc)> document_owner(doc, dom_free_doc);
+
+    Selector selector;
+    EXPECT_EQ(selector.getValues(*doc, recursiveDescentQuery(limit).c_str()), JSONUTIL_SUCCESS);
+    EXPECT_TRUE(selector.hasValues());
+    EXPECT_EQ(selector.getValues(*doc, recursiveDescentQuery(limit + 1).c_str()),
+              JSONUTIL_RECURSIVE_DESCENT_TOKEN_LIMIT_EXCEEDED);
+
+    // A reused selector starts each query with a fresh token count.
+    for (size_t i = 0; i < limit + 1; ++i) {
+        EXPECT_EQ(selector.getValues(*doc, "$..a0"), JSONUTIL_SUCCESS);
+    }
+}
 
 TEST_F(SelectorTest, test_filter_object_scalar_members) {
     const char *input = "{\"low\":1,\"high\":3}";

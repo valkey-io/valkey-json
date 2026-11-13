@@ -118,6 +118,7 @@ void Lexer::init(const char *path) {
     p = path;
     this->path = path;
     next.type = Token::UNKNOWN;
+    rdTokens = 0;
 }
 
 Token::TokenType Lexer::peekToken() const {

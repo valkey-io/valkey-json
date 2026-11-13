@@ -88,6 +88,7 @@ class Lexer {
     void skipSpaces();
     void unescape(const std::string_view &input, jsn::stringstream &ss);
     size_t getRecursiveDescentTokens() { return rdTokens; }
+    void setRecursiveDescentTokens(const size_t count) { rdTokens = count; }
     const char *p;  // current position in path
     Token next;
 
@@ -242,12 +243,14 @@ class Selector {
                 , currPathPtr(nullptr)
                 , currToken()
                 , currPathDepth(0)
+                , rdTokens(0)
         {}
         JValue *currNode;
         jsn::string nodePath;
         const char *currPathPtr;
         Token currToken;
         size_t currPathDepth;
+        size_t rdTokens;  // recursive descent tokens scanned on this traversal branch
     };
     void snapshotState(State &state) {
         state.currNode = node;
@@ -255,6 +258,7 @@ class Selector {
         state.currPathPtr = lex.p;
         state.currToken = lex.next;
         state.currPathDepth = currPathDepth;
+        state.rdTokens = lex.getRecursiveDescentTokens();
     }
     void restoreState(const State &state) {
         node = state.currNode;
@@ -262,6 +266,7 @@ class Selector {
         lex.p = state.currPathPtr;
         lex.next = state.currToken;
         currPathDepth = state.currPathDepth;
+        lex.setRecursiveDescentTokens(state.rdTokens);
     }
 
     /***
