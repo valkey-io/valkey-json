@@ -300,8 +300,6 @@ class Selector {
     JsonUtilCode evalArrayMember(int64_t idx);
     JsonUtilCode traverseToObjectMember(const StringViewHelper &member_name);
     JsonUtilCode traverseToArrayIndex(int64_t idx);
-    // True when a branch with no values must still parse the rest of the path to find syntax errors.
-    bool parseWithoutValues() const { return isV2Path && emptyFanout && !querySyntaxParsed; }
     JsonUtilCode parseSupportedPath();
     JsonUtilCode parseRelativePath();
     JsonUtilCode parseRecursivePath();
@@ -364,6 +362,7 @@ class Selector {
     void setError(const JsonUtilCode error_code) { error = error_code; }
     JsonUtilCode getError() const { return error; }
     void escape_member_name_for_json_pointer(const std::string_view &member_name, std::ostringstream &oss);
+    bool validateRemainingPathSyntax() const { return isV2Path && emptyFanout && !querySyntaxParsed; }
 
     JValue *root;          // the root value, aka the document
     JValue *node;          // current node (value) in the JSON tree

@@ -987,7 +987,7 @@ bool Selector::isSyntaxError(JsonUtilCode code) const {
  * SupportedPath       ::= ["$" | "."] RelativePath
  */
 JsonUtilCode Selector::parseSupportedPath() {
-    if (node == nullptr && !parseWithoutValues()) return JSONUTIL_SUCCESS;
+    if (node == nullptr && !validateRemainingPathSyntax()) return JSONUTIL_SUCCESS;
     if (lex.matchToken(Token::END)) {
         querySyntaxParsed = true;
         return JSONUTIL_SUCCESS;
@@ -1005,14 +1005,11 @@ JsonUtilCode Selector::parseSupportedPath() {
 /**
  *  RelativePath        ::= empty | RecursivePath | DotPath | BracketPath | QualifiedPath
  *
- * A branch whose node is nullptr has no values left. After an empty wildcard or filter (emptyFanout),
- * the branch still parses the rest of a V2 path to report syntax errors. The first branch that reaches
- * END sets querySyntaxParsed, so later branches skip the check. Other empty selections stop parsing,
- * so a malformed suffix after a missing member returns an empty result. This differs from RFC 9535,
- * which validates the whole query before it reads any data.
+ * After an empty wildcard or filter, a branch with no node still parses the remaining path once,
+ * so syntax errors are reported.
  */
 JsonUtilCode Selector::parseRelativePath() {
-    if (node == nullptr && !parseWithoutValues()) return JSONUTIL_SUCCESS;
+    if (node == nullptr && !validateRemainingPathSyntax()) return JSONUTIL_SUCCESS;
     if (lex.matchToken(Token::END)) {
         querySyntaxParsed = true;
         return JSONUTIL_SUCCESS;
@@ -1035,7 +1032,7 @@ JsonUtilCode Selector::parseRecursivePath() {
     if (!lex.matchToken(Token::DOTDOT)) ValkeyModule_Assert(false);
     CHECK_RECURSIVE_DESCENT_TOKENS();
 
-    // Three or more dots are ambiguous, so they are a syntax error.
+    // 3+ dots are ambiguous and therefore invalid
     if (lex.currToken().type == Token::DOTDOT || lex.currToken().type == Token::DOT) {
         return JSONUTIL_INVALID_DOT_SEQUENCE;
     }
@@ -1044,9 +1041,7 @@ JsonUtilCode Selector::parseRecursivePath() {
         if (rc != JSONUTIL_SUCCESS) return rc;
         dedupe();
     }
-    // recursiveSearch() evaluated the suffix at every subtree and left node null. Parse the suffix
-    // once more, so that a branch that entered with no values still has its syntax checked. Ignore
-    // non-syntax errors, as recursiveSearch() does.
+    // Check the syntax of the remaining path when no node was searched
     const JsonUtilCode rc = parseSupportedPath();
     return isSyntaxError(rc) ? rc : JSONUTIL_SUCCESS;
 }
@@ -2090,7 +2085,7 @@ JsonUtilCode Selector::swapComparisonOpSide(Token::TokenType &op) {
 // Further recursion can be investigated in the future.
 JsonUtilCode Selector::processNestedAnyMatch(const StringViewHelper &member_name, const Token::TokenType op,
                                             const JValue &comparison_value, jsn::vector<int64_t> &result) {
-    // Without values, skip the match but still consume the closing ")]".
+    // With no node, skip matching but still consume ")]"
     if (node != nullptr) {
         if (node->IsArray()) {
             for (int64_t i = 0; i < node->Size(); i++) {
