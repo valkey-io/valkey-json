@@ -15,7 +15,7 @@ Upgrade urgency levels:
 Valkey JSON 1.1.0  -  Released Fri 13 November 2026
 ================================================================================
 
-Upgrade urgency MODERATE: This release adds the `JSON.MERGE` command and fixes
+Upgrade urgency LOW: This release adds the `JSON.MERGE` command and fixes
 several JSONPath bugs.
 
 New features
