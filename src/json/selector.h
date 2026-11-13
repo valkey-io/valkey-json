@@ -300,6 +300,8 @@ class Selector {
     JsonUtilCode evalArrayMember(int64_t idx);
     JsonUtilCode traverseToObjectMember(const StringViewHelper &member_name);
     JsonUtilCode traverseToArrayIndex(int64_t idx);
+    // True when a branch with no values must still parse the rest of the path to find syntax errors.
+    bool parseWithoutValues() const { return isV2Path && emptyFanout && !querySyntaxParsed; }
     JsonUtilCode parseSupportedPath();
     JsonUtilCode parseRelativePath();
     JsonUtilCode parseRecursivePath();
@@ -383,7 +385,7 @@ class Selector {
 
     Mode mode;
     bool isRecursiveSearch;  // if we are doing a recursive search we do not wish to add new fields
-    bool querySyntaxParsed;  // a branch parsed the full query without a syntax error
+    bool querySyntaxParsed;  // a branch parsed the path to END, so the remaining syntax is valid
     bool emptyFanout;  // a wildcard or filter selected nothing; check the rest of the query
     JsonUtilCode error;  // JSONUTIL_SUCCESS indicates no error
 };

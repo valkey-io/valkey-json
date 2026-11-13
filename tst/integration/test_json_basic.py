@@ -3751,21 +3751,21 @@ class TestJsonBasic(JsonTestCase):
         assert b'[]' == client.execute_command('JSON.NUMINCRBY', k1, path + '.a', 5)
         assert document == json.loads(client.execute_command('JSON.GET', k1))
 
-    @pytest.mark.parametrize("document", [[], {}, [[]], {"empty": {}}])
+    @pytest.mark.parametrize("document", [[], {}, [[]], {"empty": {}}, [None], {"child": None}])
     @pytest.mark.parametrize("path", ['$.*[?(@.a==1]', '$[*][?(@.a==1]',
                                       '$.*[?(@.a==)]', '$[*][?(@.a==)]',
                                       '$.*[ ?(@.a==1]', '$[*][ ?(@.a==1]'])
-    def test_jsonpath_empty_wildcard_filter_syntax(self, document, path):
+    def test_jsonpath_wildcard_malformed_filter_is_syntax_error(self, document, path):
         client = self.server.get_new_client()
         client.execute_command('JSON.SET', k1, '$', json.dumps(document))
-        with pytest.raises(ResponseError):
+        with pytest.raises(ResponseError, match='SYNTAXERR'):
             client.execute_command('JSON.GET', k1, path)
 
     @pytest.mark.parametrize("prefix", [
         '$', '$[*]', '$[*][*]', '$[*].missing', '$[*][0]', '$[*][:]',
         '$[*][0:1]', '$[*][0,1]', "$[*]['a','b']", '$[*]..a', '$[?(@.a==1)]',
     ])
-    def test_jsonpath_empty_selection_filter_uses_shared_parser(self, prefix):
+    def test_jsonpath_empty_fanout_checks_suffix_syntax(self, prefix):
         client = self.server.get_new_client()
         client.execute_command('JSON.SET', k1, '$', '[]')
         path = prefix + '[?(@.a==1)]'
@@ -3788,7 +3788,7 @@ class TestJsonBasic(JsonTestCase):
         ([[{"a": 1, "x": 1}]], '$..a...x'),
         ([], '$[*]...a'),
     ])
-    def test_jsonpath_reached_dot_sequence_is_syntax_error(self, document, path):
+    def test_jsonpath_dot_sequence_is_syntax_error(self, document, path):
         client = self.server.get_new_client()
         client.execute_command('JSON.SET', k1, '$', json.dumps(document))
         with pytest.raises(ResponseError, match='SYNTAXERR Invalid dot sequence'):
@@ -3802,13 +3802,17 @@ class TestJsonBasic(JsonTestCase):
     @pytest.mark.parametrize("document", [
         {"limit": 1, "groups": []}, {"limit": 1, "groups": {}},
     ])
-    def test_jsonpath_empty_selection_filter_preserves_root(self, document):
+    def test_jsonpath_empty_fanout_rooted_comparison(self, document):
         client = self.server.get_new_client()
         client.execute_command('JSON.SET', k1, '$', json.dumps(document))
         path = '$.groups[*][?(@.a==$.limit)]'
         assert b'[]' == client.execute_command('JSON.GET', k1, path)
         with pytest.raises(ResponseError, match='SYNTAXERR'):
             client.execute_command('JSON.GET', k1, '$.groups[*][?(@.a==$.limit]')
+        # A rooted value that does not resolve to one scalar is reported as a syntax error,
+        # also when no value reaches the filter. RedisJSON returns [] instead.
+        with pytest.raises(ResponseError, match='SYNTAXERR'):
+            client.execute_command('JSON.GET', k1, '$.groups[*][?(@.a==$.missing)]')
 
     @pytest.mark.parametrize("wildcard", [".*", "[*]"])
     @pytest.mark.parametrize("document,expected,after_delete", [
