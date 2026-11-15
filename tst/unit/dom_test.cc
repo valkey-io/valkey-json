@@ -180,9 +180,11 @@ TEST_F(DomTest, testMutationOrderDeepestFirstStable) {
 
 TEST_F(DomTest, testMutationOrderEmptyAndSingleton) {
     EXPECT_TRUE(order_result_set_deepest_first({}).empty());
-    const jsn::vector<Selector::ValueInfo> rs = {{nullptr, ""}};
+    const jsn::vector<Selector::ValueInfo> root_rs = {{nullptr, ""}};
+    const jsn::vector<Selector::ValueInfo> nested_rs = {{nullptr, "/a/b/c"}};
     const jsn::vector<size_t> expected = {0};
-    EXPECT_EQ(order_result_set_deepest_first(rs), expected);
+    EXPECT_EQ(order_result_set_deepest_first(root_rs), expected);
+    EXPECT_EQ(order_result_set_deepest_first(nested_rs), expected);
 }
 
 TEST_F(DomTest, testParseObject) {

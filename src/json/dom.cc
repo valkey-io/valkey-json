@@ -54,6 +54,10 @@ RapidJsonAllocator allocator;
  */
 STATIC jsn::vector<size_t> order_result_set_deepest_first(const jsn::vector<Selector::ValueInfo> &rs) {
     jsn::vector<size_t> order(rs.size());
+    if (rs.size() <= 1) {
+        if (rs.size() == 1) order[0] = 0;
+        return order;
+    }
     jsn::vector<size_t> depths(rs.size());
     for (size_t i = 0; i < rs.size(); i++) {
         order[i] = i;
