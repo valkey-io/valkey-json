@@ -322,12 +322,56 @@ STATIC bool path_is_ancestor(const jsn::string &ancestor, const jsn::string &des
 }
 
 /**
+ * Filter a unique result set to top-most targets, skipping any target whose JSON pointer has a
+ * proper ancestor in `rs`. If `comparison_count` is non-null, stores the total number of path
+ * comparisons performed across sorting and prefix scanning.
+ */
+STATIC jsn::vector<const Selector::ValueInfo*> filter_topmost_merge_targets(
+        const jsn::vector<Selector::ValueInfo> &rs, size_t *comparison_count = nullptr) {
+    if (comparison_count != nullptr) *comparison_count = 0;
+
+    jsn::vector<const Selector::ValueInfo*> ordered_targets;
+    ordered_targets.reserve(rs.size());
+    for (const auto &vInfo : rs) ordered_targets.push_back(&vInfo);
+
+    // Sort separators before all token bytes so each ancestor immediately precedes
+    // its entire subtree, even with siblings such as "/a-" between "/a" and "/a/b"
+    // in ordinary lexical order. JSON pointer token slashes are escaped as "~1".
+    std::sort(ordered_targets.begin(), ordered_targets.end(),
+              [comparison_count](const auto *a, const auto *b) {
+        if (comparison_count != nullptr) ++(*comparison_count);
+        return std::lexicographical_compare(a->second.begin(), a->second.end(),
+                                            b->second.begin(), b->second.end(),
+                                            [](unsigned char x, unsigned char y) {
+            if (x == '/') return y != '/';
+            if (y == '/') return false;
+            return x < y;
+        });
+    });
+
+    size_t keep = 0;
+    const jsn::string *ancestor = nullptr;
+    for (const auto *vInfo : ordered_targets) {
+        const jsn::string &path = vInfo->second;
+        if (ancestor != nullptr) {
+            if (comparison_count != nullptr) ++(*comparison_count);
+            if (path_is_ancestor(*ancestor, path)) continue;
+        }
+        ancestor = &path;
+        ordered_targets[keep++] = vInfo;
+    }
+    ordered_targets.resize(keep);
+    return ordered_targets;
+}
+
+/**
  * Merge a new JSON value into an existing document at the specified path.
  * 
  * Time Complexity:
  * - Single path: O(M + N) where M = size of original value, N = size of new value
- * - Multiple paths: O(P * M_avg + P * N) where P = number of matched paths,
- *   M_avg = average size of original values, N = size of new value
+ * - Multiple paths: O(P * L * log(P) + P * M_avg + P * N) where P = number of
+ *   matched paths, L = maximum pointer length, M_avg = average size of original
+ *   values, N = size of new value
  * 
  * Path evaluation complexity:
  * - Simple path (e.g., .user.profile): O(D) where D = path depth
@@ -366,19 +410,11 @@ JsonUtilCode dom_merge_value(ValkeyModuleCtx *ctx, JDocument *doc, const char *j
     // descendant path no longer exists once its ancestor has been replaced, and prevents
     // JSON.MERGE from re-applying a patch to a child after its parent was already replaced.
     jsn::vector<std::pair<const jsn::string*, JValue>> pending_updates;
+    jsn::vector<const Selector::ValueInfo*> topmost_targets = filter_topmost_merge_targets(rs);
+    pending_updates.reserve(topmost_targets.size());
 
-    for (auto &vInfo : rs) {
-        const jsn::string &path = vInfo.second;
-
-        bool covered_by_ancestor = false;
-        for (auto &other : rs) {
-            if (&other == &vInfo) continue;
-            if (path_is_ancestor(other.second, path)) {
-                covered_by_ancestor = true;
-                break;
-            }
-        }
-        if (covered_by_ancestor) continue;
+    for (const auto *vInfo : topmost_targets) {
+        const jsn::string &path = vInfo->second;
 
         JPointerType ptr(path.c_str(), path.length(), &allocator);
         if (!ptr.IsValid()) return JSONUTIL_INVALID_JSON_PATH;

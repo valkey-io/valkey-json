@@ -54,6 +54,8 @@ size_t cobsize(ValkeyModuleCtx *) {
 }
 
 extern size_t hash_function(const char *, size_t);
+extern jsn::vector<const Selector::ValueInfo*> filter_topmost_merge_targets(
+    const jsn::vector<Selector::ValueInfo> &rs, size_t *comparison_count = nullptr);
 
 /* Since unit tests run outside of Valkey server, we need to map Valkey'
  * memory management functions to cstdlib functions. */
@@ -765,6 +767,165 @@ TEST_F(DomTest, testDomMergeValue_RecursiveDescentDisjointTargets) {
     rc = dom_get_value_as_str(doc, "$..v", nullptr, oss, false);
     EXPECT_EQ(rc, JSONUTIL_SUCCESS);
     EXPECT_STREQ(GetString(&oss), "[9,9]");
+
+    dom_free_doc(doc);
+}
+
+TEST_F(DomTest, testDomMergeValue_RecursiveDescentPrefixBoundaries) {
+    const char *existing_json =
+        R"({"a-":{},"a":{"b":{"c":1}},"a!":{},"ab":{},"a/b":{"x":1},"a~b":{"x":2},"":{"":{"x":3}},"\u0000":{"x":4}})";
+    const char *new_json = R"({"added":true})";
+
+    JDocument *doc;
+    ASSERT_EQ(dom_parse(nullptr, existing_json, strlen(existing_json), &doc), JSONUTIL_SUCCESS);
+    EXPECT_EQ(dom_merge_value(nullptr, doc, "$..*", new_json, strlen(new_json)), JSONUTIL_SUCCESS);
+
+    ReplyBuffer oss;
+    EXPECT_EQ(dom_get_value_as_str(doc, ".", nullptr, oss, false), JSONUTIL_SUCCESS);
+    EXPECT_STREQ(GetString(&oss),
+        R"({"a-":{"added":true},"a":{"b":{"c":1},"added":true},"a!":{"added":true},)"
+        R"("ab":{"added":true},"a/b":{"x":1,"added":true},"a~b":{"x":2,"added":true},)"
+        R"("":{"":{"x":3},"added":true},"\u0000":{"x":4,"added":true}})");
+
+    dom_free_doc(doc);
+}
+
+TEST_F(DomTest, testDomMergeValue_ManyDisjointTargets) {
+    auto build_disjoint_array = [](size_t count) {
+        std::string json = "[";
+        for (size_t i = 0; i < count; ++i) {
+            if (i != 0) json += ',';
+            json += R"({"v":0})";
+        }
+        json += ']';
+        return json;
+    };
+
+    auto count_disjoint_comparisons = [&](size_t count, size_t *out_comparisons) {
+        std::string json = build_disjoint_array(count);
+        JDocument *doc = nullptr;
+        ASSERT_EQ(dom_parse(nullptr, json.c_str(), json.size(), &doc), JSONUTIL_SUCCESS);
+        {
+            Selector selector;
+            ASSERT_EQ(selector.prepareSetValues(doc->GetJValue(), "$[*].v"), JSONUTIL_SUCCESS);
+            const auto &rs = selector.getUniqueResultSet();
+            ASSERT_EQ(rs.size(), count);
+
+            auto topmost = filter_topmost_merge_targets(rs, out_comparisons);
+            EXPECT_EQ(topmost.size(), count);
+        }
+        dom_free_doc(doc);
+    };
+
+    size_t comps_512 = 0;
+    size_t comps_4096 = 0;
+    count_disjoint_comparisons(512, &comps_512);
+    count_disjoint_comparisons(4096, &comps_4096);
+    EXPECT_GT(comps_512, 0u);
+    // Old pairwise ancestor checks performed 4096 * 4095 = 16,773,120 comparisons here and grew
+    // 64x for an 8x target increase. O(P log P) sorting + linear scan stays well under 4 * P * log2(P).
+    EXPECT_LE(comps_4096, 4u * 4096u * 12u);
+    EXPECT_LT(comps_4096, comps_512 * 20u);
+
+    std::string existing_json = build_disjoint_array(4096);
+    const char *new_json = "9";
+
+    JDocument *doc = nullptr;
+    ASSERT_EQ(dom_parse(nullptr, existing_json.c_str(), existing_json.size(), &doc), JSONUTIL_SUCCESS);
+    EXPECT_EQ(dom_merge_value(nullptr, doc, "$[*].v", new_json, strlen(new_json)), JSONUTIL_SUCCESS);
+
+    const JValue &root = doc->GetJValue();
+    ASSERT_EQ(root.Size(), 4096u);
+    for (const auto &item : root.GetArray()) EXPECT_EQ(item["v"].GetInt(), 9);
+
+    dom_free_doc(doc);
+}
+
+TEST_F(DomTest, testDomMergeValue_OverlappingSubtreesScaling) {
+    // Each group produces 8 matches under "$..a": 4 top-most ancestors ("a", "a!/a", "a-/a",
+    // "ab/a") and 4 nested descendants ("a/a", "a/a/b/a", "a/a/b/a/a", "a!/a/a"), including
+    // sibling keys ("a!", "a-", "ab") that sit around '/' in ordinary ASCII order.
+    auto build_overlapping_doc = [](size_t groups) {
+        std::string json = R"({"root":[)";
+        for (size_t i = 0; i < groups; ++i) {
+            if (i != 0) json += ',';
+            std::string id = std::to_string(i);
+            json += R"({"a":{"a":{"b":{"a":{"a":{"id":)" + id +
+                    R"(}}}}},"a!":{"a":{"a":{"id":)" + id +
+                    R"(}}},"a-":{"a":{"id":)" + id +
+                    R"(}},"ab":{"a":{"id":)" + id + R"(}}})";
+        }
+        json += "]}";
+        return json;
+    };
+
+    auto measure_recursive_a = [&](size_t groups, size_t *out_comparisons) {
+        std::string json = build_overlapping_doc(groups);
+        JDocument *doc = nullptr;
+        ASSERT_EQ(dom_parse(nullptr, json.c_str(), json.size(), &doc), JSONUTIL_SUCCESS);
+        {
+            Selector selector;
+            ASSERT_EQ(selector.prepareSetValues(doc->GetJValue(), "$..a"), JSONUTIL_SUCCESS);
+            const auto &rs = selector.getUniqueResultSet();
+            ASSERT_EQ(rs.size(), groups * 8u);
+
+            auto topmost = filter_topmost_merge_targets(rs, out_comparisons);
+            EXPECT_EQ(topmost.size(), groups * 4u);
+        }
+        dom_free_doc(doc);
+    };
+
+    size_t comps_512 = 0;
+    size_t comps_4096 = 0;
+    measure_recursive_a(64, &comps_512);     // 512 matched paths -> 256 top-most
+    measure_recursive_a(512, &comps_4096);   // 4096 matched paths -> 2048 top-most
+    EXPECT_GT(comps_512, 0u);
+    // Old pairwise loop exceeded 12.5M comparisons at 512 groups and scaled quadratically (64x).
+    EXPECT_LE(comps_4096, 4u * 4096u * 12u);
+    EXPECT_LT(comps_4096, comps_512 * 20u);
+
+    std::string full_json = build_overlapping_doc(512);
+    JDocument *doc = nullptr;
+    ASSERT_EQ(dom_parse(nullptr, full_json.c_str(), full_json.size(), &doc), JSONUTIL_SUCCESS);
+
+    // Also verify single-root collapse when one ancestor ("/root") covers the entire tree under "$..*".
+    {
+        Selector all_selector;
+        ASSERT_EQ(all_selector.prepareSetValues(doc->GetJValue(), "$..*"), JSONUTIL_SUCCESS);
+        const auto &all_rs = all_selector.getUniqueResultSet();
+        ASSERT_GT(all_rs.size(), 4096u);
+
+        size_t all_comparisons = 0;
+        auto topmost = filter_topmost_merge_targets(all_rs, &all_comparisons);
+        ASSERT_EQ(topmost.size(), 1u);
+        EXPECT_STREQ(topmost[0]->second.c_str(), "/root");
+        EXPECT_LE(all_comparisons, 4u * all_rs.size() * 16u);
+    }
+
+    const char *patch = R"({"patched":true})";
+    ASSERT_EQ(dom_merge_value(nullptr, doc, "$..a", patch, strlen(patch)), JSONUTIL_SUCCESS);
+
+    const JValue &groups = doc->GetJValue()["root"];
+    ASSERT_EQ(groups.Size(), 512u);
+    for (rapidjson::SizeType i = 0; i < groups.Size(); ++i) {
+        const JValue &g = groups[i];
+        // Top-most "a" targets receive the patch; nested "a" descendants must not be patched again.
+        EXPECT_TRUE(g["a"].HasMember("patched"));
+        EXPECT_FALSE(g["a"]["a"].HasMember("patched"));
+        EXPECT_FALSE(g["a"]["a"]["b"]["a"].HasMember("patched"));
+        EXPECT_FALSE(g["a"]["a"]["b"]["a"]["a"].HasMember("patched"));
+        EXPECT_EQ(g["a"]["a"]["b"]["a"]["a"]["id"].GetUint(), i);
+
+        EXPECT_TRUE(g["a!"]["a"].HasMember("patched"));
+        EXPECT_FALSE(g["a!"]["a"]["a"].HasMember("patched"));
+        EXPECT_EQ(g["a!"]["a"]["a"]["id"].GetUint(), i);
+
+        EXPECT_TRUE(g["a-"]["a"].HasMember("patched"));
+        EXPECT_EQ(g["a-"]["a"]["id"].GetUint(), i);
+
+        EXPECT_TRUE(g["ab"]["a"].HasMember("patched"));
+        EXPECT_EQ(g["ab"]["a"]["id"].GetUint(), i);
+    }
 
     dom_free_doc(doc);
 }
