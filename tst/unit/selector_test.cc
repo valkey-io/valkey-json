@@ -767,6 +767,32 @@ TEST_F(SelectorTest, test_recursiveDescent_get_part1) {
     dom_free_doc(d2);
 }
 
+TEST_F(SelectorTest, test_recursiveDescent_restores_escaped_paths) {
+    const char *input = R"({"prefix":{"a~/":{"":{"value":1},"~1":{"value":2}},
+        "array":[{"value":3},0,0,0,0,0,0,0,0,0,{"value":4}],
+        "nul\u0000key":{"value":5},"sibling":{"value":6}}})";
+    JDocument *doc = nullptr;
+    ASSERT_EQ(dom_parse(nullptr, input, strlen(input), &doc), JSONUTIL_SUCCESS);
+    const std::unique_ptr<JDocument, decltype(&dom_free_doc)> document_owner(doc, dom_free_doc);
+
+    Selector selector;
+    ASSERT_EQ(selector.getValues(*doc, "$.prefix..value"), JSONUTIL_SUCCESS);
+    const auto &results = selector.getResultSet();
+    const std::vector<std::string> expected_paths = {
+        "/prefix/a~0~1//value",
+        "/prefix/a~0~1/~01/value",
+        "/prefix/array/0/value",
+        "/prefix/array/10/value",
+        std::string("/prefix/nul\0key/value", sizeof("/prefix/nul\0key/value") - 1),
+        "/prefix/sibling/value"
+    };
+    ASSERT_EQ(results.size(), expected_paths.size());
+    for (size_t i = 0; i < results.size(); ++i) {
+        EXPECT_EQ(results[i].first->GetInt(), static_cast<int>(i + 1));
+        EXPECT_EQ(std::string(results[i].second.data(), results[i].second.size()), expected_paths[i]);
+    }
+}
+
 TEST_F(SelectorTest, test_recursiveDescent_get_part2) {
     const char *input = "{\"a\":1, \"b\": {\"e\":[0,1,2]}, \"c\":{\"e\":[10,11,12]}}";
     JDocument *d1;
