@@ -241,14 +241,14 @@ class Selector {
     struct State {
         State()
                 : currNode(nullptr)
-                , nodePath()
+                , nodePathLength(0)
                 , currPathPtr(nullptr)
                 , currToken()
                 , currPathDepth(0)
                 , rdTokens(0)
         {}
         JValue *currNode;
-        jsn::string nodePath;
+        size_t nodePathLength;
         const char *currPathPtr;
         Token currToken;
         size_t currPathDepth;
@@ -256,7 +256,7 @@ class Selector {
     };
     void snapshotState(State &state) {
         state.currNode = node;
-        state.nodePath = nodePath;
+        state.nodePathLength = nodePath.size();
         state.currPathPtr = lex.p;
         state.currToken = lex.next;
         state.currPathDepth = currPathDepth;
@@ -264,7 +264,9 @@ class Selector {
     }
     void restoreState(const State &state) {
         node = state.currNode;
-        nodePath = state.nodePath;
+        // Traversal only appends to the saved prefix and restores nested suffixes.
+        ValkeyModule_Assert(nodePath.size() >= state.nodePathLength);
+        nodePath.resize(state.nodePathLength);
         lex.p = state.currPathPtr;
         lex.next = state.currToken;
         currPathDepth = state.currPathDepth;
@@ -361,7 +363,7 @@ class Selector {
     JsonUtilCode recursiveSearch(JValue &v, const char *p);
     void setError(const JsonUtilCode error_code) { error = error_code; }
     JsonUtilCode getError() const { return error; }
-    void escape_member_name_for_json_pointer(const std::string_view &member_name, std::ostringstream &oss);
+    void escape_member_name_for_json_pointer(const std::string_view &member_name, jsn::string &path);
     bool validateRemainingPathSyntax() const { return isV2Path && emptyFanout && !querySyntaxParsed; }
 
     JValue *root;          // the root value, aka the document

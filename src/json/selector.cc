@@ -1070,32 +1070,30 @@ JsonUtilCode Selector::recursiveSearch(JValue &v, const char *p) {
     if (isSyntaxError(rc)) return rc;
 
     // Descend to each child (i.e., recursive descent)
+    const size_t path_length = nodePath.size();
     if (v.IsObject()) {
         for (auto &m : v.GetObject()) {
-            jsn::string path_copy = nodePath;
-            std::ostringstream oss;
-            escape_member_name_for_json_pointer(m.name.GetStringView(), oss);
-            nodePath.append("/").append(oss.str());
+            nodePath.push_back('/');
+            escape_member_name_for_json_pointer(m.name.GetStringView(), nodePath);
             incrPathDepth();
             TRACE("DEBUG", "-> recursiveSearch descend to object member " << m.name.GetStringView()
                 << ", nodePath: " << nodePath << ", currPathDepth: " << currPathDepth << ", maxPathDepth: "
                 << maxPathDepth)
             rc = recursiveSearch(m.value, p);
             decrPathDepth();
+            nodePath.resize(path_length);
             if (isSyntaxError(rc)) return rc;
-            nodePath = path_copy;
         }
     } else if (v.IsArray()) {
         for (int64_t i=0; i < v.Size(); i++) {
-            jsn::string path_copy = nodePath;
             nodePath.append("/").append(std::to_string(i));
             incrPathDepth();
             TRACE("DEBUG", "-> recursiveSearch descend to array index " << i << ", nodePath: " << nodePath
             << ", currPathDepth: " << currPathDepth << ", maxPathDepth: " << maxPathDepth)
             rc = recursiveSearch(v.GetArray()[i], p);
             decrPathDepth();
+            nodePath.resize(path_length);
             if (isSyntaxError(rc)) return rc;
-            nodePath = path_copy;
         }
     }
 
@@ -1360,9 +1358,8 @@ JsonUtilCode Selector::evalObjectMember(const StringViewHelper &member_name, JVa
     State state;
     snapshotState(state);
 
-    std::ostringstream oss;
-    escape_member_name_for_json_pointer(member_name.getView(), oss);
-    nodePath.append("/").append(oss.str());
+    nodePath.push_back('/');
+    escape_member_name_for_json_pointer(member_name.getView(), nodePath);
     TRACE("DEBUG", "evalObjectMember object member " << member_name.getView()
     << ", curr token: " << lex.currToken().type << ", remaining path: " << lex.p << ", nodePath: " << nodePath)
     JsonUtilCode rc =  evalMember(val, lex.p);
@@ -1440,9 +1437,8 @@ JsonUtilCode Selector::traverseToObjectMember(const StringViewHelper &member_nam
         return JSONUTIL_SUCCESS;
     }
 
-    std::ostringstream oss;
-    escape_member_name_for_json_pointer(member_name.getView(), oss);
-    nodePath.append("/").append(oss.str());
+    nodePath.push_back('/');
+    escape_member_name_for_json_pointer(member_name.getView(), nodePath);
     TRACE("DEBUG", "traverseToObjectMember traversed to object member "
     << member_name.getView() << ". remaining path: " << lex.p
     << ", nodePath: " << nodePath)
@@ -2504,14 +2500,14 @@ void Selector::dedupe() {
     TRACE("DEBUG", "dedupe resultSet size after dedupe: " << resultSet.size());
 }
 
-void Selector::escape_member_name_for_json_pointer(const std::string_view &member_name, std::ostringstream &oss) {
+void Selector::escape_member_name_for_json_pointer(const std::string_view &member_name, jsn::string &path) {
     for (char c : member_name) {
         if (c == '~') {
-            oss << "~0";
+            path.append("~0");
         } else if (c == '/') {
-            oss << "~1";
+            path.append("~1");
         } else {
-            oss << c;
+            path.push_back(c);
         }
     }
 }
