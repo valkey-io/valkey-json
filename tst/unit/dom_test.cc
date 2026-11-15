@@ -54,6 +54,7 @@ size_t cobsize(ValkeyModuleCtx *) {
 }
 
 extern size_t hash_function(const char *, size_t);
+extern jsn::vector<size_t> order_result_set_deepest_first(const jsn::vector<Selector::ValueInfo> &rs);
 
 /* Since unit tests run outside of Valkey server, we need to map Valkey'
  * memory management functions to cstdlib functions. */
@@ -162,6 +163,29 @@ class DomTest : public ::testing::Test {
         keyTable = nullptr;
     }
 };
+
+TEST_F(DomTest, testMutationOrderDeepestFirstStable) {
+    const jsn::vector<Selector::ValueInfo> rs = {
+        {nullptr, ""},
+        {nullptr, "/a"},
+        {nullptr, "/a/b/c"},
+        {nullptr, "/d/e"},
+        {nullptr, "/f~1g/h~0i"},
+        {nullptr, "/j"},
+        {nullptr, "/k/l/m"}
+    };
+    const jsn::vector<size_t> expected = {2, 6, 3, 4, 1, 5, 0};
+    EXPECT_EQ(order_result_set_deepest_first(rs), expected);
+}
+
+TEST_F(DomTest, testMutationOrderEmptyAndSingleton) {
+    EXPECT_TRUE(order_result_set_deepest_first({}).empty());
+    const jsn::vector<Selector::ValueInfo> root_rs = {{nullptr, ""}};
+    const jsn::vector<Selector::ValueInfo> nested_rs = {{nullptr, "/a/b/c"}};
+    const jsn::vector<size_t> expected = {0};
+    EXPECT_EQ(order_result_set_deepest_first(root_rs), expected);
+    EXPECT_EQ(order_result_set_deepest_first(nested_rs), expected);
+}
 
 TEST_F(DomTest, testParseObject) {
     JDocument *doc;

@@ -43,7 +43,7 @@ RapidJsonAllocator allocator;
 
  /**
  * Order a unique result set deepest first, using most '/' separators.
- * Ties retain original relative order via stable sort.
+ * Path depths are computed once; ties retain original relative order via stable sort.
  *
  * A size changing mutation on an array invalidates cached JValue*
  * pointers to its elements. Acting on descendants before ancestors ensures
@@ -54,11 +54,17 @@ RapidJsonAllocator allocator;
  */
 STATIC jsn::vector<size_t> order_result_set_deepest_first(const jsn::vector<Selector::ValueInfo> &rs) {
     jsn::vector<size_t> order(rs.size());
-    for (size_t i = 0; i < rs.size(); i++) order[i] = i;
-    std::stable_sort(order.begin(), order.end(), [&rs](size_t a, size_t b) {
-        size_t depth_a = std::count(rs[a].second.begin(), rs[a].second.end(), '/');
-        size_t depth_b = std::count(rs[b].second.begin(), rs[b].second.end(), '/');
-        return depth_a > depth_b;  // deeper paths first
+    if (rs.size() <= 1) {
+        if (rs.size() == 1) order[0] = 0;
+        return order;
+    }
+    jsn::vector<size_t> depths(rs.size());
+    for (size_t i = 0; i < rs.size(); i++) {
+        order[i] = i;
+        depths[i] = std::count(rs[i].second.begin(), rs[i].second.end(), '/');
+    }
+    std::stable_sort(order.begin(), order.end(), [&depths](size_t a, size_t b) {
+        return depths[a] > depths[b];  // deeper paths first
     });
     return order;
 }
